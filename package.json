@@ -1,0 +1,188 @@
+{
+  "name": "api-pilot",
+  "displayName": "API Pilot",
+  "description": "A powerful API debugging tool for VS Code, similar to Postman",
+  "version": "0.1.0",
+  "publisher": "api-pilot",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Testing",
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "api-pilot",
+          "title": "API Pilot",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "api-pilot": [
+        {
+          "id": "apiPilot.collections",
+          "name": "Collections"
+        },
+        {
+          "id": "apiPilot.history",
+          "name": "History"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "apiPilot.newRequest",
+        "title": "New Request",
+        "category": "API Pilot",
+        "icon": "$(add)"
+      },
+      {
+        "command": "apiPilot.openPanel",
+        "title": "Open API Pilot",
+        "category": "API Pilot"
+      },
+      {
+        "command": "apiPilot.newCollection",
+        "title": "New Collection",
+        "category": "API Pilot",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "apiPilot.renameCollection",
+        "title": "Rename",
+        "category": "API Pilot",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "apiPilot.deleteCollection",
+        "title": "Delete",
+        "category": "API Pilot",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "apiPilot.addFolder",
+        "title": "Add Folder",
+        "category": "API Pilot",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "apiPilot.refreshCollections",
+        "title": "Refresh",
+        "category": "API Pilot",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "apiPilot.openRequest",
+        "title": "Open Request",
+        "category": "API Pilot"
+      },
+      {
+        "command": "apiPilot.selectEnvironment",
+        "title": "Select Environment",
+        "category": "API Pilot"
+      },
+      {
+        "command": "apiPilot.manageEnvVars",
+        "title": "Manage Environment Variables",
+        "category": "API Pilot"
+      },
+      {
+        "command": "apiPilot.importCurl",
+        "title": "Import cURL",
+        "category": "API Pilot",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "apiPilot.clearHistory",
+        "title": "Clear History",
+        "category": "API Pilot",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "apiPilot.refreshHistory",
+        "title": "Refresh",
+        "category": "API Pilot",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "apiPilot.newRequest",
+          "when": "view == apiPilot.collections",
+          "group": "navigation@1"
+        },
+        {
+          "command": "apiPilot.newCollection",
+          "when": "view == apiPilot.collections",
+          "group": "navigation@2"
+        },
+        {
+          "command": "apiPilot.refreshCollections",
+          "when": "view == apiPilot.collections",
+          "group": "navigation@3"
+        },
+        {
+          "command": "apiPilot.importCurl",
+          "when": "view == apiPilot.history",
+          "group": "navigation@1"
+        },
+        {
+          "command": "apiPilot.refreshHistory",
+          "when": "view == apiPilot.history",
+          "group": "navigation@2"
+        },
+        {
+          "command": "apiPilot.clearHistory",
+          "when": "view == apiPilot.history",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "apiPilot.renameCollection",
+          "when": "view == apiPilot.collections && viewItem == collection",
+          "group": "1_modify@1"
+        },
+        {
+          "command": "apiPilot.addFolder",
+          "when": "view == apiPilot.collections && viewItem == collection",
+          "group": "1_modify@2"
+        },
+        {
+          "command": "apiPilot.deleteCollection",
+          "when": "view == apiPilot.collections && viewItem == collection",
+          "group": "2_delete"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "npm run build:extension && npm run build:webview",
+    "build:extension": "node esbuild.js --production",
+    "build:webview": "cd webview-ui && npm run build",
+    "watch": "node esbuild.js --watch",
+    "dev:webview": "cd webview-ui && npm run dev",
+    "lint": "eslint src --ext ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.6.1"
+  },
+  "dependencies": {
+    "undici": "^6.6.0"
+  }
+}

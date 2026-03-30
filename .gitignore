@@ -1,0 +1,26 @@
+# Build outputs
+dist/
+dist-webview/
+
+# Dependencies
+node_modules/
+webview-ui/node_modules/
+
+# Packaged extension
+*.vsix
+
+# Runtime workspace data
+.api-pilot/history/
+
+# IDE
+.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+docs

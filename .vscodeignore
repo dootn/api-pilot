@@ -1,0 +1,28 @@
+# Source files (compiled to dist/)
+src/
+webview-ui/
+
+# Build tooling
+esbuild.js
+vite.config.ts
+vitest.config.ts
+tsconfig*.json
+
+# Test files
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+**/__mocks__/
+
+# Dev dependencies & config
+node_modules/
+.vscode/
+.github/
+docs/
+.gitignore
+.eslintrc*
+.prettierrc*
+*.vsix
+
+# Build artifacts not needed
+dist-webview/index.html

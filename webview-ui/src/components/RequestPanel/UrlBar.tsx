@@ -1,0 +1,90 @@
+import { useTabStore } from '../../stores/tabStore';
+import type { HttpMethod } from '../../stores/requestStore';
+import { vscode } from '../../vscode';
+
+const METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'];
+
+const METHOD_CLASSES: Record<HttpMethod, string> = {
+  GET: 'method-get',
+  POST: 'method-post',
+  PUT: 'method-put',
+  DELETE: 'method-delete',
+  PATCH: 'method-patch',
+  OPTIONS: 'method-options',
+  HEAD: 'method-head',
+};
+
+export function UrlBar() {
+  const { activeTabId, tabs, updateTab } = useTabStore();
+  const tab = tabs.find((t) => t.id === activeTabId);
+  if (!tab) return null;
+
+  const handleSend = () => {
+    if (!tab.url.trim()) return;
+
+    if (tab.loading) {
+      vscode.postMessage({ type: 'cancelRequest', requestId: tab.id });
+      updateTab(tab.id, { loading: false });
+      return;
+    }
+
+    updateTab(tab.id, { loading: true, response: null, responseError: null });
+
+    vscode.postMessage({
+      type: 'sendRequest',
+      requestId: tab.id,
+      payload: {
+        id: tab.id,
+        name: tab.name,
+        method: tab.method,
+        url: tab.url.trim(),
+        params: tab.params.filter((p) => p.key),
+        headers: tab.headers.filter((h) => h.key),
+        body: tab.body,
+        auth: tab.auth,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      handleSend();
+    }
+  };
+
+  return (
+    <div className="url-bar">
+      <select
+        className={`method-select ${METHOD_CLASSES[tab.method]}`}
+        value={tab.method}
+        onChange={(e) => updateTab(tab.id, { method: e.target.value as HttpMethod })}
+      >
+        {METHODS.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+      </select>
+
+      <input
+        className="url-input"
+        type="text"
+        placeholder="Enter request URL (e.g. https://api.example.com/users)"
+        value={tab.url}
+        onChange={(e) => updateTab(tab.id, { url: e.target.value })}
+        onKeyDown={handleKeyDown}
+        spellCheck={false}
+      />
+
+      <button
+        className={`send-btn ${tab.loading ? 'cancel' : ''}`}
+        onClick={handleSend}
+        disabled={!tab.url.trim() && !tab.loading}
+      >
+        {tab.loading ? 'Cancel' : 'Send'}
+      </button>
+    </div>
+  );
+}

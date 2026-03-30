@@ -1,0 +1,134 @@
+import * as vscode from 'vscode';
+import { HistoryService } from '../services/HistoryService';
+import { HistoryEntry } from '../types';
+
+const METHOD_ICONS: Record<string, string> = {
+  GET: 'symbol-method',
+  POST: 'symbol-event',
+  PUT: 'symbol-property',
+  DELETE: 'symbol-constant',
+  PATCH: 'symbol-variable',
+};
+
+export class HistoryTreeProvider implements vscode.TreeDataProvider<HistoryTreeItem> {
+  private _onDidChangeTreeData = new vscode.EventEmitter<HistoryTreeItem | undefined | void>();
+  readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+
+  constructor(private historyService: HistoryService) {}
+
+  refresh(): void {
+    this._onDidChangeTreeData.fire();
+  }
+
+  getTreeItem(element: HistoryTreeItem): vscode.TreeItem {
+    return element;
+  }
+
+  getChildren(element?: HistoryTreeItem): Thenable<HistoryTreeItem[]> {
+    if (!element) {
+      // Root — show date groups
+      const groups = this.historyService.getDateGroups();
+      if (groups.length === 0) {
+        return Promise.resolve([
+          new HistoryTreeItem(
+            'No history yet',
+            vscode.TreeItemCollapsibleState.None,
+            'placeholder'
+          ),
+        ]);
+      }
+
+      return Promise.resolve(
+        groups.map((g) => {
+          const label = this.formatDateLabel(g.date);
+          return new HistoryTreeItem(
+            label,
+            vscode.TreeItemCollapsibleState.Collapsed,
+            'dateGroup',
+            undefined,
+            g.date,
+            `${g.count} requests`
+          );
+        })
+      );
+    }
+
+    // Children of a date group
+    if (element.groupDate) {
+      const entries = this.historyService.getByDate(element.groupDate);
+      return Promise.resolve(
+        entries.map((entry) => {
+          const time = new Date(entry.timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+          const url = this.shortenUrl(entry.request.url);
+          const status = entry.response.status;
+          const label = `${time} ${entry.request.method} ${url}`;
+
+          return new HistoryTreeItem(
+            label,
+            vscode.TreeItemCollapsibleState.None,
+            'entry',
+            entry,
+            undefined,
+            `[${status}]`
+          );
+        })
+      );
+    }
+
+    return Promise.resolve([]);
+  }
+
+  private formatDateLabel(dateKey: string): string {
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+    if (dateKey === todayKey) return 'Today';
+    if (dateKey === yesterdayKey) return 'Yesterday';
+    return dateKey;
+  }
+
+  private shortenUrl(url: string): string {
+    try {
+      const u = new URL(url);
+      return u.pathname + (u.search ? u.search : '');
+    } catch {
+      return url.length > 40 ? url.slice(0, 40) + '...' : url;
+    }
+  }
+}
+
+export class HistoryTreeItem extends vscode.TreeItem {
+  constructor(
+    public readonly label: string,
+    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
+    public readonly itemType: 'dateGroup' | 'entry' | 'placeholder',
+    public readonly entry?: HistoryEntry,
+    public readonly groupDate?: string,
+    description?: string
+  ) {
+    super(label, collapsibleState);
+    this.description = description;
+    this.contextValue = itemType;
+
+    if (itemType === 'entry' && entry) {
+      const iconId = METHOD_ICONS[entry.request.method] || 'symbol-event';
+      this.iconPath = new vscode.ThemeIcon(iconId);
+      this.command = {
+        command: 'apiPilot.openRequest',
+        title: 'Open Request',
+        arguments: [JSON.stringify(entry.request)],
+      };
+    } else if (itemType === 'dateGroup') {
+      this.iconPath = new vscode.ThemeIcon('calendar');
+    } else if (itemType === 'placeholder') {
+      this.iconPath = new vscode.ThemeIcon('info');
+    }
+  }
+}
