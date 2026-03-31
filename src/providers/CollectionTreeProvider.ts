@@ -47,6 +47,10 @@ export class CollectionTreeProvider implements vscode.TreeDataProvider<Collectio
 
     // Children of a collection or folder
     const items = element.collectionData?.items || element.folderItems || [];
+    const parentCollectionId = element.itemType === 'collection'
+      ? element.itemId
+      : element.collectionId;
+
     return Promise.resolve(
       items.map((item) => {
         if (item.type === 'folder') {
@@ -58,7 +62,9 @@ export class CollectionTreeProvider implements vscode.TreeDataProvider<Collectio
             'folder',
             item.name,
             undefined,
-            item.items
+            item.items,
+            undefined,
+            parentCollectionId
           );
         } else {
           const req = item.request;
@@ -71,7 +77,8 @@ export class CollectionTreeProvider implements vscode.TreeDataProvider<Collectio
             req?.id,
             undefined,
             undefined,
-            req ? JSON.stringify(req) : undefined
+            req ? JSON.stringify(req) : undefined,
+            parentCollectionId
           );
         }
       })
@@ -82,6 +89,7 @@ export class CollectionTreeProvider implements vscode.TreeDataProvider<Collectio
 export class CollectionTreeItem extends vscode.TreeItem {
   public collectionData?: Collection;
   public folderItems?: CollectionItem[];
+  public collectionId?: string;
 
   constructor(
     public readonly label: string,
@@ -90,11 +98,13 @@ export class CollectionTreeItem extends vscode.TreeItem {
     public readonly itemId?: string,
     collectionData?: Collection,
     folderItems?: CollectionItem[],
-    private requestData?: string
+    private requestData?: string,
+    collectionId?: string
   ) {
     super(label, collapsibleState);
     this.collectionData = collectionData;
     this.folderItems = folderItems;
+    this.collectionId = collectionId;
     this.contextValue = itemType;
 
     switch (itemType) {
@@ -113,7 +123,7 @@ export class CollectionTreeItem extends vscode.TreeItem {
           this.command = {
             command: 'apiPilot.openRequest',
             title: 'Open Request',
-            arguments: [requestData],
+            arguments: [requestData, collectionId],
           };
         }
         break;

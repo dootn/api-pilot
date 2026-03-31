@@ -1,6 +1,7 @@
 import { request } from 'undici';
 import { ApiRequest, ApiResponse, KeyValuePair } from '../types';
 import { VariableResolver } from './VariableResolver';
+import { isBinaryContentType } from './contentTypeUtils';
 
 export class HttpClient {
   private abortControllers = new Map<string, AbortController>();
@@ -28,16 +29,35 @@ export class HttpClient {
         signal: controller.signal,
       });
 
-      const responseBody = await response.body.text();
+      const flatHeaders = this.flattenHeaders(response.headers);
+      const contentTypeHeader = flatHeaders['content-type'] || flatHeaders['Content-Type'] || '';
+      const contentType = contentTypeHeader.split(';')[0].trim();
+
+      let responseBody: string;
+      let bodyBase64: string | undefined;
+      let bodySize: number;
+
+      if (this.isBinaryContentType(contentType)) {
+        const buffer = Buffer.from(await response.body.arrayBuffer());
+        bodyBase64 = buffer.toString('base64');
+        responseBody = '';
+        bodySize = buffer.byteLength;
+      } else {
+        responseBody = await response.body.text();
+        bodySize = Buffer.byteLength(responseBody, 'utf-8');
+      }
+
       const endTime = Date.now();
 
       return {
         status: response.statusCode,
         statusText: this.getStatusText(response.statusCode),
-        headers: this.flattenHeaders(response.headers),
+        headers: flatHeaders,
         body: responseBody,
-        bodySize: Buffer.byteLength(responseBody, 'utf-8'),
+        bodySize,
         time: endTime - startTime,
+        contentType: contentType || undefined,
+        bodyBase64,
       };
     } finally {
       this.abortControllers.delete(requestId);
@@ -87,6 +107,8 @@ export class HttpClient {
         headers['Content-Type'] = 'application/json';
       } else if (apiRequest.body.type === 'x-www-form-urlencoded') {
         headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      } else if (apiRequest.body.type === 'raw' && apiRequest.body.rawContentType) {
+        headers['Content-Type'] = apiRequest.body.rawContentType;
       }
     }
 
@@ -112,7 +134,7 @@ export class HttpClient {
     }
   }
 
-  private buildBody(apiRequest: ApiRequest): string | undefined {
+  private buildBody(apiRequest: ApiRequest): string | Uint8Array | undefined {
     if (['GET', 'HEAD', 'OPTIONS'].includes(apiRequest.method)) {
       return undefined;
     }
@@ -123,6 +145,11 @@ export class HttpClient {
       case 'json':
       case 'raw':
         return apiRequest.body.raw || undefined;
+      case 'binary':
+        if (apiRequest.body.binaryData) {
+          return Buffer.from(apiRequest.body.binaryData, 'base64');
+        }
+        return undefined;
       case 'graphql':
         if (apiRequest.body.graphql) {
           try {
@@ -148,6 +175,10 @@ export class HttpClient {
       default:
         return undefined;
     }
+  }
+
+  private isBinaryContentType(contentType: string): boolean {
+    return isBinaryContentType(contentType);
   }
 
   private flattenHeaders(headers: Record<string, string | string[] | undefined>): Record<string, string> {

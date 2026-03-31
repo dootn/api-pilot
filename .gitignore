@@ -10,7 +10,7 @@ webview-ui/node_modules/
 *.vsix
 
 # Runtime workspace data
-.api-pilot/history/
+.api-pilot
 
 # IDE
 .vscode/settings.json

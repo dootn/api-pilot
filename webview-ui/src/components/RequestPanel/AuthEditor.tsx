@@ -1,6 +1,13 @@
 import { useTabStore } from '../../stores/tabStore';
 import type { AuthConfig } from '../../stores/requestStore';
 
+const AUTH_TYPES: { value: AuthConfig['type']; label: string }[] = [
+  { value: 'none', label: 'None' },
+  { value: 'bearer', label: 'Bearer' },
+  { value: 'basic', label: 'Basic' },
+  { value: 'apikey', label: 'API Key' },
+];
+
 export function AuthEditor() {
   const { activeTabId, tabs, updateTab } = useTabStore();
   const tab = tabs.find((t) => t.id === activeTabId);
@@ -9,45 +16,49 @@ export function AuthEditor() {
   const auth = tab.auth;
   const setAuth = (newAuth: AuthConfig) => updateTab(tab.id, { auth: newAuth });
 
-  const handleTypeChange = (type: string) => {
-    switch (type) {
-      case 'none':
-        setAuth({ type: 'none' });
-        break;
-      case 'bearer':
-        setAuth({ type: 'bearer', token: '' });
-        break;
-      case 'basic':
-        setAuth({ type: 'basic', username: '', password: '' });
-        break;
-      case 'apikey':
-        setAuth({ type: 'apikey', key: '', value: '', in: 'header' });
-        break;
-    }
+  const handleTypeChange = (type: AuthConfig['type']) => {
+    // Preserve all existing field values — only change the active type
+    setAuth({ ...auth, type });
   };
 
   return (
     <div className="auth-editor">
-      <div className="auth-type-select">
-        <select
-          className="method-select"
-          value={auth.type}
-          onChange={(e) => handleTypeChange(e.target.value)}
-          style={{ width: '100%' }}
-        >
-          <option value="none">No Auth</option>
-          <option value="bearer">Bearer Token</option>
-          <option value="basic">Basic Auth</option>
-          <option value="apikey">API Key</option>
-        </select>
+      {/* Horizontal radio-style type selector */}
+      <div style={{ display: 'flex', gap: 2, padding: '6px 8px 4px', flexWrap: 'wrap' }}>
+        {AUTH_TYPES.map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => handleTypeChange(value)}
+            style={{
+              padding: '3px 10px',
+              fontSize: 12,
+              border: '1px solid',
+              borderRadius: 3,
+              cursor: 'pointer',
+              borderColor: auth.type === value ? 'var(--button-bg)' : 'var(--border-color)',
+              background: auth.type === value ? 'var(--button-bg)' : 'transparent',
+              color: auth.type === value ? 'var(--button-fg)' : 'var(--panel-fg)',
+              fontWeight: auth.type === value ? 600 : 400,
+              opacity: auth.type === value ? 1 : 0.75,
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
+
+      {auth.type === 'none' && (
+        <div className="empty-state" style={{ padding: '20px' }}>
+          <span style={{ opacity: 0.6 }}>No authentication</span>
+        </div>
+      )}
 
       {auth.type === 'bearer' && (
         <div className="auth-field">
           <label>Token</label>
           <input
             type="text"
-            value={auth.token}
+            value={auth.token ?? ''}
             onChange={(e) => setAuth({ ...auth, token: e.target.value })}
             placeholder="Enter bearer token"
             spellCheck={false}
@@ -61,7 +72,7 @@ export function AuthEditor() {
             <label>Username</label>
             <input
               type="text"
-              value={auth.username}
+              value={auth.username ?? ''}
               onChange={(e) => setAuth({ ...auth, username: e.target.value })}
               placeholder="Username"
               spellCheck={false}
@@ -71,7 +82,7 @@ export function AuthEditor() {
             <label>Password</label>
             <input
               type="password"
-              value={auth.password}
+              value={auth.password ?? ''}
               onChange={(e) => setAuth({ ...auth, password: e.target.value })}
               placeholder="Password"
             />
@@ -85,7 +96,7 @@ export function AuthEditor() {
             <label>Key</label>
             <input
               type="text"
-              value={auth.key}
+              value={auth.key ?? ''}
               onChange={(e) => setAuth({ ...auth, key: e.target.value })}
               placeholder="e.g. X-API-Key"
               spellCheck={false}
@@ -95,7 +106,7 @@ export function AuthEditor() {
             <label>Value</label>
             <input
               type="text"
-              value={auth.value}
+              value={auth.value ?? ''}
               onChange={(e) => setAuth({ ...auth, value: e.target.value })}
               placeholder="API key value"
               spellCheck={false}
@@ -105,7 +116,7 @@ export function AuthEditor() {
             <label>Add to</label>
             <select
               className="method-select"
-              value={auth.in}
+              value={auth.in ?? 'header'}
               onChange={(e) => setAuth({ ...auth, in: e.target.value as 'header' | 'query' })}
               style={{ width: '100%' }}
             >

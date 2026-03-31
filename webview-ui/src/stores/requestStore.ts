@@ -10,17 +10,24 @@ export interface KeyValuePair {
 }
 
 export interface RequestBody {
-  type: 'none' | 'json' | 'form-data' | 'x-www-form-urlencoded' | 'raw';
+  type: 'none' | 'json' | 'form-data' | 'x-www-form-urlencoded' | 'raw' | 'binary';
   raw?: string;
+  rawContentType?: string;
   formData?: KeyValuePair[];
   urlEncoded?: KeyValuePair[];
+  binaryPath?: string;
+  binaryName?: string;
 }
 
-export type AuthConfig =
-  | { type: 'none' }
-  | { type: 'bearer'; token: string }
-  | { type: 'basic'; username: string; password: string }
-  | { type: 'apikey'; key: string; value: string; in: 'header' | 'query' };
+export interface AuthConfig {
+  type: 'none' | 'bearer' | 'basic' | 'apikey';
+  token?: string;
+  username?: string;
+  password?: string;
+  key?: string;
+  value?: string;
+  in?: 'header' | 'query';
+}
 
 export interface ApiResponse {
   status: number;
@@ -29,6 +36,8 @@ export interface ApiResponse {
   body: string;
   bodySize: number;
   time: number;
+  contentType?: string;
+  bodyBase64?: string;
 }
 
 interface RequestState {

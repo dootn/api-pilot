@@ -1,9 +1,12 @@
 import { create } from 'zustand';
 import type { HttpMethod, KeyValuePair, RequestBody, AuthConfig, ApiResponse } from './requestStore';
+import { vscode } from '../vscode';
 
 export interface RequestTab {
   id: string;
   name: string;
+  isCustomNamed: boolean;
+  collectionId?: string;
   method: HttpMethod;
   url: string;
   params: KeyValuePair[];
@@ -17,6 +20,8 @@ export interface RequestTab {
   isDirty: boolean;
 }
 
+type PersistedTab = Omit<RequestTab, 'response' | 'responseError' | 'loading' | 'isDirty'>;
+
 interface TabState {
   tabs: RequestTab[];
   activeTabId: string;
@@ -25,7 +30,9 @@ interface TabState {
   removeTab: (id: string) => void;
   setActiveTabId: (id: string) => void;
   updateTab: (id: string, updates: Partial<RequestTab>) => void;
+  renameTab: (id: string, name: string) => void;
   getActiveTab: () => RequestTab | undefined;
+  restoreSession: (tabs: RequestTab[], activeTabId: string) => void;
 }
 
 function createDefaultTab(): RequestTab {
@@ -33,6 +40,7 @@ function createDefaultTab(): RequestTab {
   return {
     id,
     name: 'New Request',
+    isCustomNamed: false,
     method: 'GET',
     url: '',
     params: [{ key: '', value: '', enabled: true }],
@@ -45,6 +53,16 @@ function createDefaultTab(): RequestTab {
     loading: false,
     isDirty: false,
   };
+}
+
+function ensureTrailingEmpty(arr: KeyValuePair[]): KeyValuePair[] {
+  const filled = arr.filter((r) => r.key || r.value);
+  return [...filled, { key: '', value: '', enabled: true }];
+}
+
+function stripTransient(tab: RequestTab): PersistedTab {
+  const { response: _r, responseError: _re, loading: _l, isDirty: _d, ...rest } = tab;
+  return rest;
 }
 
 const initialTab = createDefaultTab();
@@ -64,6 +82,9 @@ export const useTabStore = create<TabState>((set, get) => ({
   addTabWithData: (data) => {
     const newTab = { ...createDefaultTab(), ...data };
     newTab.name = data.url ? `${data.method || 'GET'} ${new URL(data.url).pathname}` : (data.name || 'Imported Request');
+    // Ensure editable rows in params/headers (always keep a trailing empty row)
+    if (data.params !== undefined) newTab.params = ensureTrailingEmpty(data.params);
+    if (data.headers !== undefined) newTab.headers = ensureTrailingEmpty(data.headers);
     set((state) => ({
       tabs: [...state.tabs, newTab],
       activeTabId: newTab.id,
@@ -85,6 +106,12 @@ export const useTabStore = create<TabState>((set, get) => ({
 
   setActiveTabId: (id) => set({ activeTabId: id }),
 
+  renameTab: (id, name) => {
+    set((state) => ({
+      tabs: state.tabs.map((t) => (t.id === id ? { ...t, name, isCustomNamed: true } : t)),
+    }));
+  },
+
   updateTab: (id, updates) => {
     set((state) => ({
       tabs: state.tabs.map((t) =>
@@ -97,4 +124,30 @@ export const useTabStore = create<TabState>((set, get) => ({
     const state = get();
     return state.tabs.find((t) => t.id === state.activeTabId);
   },
+
+  restoreSession: (tabs, activeTabId) => {
+    const normalized = tabs.map((t) => ({
+      ...t,
+      params: ensureTrailingEmpty(t.params),
+      headers: ensureTrailingEmpty(t.headers),
+    }));
+    set({ tabs: normalized, activeTabId });
+  },
 }));
+
+// Debounced persist — save to extension (written to .api-pilot/session/tabs.json)
+let _saveTimer: ReturnType<typeof setTimeout> | null = null;
+useTabStore.subscribe((state) => {
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    const { tabs, activeTabId } = useTabStore.getState();
+    vscode.postMessage({
+      type: 'saveTabState',
+      payload: {
+        tabs: tabs.map(stripTransient),
+        activeTabId,
+        savedAt: Date.now(),
+      },
+    });
+  }, 600);
+});

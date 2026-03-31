@@ -10,9 +10,12 @@ export interface KeyValuePair {
 export interface RequestBody {
   type: 'none' | 'json' | 'form-data' | 'x-www-form-urlencoded' | 'raw' | 'binary' | 'graphql';
   raw?: string;
+  rawContentType?: string;
   formData?: KeyValuePair[];
   urlEncoded?: KeyValuePair[];
   binaryPath?: string;
+  binaryName?: string;
+  binaryData?: string;
   graphql?: { query: string; variables: string };
 }
 
@@ -45,6 +48,8 @@ export interface ApiResponse {
   body: string;
   bodySize: number;
   time: number;
+  contentType?: string;
+  bodyBase64?: string;
 }
 
 export interface HistoryEntry {

@@ -4,6 +4,10 @@
   "description": "A powerful API debugging tool for VS Code, similar to Postman",
   "version": "0.1.0",
   "publisher": "api-pilot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dootn/api-pilot"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -109,6 +113,41 @@
         "title": "Refresh",
         "category": "API Pilot",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "apiPilot.renameFolder",
+        "title": "Rename Folder",
+        "category": "API Pilot"
+      },
+      {
+        "command": "apiPilot.deleteFolder",
+        "title": "Delete Folder",
+        "category": "API Pilot"
+      },
+      {
+        "command": "apiPilot.addSubfolder",
+        "title": "Add Subfolder",
+        "category": "API Pilot"
+      },
+      {
+        "command": "apiPilot.deleteRequest",
+        "title": "Delete Request",
+        "category": "API Pilot"
+      },
+      {
+        "command": "apiPilot.openHistoryEntry",
+        "title": "Open in New Tab",
+        "category": "API Pilot"
+      },
+      {
+        "command": "apiPilot.deleteHistoryEntry",
+        "title": "Delete Entry",
+        "category": "API Pilot"
+      },
+      {
+        "command": "apiPilot.deleteHistoryGroup",
+        "title": "Delete Day",
+        "category": "API Pilot"
       }
     ],
     "menus": {
@@ -158,6 +197,41 @@
         {
           "command": "apiPilot.deleteCollection",
           "when": "view == apiPilot.collections && viewItem == collection",
+          "group": "2_delete"
+        },
+        {
+          "command": "apiPilot.addSubfolder",
+          "when": "view == apiPilot.collections && viewItem == folder",
+          "group": "1_modify@1"
+        },
+        {
+          "command": "apiPilot.renameFolder",
+          "when": "view == apiPilot.collections && viewItem == folder",
+          "group": "1_modify@2"
+        },
+        {
+          "command": "apiPilot.deleteFolder",
+          "when": "view == apiPilot.collections && viewItem == folder",
+          "group": "2_delete"
+        },
+        {
+          "command": "apiPilot.deleteRequest",
+          "when": "view == apiPilot.collections && viewItem == request",
+          "group": "2_delete"
+        },
+        {
+          "command": "apiPilot.openHistoryEntry",
+          "when": "view == apiPilot.history && viewItem == entry",
+          "group": "1_open"
+        },
+        {
+          "command": "apiPilot.deleteHistoryEntry",
+          "when": "view == apiPilot.history && viewItem == entry",
+          "group": "2_delete"
+        },
+        {
+          "command": "apiPilot.deleteHistoryGroup",
+          "when": "view == apiPilot.history && viewItem == dateGroup",
           "group": "2_delete"
         }
       ]

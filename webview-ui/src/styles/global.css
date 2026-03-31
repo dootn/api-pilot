@@ -3,7 +3,8 @@
   --panel-fg: var(--vscode-editor-foreground, #cccccc);
   --input-bg: var(--vscode-input-background, #3c3c3c);
   --input-fg: var(--vscode-input-foreground, #cccccc);
-  --input-border: var(--vscode-input-border, #3c3c3c);
+  /* vscode-input-border is undefined in most dark themes → fall back to a visible border */
+  --input-border: var(--vscode-input-border, #666666);
   --button-bg: var(--vscode-button-background, #0e639c);
   --button-fg: var(--vscode-button-foreground, #ffffff);
   --button-hover: var(--vscode-button-hoverBackground, #1177bb);
@@ -58,6 +59,11 @@ body {
   font-weight: 600;
   cursor: pointer;
   min-width: 80px;
+  outline: none;
+}
+
+.method-select:focus {
+  border-color: var(--vscode-focusBorder, #007fd4);
 }
 
 .method-select option {
@@ -445,3 +451,417 @@ body {
 .method-patch { color: #c586c0; }
 .method-options { color: #888; }
 .method-head { color: #888; }
+
+/* Environment toggle button */
+.env-toggle-btn {
+  background: transparent;
+  color: var(--panel-fg);
+  border: 1px solid var(--border-color);
+  padding: 6px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+
+.env-toggle-btn:hover {
+  opacity: 1;
+  border-color: var(--input-border);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Environment switcher bar (below URL bar) */
+.env-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--tab-inactive-bg);
+  font-size: 12px;
+}
+
+.env-switcher-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.env-switcher-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  color: var(--vscode-descriptionForeground, #888);
+  border: 1px solid transparent;
+  padding: 3px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  max-width: 260px;
+  overflow: hidden;
+}
+
+.env-switcher-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-color);
+  color: var(--panel-fg);
+}
+
+.env-switcher-btn.active {
+  color: var(--success-fg);
+}
+
+.env-switcher-dot {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.env-switcher-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.env-switcher-caret {
+  font-size: 10px;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.env-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 9998;
+  background: var(--vscode-menu-background, #252526);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  min-width: 200px;
+  max-width: 300px;
+  padding: 4px 0;
+}
+
+.env-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--panel-fg);
+}
+
+.env-dropdown-item:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+}
+
+.env-dropdown-item.selected {
+  color: var(--success-fg);
+}
+
+.env-dropdown-dot {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.env-dropdown-dot.active {
+  color: var(--success-fg);
+}
+
+.env-manage-btn {
+  background: transparent;
+  color: var(--vscode-descriptionForeground, #888);
+  border: 1px solid transparent;
+  padding: 3px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.env-manage-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-color);
+  color: var(--panel-fg);
+}
+
+/* Save to collection button */
+.save-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.save-btn {
+  background: transparent;
+  color: var(--vscode-descriptionForeground, #888);
+  border: 1px solid var(--border-color);
+  padding: 6px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--panel-fg);
+}
+
+.save-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.save-btn.saved {
+  color: var(--success-fg);
+  border-color: var(--success-fg);
+  font-size: 12px;
+}
+
+.save-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 9998;
+  background: var(--vscode-menu-background, #252526);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  min-width: 180px;
+  max-width: 260px;
+  padding: 4px 0;
+}
+
+.save-dropdown-item {
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--panel-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.save-dropdown-item:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+}
+
+/* Environment Manager Overlay */
+.env-manager-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.env-manager-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  width: 700px;
+  max-width: 95vw;
+  height: 500px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.env-manager-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.env-manager-close {
+  background: transparent;
+  border: none;
+  color: var(--panel-fg);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  opacity: 0.6;
+}
+
+.env-manager-close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.env-manager-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Environment List (left panel) */
+.env-list {
+  width: 200px;
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.env-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.env-add-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--panel-fg);
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.env-add-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--input-border);
+}
+
+.env-list-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.env-list-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.env-list-item.selected {
+  background: rgba(255, 255, 255, 0.08);
+  border-left: 2px solid var(--button-bg);
+}
+
+.env-active-btn {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  color: var(--vscode-descriptionForeground, #888);
+}
+
+.env-active-btn.active {
+  color: var(--success-fg);
+}
+
+/* Environment Editor (right panel) */
+.env-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.env-editor-top {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px 6px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.env-name-input {
+  flex: 1;
+  background: transparent;
+  color: var(--panel-fg);
+  border: 1px solid transparent;
+  padding: 4px 6px;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+}
+
+.env-name-input:hover,
+.env-name-input:focus {
+  border-color: var(--input-border);
+  background: var(--input-bg);
+}
+
+.env-editor-footer {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+/* Shared small buttons for env manager */
+.env-btn {
+  background: transparent;
+  color: var(--panel-fg);
+  border: 1px solid var(--border-color);
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.env-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--input-border);
+}
+
+.env-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.env-btn-primary {
+  background: var(--button-bg);
+  color: var(--button-fg);
+  border-color: var(--button-bg);
+}
+
+.env-btn-primary:hover:not(:disabled) {
+  background: var(--button-hover);
+  border-color: var(--button-hover);
+}
+
+.env-btn-danger {
+  background: rgba(241, 76, 76, 0.15);
+  border-color: var(--error-fg);
+  color: var(--error-fg);
+}
+
+.env-btn-danger:hover:not(:disabled) {
+  background: rgba(241, 76, 76, 0.3);
+}

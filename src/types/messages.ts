@@ -20,6 +20,21 @@ export interface ReadyMessage {
   type: 'ready';
 }
 
+export interface CreateEnvironmentMessage {
+  type: 'createEnvironment';
+  payload: { name: string };
+}
+
+export interface UpdateEnvironmentMessage {
+  type: 'updateEnvironment';
+  payload: { env: import('./index').Environment };
+}
+
+export interface DeleteEnvironmentMessage {
+  type: 'deleteEnvironment';
+  payload: { id: string };
+}
+
 // Extension -> Webview messages
 export interface RequestResultMessage {
   type: 'requestResult';

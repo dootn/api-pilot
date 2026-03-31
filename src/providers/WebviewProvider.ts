@@ -8,6 +8,9 @@ export interface WebviewServices {
   collectionService?: CollectionService;
   envService?: EnvService;
   historyService?: HistoryService;
+  storageService?: import('../services/StorageService').StorageService;
+  onCollectionChanged?: () => void;
+  onHistoryChanged?: () => void;
 }
 
 export class WebviewProvider implements vscode.WebviewViewProvider {
@@ -42,7 +45,10 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
       webviewView.webview,
       WebviewProvider.services.collectionService,
       WebviewProvider.services.envService,
-      WebviewProvider.services.historyService
+      WebviewProvider.services.historyService,
+      WebviewProvider.services.storageService,
+      WebviewProvider.services.onCollectionChanged,
+      WebviewProvider.services.onHistoryChanged
     );
 
     webviewView.webview.onDidReceiveMessage((message) => {
@@ -73,7 +79,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data: blob:; media-src ${webview.cspSource} data: blob:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
   <link rel="stylesheet" href="${styleUri}">
   <title>API Pilot</title>
 </head>
@@ -103,7 +109,10 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
       panel.webview,
       WebviewProvider.services.collectionService,
       WebviewProvider.services.envService,
-      WebviewProvider.services.historyService
+      WebviewProvider.services.historyService,
+      WebviewProvider.services.storageService,
+      WebviewProvider.services.onCollectionChanged,
+      WebviewProvider.services.onHistoryChanged
     );
 
     panel.webview.onDidReceiveMessage((message) => {
@@ -128,7 +137,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${panel.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${panel.webview.cspSource};">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${panel.webview.cspSource} data: blob:; media-src ${panel.webview.cspSource} data: blob:; style-src ${panel.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${panel.webview.cspSource};">
   <link rel="stylesheet" href="${styleUri}">
   <title>API Pilot</title>
 </head>

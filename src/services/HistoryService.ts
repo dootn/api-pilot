@@ -1,11 +1,15 @@
 import { randomUUID } from 'crypto';
 import { StorageService } from './StorageService';
 import { HistoryEntry, ApiRequest, ApiResponse } from '../types';
+import { isBinaryContentType } from './contentTypeUtils';
 
 const HISTORY_DIR = 'history';
 const MAX_HISTORY_PER_DAY = 200;
 
 export class HistoryService {
+  /** Per-instance counter ensures filenames are unique within the same millisecond */
+  private addCounter = 0;
+
   constructor(private storage: StorageService) {}
 
   add(request: ApiRequest, response: ApiResponse): HistoryEntry {
@@ -17,32 +21,45 @@ export class HistoryService {
     };
 
     const dateKey = this.getDateKey(entry.timestamp);
-    const entries = this.getEntriesForDate(dateKey);
-    entries.unshift(entry);
+    const dateDir = `${HISTORY_DIR}/${dateKey}`;
 
-    // Limit per day
-    if (entries.length > MAX_HISTORY_PER_DAY) {
-      entries.length = MAX_HISTORY_PER_DAY;
+    // Enforce per-day limit: delete oldest entry (and its body file) when at capacity
+    const existing = this.storage.listFiles(dateDir);
+    if (existing.length >= MAX_HISTORY_PER_DAY) {
+      const oldest = [...existing].sort()[0];
+      const oldBase = oldest.replace('.json', '');
+      this.storage.deleteFile(dateDir, oldest);
+      this.storage.deleteFile(dateDir, `${oldBase}.body`);
     }
 
-    this.storage.writeJson(HISTORY_DIR, `${dateKey}.json`, entries);
+    const seq = String(this.addCounter++).padStart(6, '0');
+    const base = `${entry.timestamp}_${seq}_${entry.id}`;
+
+    // Store response body as raw bytes in a separate file (text: UTF-8; binary: raw bytes)
+    const entryWithoutBody: HistoryEntry = {
+      ...entry,
+      response: { ...response, body: '', bodyBase64: undefined },
+    };
+    this.storage.writeJson(dateDir, `${base}.json`, entryWithoutBody);
+
+    if (response.bodyBase64) {
+      // Decode base64 back to raw bytes before storing — no redundant encoding
+      this.storage.writeRaw(dateDir, `${base}.body`, Buffer.from(response.bodyBase64, 'base64'));
+    } else if (response.body) {
+      this.storage.writeRaw(dateDir, `${base}.body`, Buffer.from(response.body, 'utf-8'));
+    }
+
     return entry;
   }
 
-  getRecent(limit: number = 50): HistoryEntry[] {
-    const files = this.storage.listFiles(HISTORY_DIR);
-    // Sort by date descending
-    files.sort((a, b) => b.localeCompare(a));
-
+  getRecent(limit = 50): HistoryEntry[] {
+    const dateDirs = this.storage.listDirs(HISTORY_DIR).sort().reverse();
     const results: HistoryEntry[] = [];
-    for (const file of files) {
+    for (const dir of dateDirs) {
       if (results.length >= limit) break;
-      const entries = this.storage.readJson<HistoryEntry[]>(HISTORY_DIR, file);
-      if (entries) {
-        results.push(...entries);
-      }
+      const entries = this.getEntriesForDate(dir);
+      results.push(...entries.slice(0, limit - results.length));
     }
-
     return results.slice(0, limit);
   }
 
@@ -51,24 +68,63 @@ export class HistoryService {
   }
 
   getDateGroups(): { date: string; count: number }[] {
-    const files = this.storage.listFiles(HISTORY_DIR);
-    files.sort((a, b) => b.localeCompare(a));
-    return files.map((file) => {
-      const dateKey = file.replace('.json', '');
-      const entries = this.storage.readJson<HistoryEntry[]>(HISTORY_DIR, file);
-      return { date: dateKey, count: entries?.length || 0 };
-    });
+    const dirs = this.storage.listDirs(HISTORY_DIR);
+    dirs.sort((a, b) => b.localeCompare(a));
+    return dirs.map((dir) => ({
+      date: dir,
+      count: this.storage.listFiles(`${HISTORY_DIR}/${dir}`).length,
+    }));
   }
 
   clear(): void {
-    const files = this.storage.listFiles(HISTORY_DIR);
-    for (const file of files) {
-      this.storage.deleteFile(HISTORY_DIR, file);
+    const dirs = this.storage.listDirs(HISTORY_DIR);
+    for (const dir of dirs) {
+      this.storage.deleteDir(`${HISTORY_DIR}/${dir}`);
     }
   }
 
+  deleteEntry(id: string): boolean {
+    const dirs = this.storage.listDirs(HISTORY_DIR);
+    for (const dir of dirs) {
+      const dateDir = `${HISTORY_DIR}/${dir}`;
+      const files = this.storage.listFiles(dateDir);
+      const file = files.find((f) => f.endsWith('.json') && f.includes(id));
+      if (file) {
+        const base = file.replace('.json', '');
+        this.storage.deleteFile(dateDir, file);
+        this.storage.deleteFile(dateDir, `${base}.body`);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  deleteGroup(dateKey: string): boolean {
+    return this.storage.deleteDir(`${HISTORY_DIR}/${dateKey}`);
+  }
+
   private getEntriesForDate(dateKey: string): HistoryEntry[] {
-    return this.storage.readJson<HistoryEntry[]>(HISTORY_DIR, `${dateKey}.json`) || [];
+    const dateDir = `${HISTORY_DIR}/${dateKey}`;
+    const files = this.storage.listFiles(dateDir);
+    return files
+      .sort((a, b) => b.localeCompare(a)) // descending → newest first
+      .map((f) => {
+        const entry = this.storage.readJson<HistoryEntry>(dateDir, f);
+        if (!entry) return null;
+        const base = f.replace('.json', '');
+        const bodyBuf = this.storage.readRaw(dateDir, `${base}.body`);
+        if (bodyBuf) {
+          const ct = entry.response.contentType ?? '';
+          if (ct && isBinaryContentType(ct)) {
+            // Re-encode to base64 for the webview (message protocol requires serializable data)
+            entry.response.bodyBase64 = bodyBuf.toString('base64');
+          } else {
+            entry.response.body = bodyBuf.toString('utf-8');
+          }
+        }
+        return entry;
+      })
+      .filter((e): e is HistoryEntry => e !== null);
   }
 
   private getDateKey(timestamp: number): string {
@@ -76,3 +132,4 @@ export class HistoryService {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 }
+

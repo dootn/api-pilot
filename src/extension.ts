@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import { WebviewProvider } from './providers/WebviewProvider';
 import { CollectionTreeProvider } from './providers/CollectionTreeProvider';
 import { HistoryTreeProvider } from './providers/HistoryTreeProvider';
-import { EnvStatusBarItem } from './providers/EnvStatusBarItem';
 import { StorageService } from './services/StorageService';
 import { CollectionService } from './services/CollectionService';
 import { EnvService } from './services/EnvService';
@@ -18,16 +17,6 @@ export function activate(context: vscode.ExtensionContext) {
   const envService = new EnvService(storageService);
   const historyService = new HistoryService(storageService);
 
-  // Register sidebar webview provider
-  const webviewProvider = new WebviewProvider(context.extensionUri, {
-    collectionService,
-    envService,
-    historyService,
-  });
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider('apiPilot.mainView', webviewProvider)
-  );
-
   // Register collection tree
   const collectionTreeProvider = new CollectionTreeProvider(collectionService);
   context.subscriptions.push(
@@ -38,6 +27,19 @@ export function activate(context: vscode.ExtensionContext) {
   const historyTreeProvider = new HistoryTreeProvider(historyService);
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider('apiPilot.history', historyTreeProvider)
+  );
+
+  // Register sidebar webview provider
+  const webviewProvider = new WebviewProvider(context.extensionUri, {
+    collectionService,
+    envService,
+    historyService,
+    storageService,
+    onCollectionChanged: () => collectionTreeProvider.refresh(),
+    onHistoryChanged: () => historyTreeProvider.refresh(),
+  });
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider('apiPilot.mainView', webviewProvider)
   );
 
   // Open a new request panel
@@ -55,13 +57,14 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Open a saved request
   context.subscriptions.push(
-    vscode.commands.registerCommand('apiPilot.openRequest', (requestData: string) => {
+    vscode.commands.registerCommand('apiPilot.openRequest', (requestData: string, collectionId?: string) => {
       const panel = WebviewProvider.createPanel(context.extensionUri);
       // Send the request data to the webview after it's ready
       setTimeout(() => {
+        const parsed = JSON.parse(requestData);
         panel.webview.postMessage({
           type: 'loadRequest',
-          payload: JSON.parse(requestData),
+          payload: collectionId ? { ...parsed, collectionId } : parsed,
         });
       }, 500);
     })
@@ -138,10 +141,6 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Environment status bar
-  const envStatusBar = new EnvStatusBarItem(envService);
-  context.subscriptions.push({ dispose: () => envStatusBar.dispose() });
-
   // Select environment
   context.subscriptions.push(
     vscode.commands.registerCommand('apiPilot.selectEnvironment', async () => {
@@ -180,7 +179,6 @@ export function activate(context: vscode.ExtensionContext) {
           envService.setActiveEnvId(env.id);
         }
       }
-      envStatusBar.update();
     })
   );
 
@@ -265,6 +263,113 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('apiPilot.refreshHistory', () => {
       historyTreeProvider.refresh();
+    })
+  );
+
+  // Rename folder in collection
+  context.subscriptions.push(
+    vscode.commands.registerCommand('apiPilot.renameFolder', async (item: { collectionId?: string; itemId?: string; label: string }) => {
+      if (!item.collectionId || !item.itemId) return;
+      const newName = await vscode.window.showInputBox({
+        prompt: 'Rename folder',
+        value: item.label,
+        validateInput: (v) => (v.trim() ? null : 'Name is required'),
+      });
+      if (newName) {
+        collectionService.renameFolder(item.collectionId, item.itemId, newName.trim());
+        collectionTreeProvider.refresh();
+      }
+    })
+  );
+
+  // Delete folder from collection
+  context.subscriptions.push(
+    vscode.commands.registerCommand('apiPilot.deleteFolder', async (item: { collectionId?: string; itemId?: string; label: string }) => {
+      if (!item.collectionId || !item.itemId) return;
+      const confirm = await vscode.window.showWarningMessage(
+        `Delete folder "${item.label}" and all its contents?`,
+        { modal: true },
+        'Delete'
+      );
+      if (confirm === 'Delete') {
+        collectionService.removeItem(item.collectionId, item.itemId);
+        collectionTreeProvider.refresh();
+      }
+    })
+  );
+
+  // Add subfolder to a folder
+  context.subscriptions.push(
+    vscode.commands.registerCommand('apiPilot.addSubfolder', async (item: { collectionId?: string; itemId?: string }) => {
+      if (!item.collectionId || !item.itemId) return;
+      const name = await vscode.window.showInputBox({
+        prompt: 'Subfolder name',
+        placeHolder: 'New Folder',
+        validateInput: (v) => (v.trim() ? null : 'Name is required'),
+      });
+      if (name) {
+        collectionService.addFolder(item.collectionId, name.trim(), item.itemId);
+        collectionTreeProvider.refresh();
+      }
+    })
+  );
+
+  // Delete request from collection
+  context.subscriptions.push(
+    vscode.commands.registerCommand('apiPilot.deleteRequest', async (item: { collectionId?: string; itemId?: string; label: string }) => {
+      if (!item.collectionId || !item.itemId) return;
+      const confirm = await vscode.window.showWarningMessage(
+        `Delete "${item.label}"?`,
+        { modal: true },
+        'Delete'
+      );
+      if (confirm === 'Delete') {
+        collectionService.removeItem(item.collectionId, item.itemId);
+        collectionTreeProvider.refresh();
+      }
+    })
+  );
+
+  // Open history entry in new tab
+  context.subscriptions.push(
+    vscode.commands.registerCommand('apiPilot.openHistoryEntry', (item: { entry?: import('./types').HistoryEntry }) => {
+      if (!item.entry) return;
+      const panel = WebviewProvider.createPanel(context.extensionUri);
+      setTimeout(() => {
+        panel.webview.postMessage({ type: 'loadRequest', payload: item.entry!.request });
+      }, 500);
+    })
+  );
+
+  // Delete single history entry
+  context.subscriptions.push(
+    vscode.commands.registerCommand('apiPilot.deleteHistoryEntry', async (item: { entry?: import('./types').HistoryEntry }) => {
+      if (!item.entry) return;
+      const confirm = await vscode.window.showWarningMessage(
+        'Delete this history entry?',
+        { modal: true },
+        'Delete'
+      );
+      if (confirm === 'Delete') {
+        historyService.deleteEntry(item.entry.id);
+        historyTreeProvider.refresh();
+      }
+    })
+  );
+
+  // Delete history date group
+  context.subscriptions.push(
+    vscode.commands.registerCommand('apiPilot.deleteHistoryGroup', async (item: { groupDate?: string; label: string }) => {
+      if (!item.groupDate) return;
+      const confirm = await vscode.window.showWarningMessage(
+        `Delete all history for "${item.label}"?`,
+        { modal: true },
+        'Delete'
+      );
+      if (confirm === 'Delete') {
+        historyService.deleteGroup(item.groupDate);
+        historyTreeProvider.refresh();
+      }
     })
   );
 }

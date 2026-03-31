@@ -8,6 +8,8 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
+**[English](./README_en.md) | [中文](./README_zh.md)**
+
 ---
 
 ## Features / 功能特性
