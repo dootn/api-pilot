@@ -17,6 +17,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'apiPilot.mainPanel';
 
   private static services: WebviewServices = {};
+  private static currentPanel: vscode.WebviewPanel | undefined;
   private view?: vscode.WebviewView;
   private messageHandler?: MessageHandler;
 
@@ -91,6 +92,12 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   }
 
   public static createPanel(extensionUri: vscode.Uri): vscode.WebviewPanel {
+    // If panel already exists, reveal it and return
+    if (WebviewProvider.currentPanel) {
+      WebviewProvider.currentPanel.reveal(vscode.ViewColumn.One);
+      return WebviewProvider.currentPanel;
+    }
+
     const panel = vscode.window.createWebviewPanel(
       'apiPilot.panel',
       'API Pilot',
@@ -104,6 +111,9 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         ],
       }
     );
+
+    // Store the panel reference
+    WebviewProvider.currentPanel = panel;
 
     const messageHandler = new MessageHandler(
       panel.webview,
@@ -121,6 +131,8 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 
     panel.onDidDispose(() => {
       messageHandler.dispose();
+      // Clear the panel reference when disposed
+      WebviewProvider.currentPanel = undefined;
     });
 
     const distPath = vscode.Uri.joinPath(extensionUri, 'dist-webview');

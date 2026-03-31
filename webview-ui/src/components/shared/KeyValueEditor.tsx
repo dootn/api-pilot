@@ -1,13 +1,16 @@
 import { type KeyValuePair } from '../../stores/requestStore';
+import { VarInput } from '../../utils/varHighlight';
 
 interface Props {
   items: KeyValuePair[];
   onChange: (items: KeyValuePair[]) => void;
   keyPlaceholder?: string;
   valuePlaceholder?: string;
+  /** When provided, {{var}} tokens in key/value cells are highlighted. */
+  knownVarNames?: Set<string>;
 }
 
-export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valuePlaceholder = 'Value' }: Props) {
+export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valuePlaceholder = 'Value', knownVarNames }: Props) {
   const updateItem = (index: number, field: keyof KeyValuePair, value: string | boolean) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
@@ -37,18 +40,20 @@ export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valueP
             checked={item.enabled}
             onChange={(e) => updateItem(index, 'enabled', e.target.checked)}
           />
-          <input
+          <VarInput
             className="kv-input"
             placeholder={keyPlaceholder}
             value={item.key}
-            onChange={(e) => updateItem(index, 'key', e.target.value)}
+            onChange={(v) => updateItem(index, 'key', v)}
+            knownVarNames={knownVarNames}
             spellCheck={false}
           />
-          <input
+          <VarInput
             className="kv-input"
             placeholder={valuePlaceholder}
             value={item.value}
-            onChange={(e) => updateItem(index, 'value', e.target.value)}
+            onChange={(v) => updateItem(index, 'value', v)}
+            knownVarNames={knownVarNames}
             spellCheck={false}
           />
           <button

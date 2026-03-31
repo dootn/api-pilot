@@ -1,11 +1,13 @@
 import * as vscode from 'vscode';
 import { HttpClient } from '../services/HttpClient';
+import { ScriptRunner } from '../services/ScriptRunner';
 import { CollectionService } from '../services/CollectionService';
 import { EnvService } from '../services/EnvService';
 import { HistoryService } from '../services/HistoryService';
 import { StorageService } from '../services/StorageService';
+import { exportCurl } from '../services/CurlExporter';
 import { WebviewMessage } from '../types/messages';
-import { ApiRequest, Environment } from '../types';
+import { ApiRequest, ConsoleEntry, Environment } from '../types';
 
 const SESSION_DIR = 'session';
 const SESSION_FILE = 'tabs.json';
@@ -31,6 +33,7 @@ interface TabSession {
 
 export class MessageHandler {
   private httpClient: HttpClient;
+  private scriptRunner: ScriptRunner;
 
   constructor(
     private webview: vscode.Webview,
@@ -42,6 +45,7 @@ export class MessageHandler {
     private onHistoryChanged?: () => void
   ) {
     this.httpClient = new HttpClient();
+    this.scriptRunner = new ScriptRunner();
   }
 
   async handle(message: WebviewMessage): Promise<void> {
@@ -90,6 +94,12 @@ export class MessageHandler {
       case 'selectBinaryFile':
         await this.handleSelectBinaryFile(message.requestId!);
         break;
+      case 'selectFormDataFile':
+        await this.handleSelectFormDataFile(message.requestId!, (message.payload as { fieldKey: string }).fieldKey);
+        break;
+      case 'copyAsCurl':
+        await this.handleCopyAsCurl(message.payload as ApiRequest);
+        break;
       case 'ready':
         this.handleReady();
         break;
@@ -110,14 +120,40 @@ export class MessageHandler {
         }
       }
 
+      // Pre-read form-data files if needed
+      if (apiRequest.body.type === 'form-data' && apiRequest.body.formData) {
+        for (const field of apiRequest.body.formData) {
+          if (field.type === 'file' && field.filePath) {
+            try {
+              const data = await vscode.workspace.fs.readFile(vscode.Uri.file(field.filePath));
+              field.fileData = Buffer.from(data).toString('base64');
+            } catch {
+              // ignore read error — HttpClient will skip this field
+            }
+          }
+        }
+      }
+
+      const envVariables = this.envService?.getActiveVariables() || [];
+      const consoleEntries: ConsoleEntry[] = [];
+
+      // Run pre-request script (may modify headers, params, url, etc.)
+      if (apiRequest.preScript?.trim()) {
+        apiRequest = this.scriptRunner.runPreScript(apiRequest.preScript, apiRequest, envVariables, consoleEntries);
+      }
+
       this.webview.postMessage({
         type: 'requestProgress',
         requestId,
         payload: { status: 'sending' },
       });
 
-      const envVariables = this.envService?.getActiveVariables() || [];
       const response = await this.httpClient.send(apiRequest, requestId, envVariables);
+
+      // Run post-response script and collect test results
+      const testResults = apiRequest.postScript?.trim()
+        ? this.scriptRunner.runPostScript(apiRequest.postScript, apiRequest, response, envVariables, consoleEntries)
+        : [];
 
       // Record to history
       this.historyService?.add(apiRequest, response);
@@ -126,7 +162,7 @@ export class MessageHandler {
       this.webview.postMessage({
         type: 'requestResult',
         requestId,
-        payload: response,
+        payload: { ...response, testResults, consoleEntries },
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -246,6 +282,15 @@ export class MessageHandler {
     }
     // Also send current environments
     this.handleGetEnvironments();
+    // Send locale based on settings then VS Code language
+    const configLocale = vscode.workspace.getConfiguration('api-pilot').get<string>('locale', 'auto');
+    let locale = 'en';
+    if (configLocale === 'auto') {
+      locale = vscode.env.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
+    } else if (configLocale === 'zh-CN' || configLocale === 'en') {
+      locale = configLocale;
+    }
+    this.webview.postMessage({ type: 'setLocale', payload: locale });
   }
 
   private handleSaveTabState(session: TabSession): void {
@@ -290,6 +335,28 @@ export class MessageHandler {
         payload: { path: filePath, name },
       });
     }
+  }
+
+  private async handleSelectFormDataFile(requestId: string, fieldKey: string): Promise<void> {
+    const uris = await vscode.window.showOpenDialog({
+      canSelectMany: false,
+      openLabel: 'Select File',
+    });
+    if (uris && uris[0]) {
+      const filePath = uris[0].fsPath;
+      const name = filePath.split('/').pop() || filePath.split('\\').pop() || 'file';
+      this.webview.postMessage({
+        type: 'formDataFilePicked',
+        requestId,
+        payload: { fieldKey, path: filePath, name },
+      });
+    }
+  }
+
+  private async handleCopyAsCurl(request: ApiRequest): Promise<void> {
+    const curl = exportCurl(request);
+    await vscode.env.clipboard.writeText(curl);
+    vscode.window.showInformationMessage('cURL copied to clipboard.');
   }
 
   dispose(): void {

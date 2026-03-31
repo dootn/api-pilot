@@ -6,9 +6,11 @@ import { searchHeaders, getHeaderValues } from '../../data/httpHeaders';
 interface Props {
   items: KeyValuePair[];
   onChange: (items: KeyValuePair[]) => void;
+  /** When provided, {{var}} tokens in value cells are highlighted. */
+  knownVarNames?: Set<string>;
 }
 
-export function HeadersEditor({ items, onChange }: Props) {
+export function HeadersEditor({ items, onChange, knownVarNames }: Props) {
   const updateItem = (index: number, field: keyof KeyValuePair, value: string | boolean) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
@@ -37,6 +39,7 @@ export function HeadersEditor({ items, onChange }: Props) {
           onUpdate={(field, value) => updateItem(index, field, value)}
           onRemove={() => removeItem(index)}
           canRemove={items.length > 1}
+          knownVarNames={knownVarNames}
         />
       ))}
     </div>
@@ -48,9 +51,10 @@ interface RowProps {
   onUpdate: (field: keyof KeyValuePair, value: string | boolean) => void;
   onRemove: () => void;
   canRemove: boolean;
+  knownVarNames?: Set<string>;
 }
 
-function HeaderRow({ item, onUpdate, onRemove, canRemove }: RowProps) {
+function HeaderRow({ item, onUpdate, onRemove, canRemove, knownVarNames }: RowProps) {
   const keySuggestions = useMemo(
     () =>
       searchHeaders(item.key).map((h) => ({
@@ -84,6 +88,7 @@ function HeaderRow({ item, onUpdate, onRemove, canRemove }: RowProps) {
         onChange={(val) => onUpdate('value', val)}
         suggestions={valueSuggestions}
         placeholder="Value"
+        knownVarNames={knownVarNames}
       />
       <button
         className="kv-delete-btn"

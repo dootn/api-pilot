@@ -2,14 +2,6 @@ import * as vscode from 'vscode';
 import { HistoryService } from '../services/HistoryService';
 import { HistoryEntry } from '../types';
 
-const METHOD_ICONS: Record<string, string> = {
-  GET: 'symbol-method',
-  POST: 'symbol-event',
-  PUT: 'symbol-property',
-  DELETE: 'symbol-constant',
-  PATCH: 'symbol-variable',
-};
-
 export class HistoryTreeProvider implements vscode.TreeDataProvider<HistoryTreeItem> {
   private _onDidChangeTreeData = new vscode.EventEmitter<HistoryTreeItem | undefined | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
@@ -58,13 +50,10 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<HistoryTreeI
       const entries = this.historyService.getByDate(element.groupDate);
       return Promise.resolve(
         entries.map((entry) => {
-          const time = new Date(entry.timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          });
           const url = this.shortenUrl(entry.request.url);
           const status = entry.response.status;
-          const label = `${time} ${entry.request.method} ${url}`;
+          // Include method name in the label
+          const label = `${entry.request.method} ${url}`;
 
           return new HistoryTreeItem(
             label,
@@ -72,7 +61,8 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<HistoryTreeI
             'entry',
             entry,
             undefined,
-            `[${status}]`
+            `[${status}]`,
+            entry.request.method
           );
         })
       );
@@ -111,15 +101,16 @@ export class HistoryTreeItem extends vscode.TreeItem {
     public readonly itemType: 'dateGroup' | 'entry' | 'placeholder',
     public readonly entry?: HistoryEntry,
     public readonly groupDate?: string,
-    description?: string
+    description?: string,
+    method?: string
   ) {
     super(label, collapsibleState);
     this.description = description;
     this.contextValue = itemType;
 
     if (itemType === 'entry' && entry) {
-      const iconId = METHOD_ICONS[entry.request.method] || 'symbol-event';
-      this.iconPath = new vscode.ThemeIcon(iconId);
+      // Remove icon to show method name as text only
+      // this.iconPath = new vscode.ThemeIcon(iconId);
       this.command = {
         command: 'apiPilot.openRequest',
         title: 'Open Request',

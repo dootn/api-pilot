@@ -5,12 +5,16 @@ import { ResponsePanel } from './components/ResponsePanel/ResponsePanel';
 import { useVscodeMessage } from './hooks/useVscodeMessage';
 import { useTabStore, type RequestTab } from './stores/tabStore';
 import type { ApiResponse } from './stores/requestStore';
+import { useLocaleStore } from './stores/localeStore';
 import { vscode } from './vscode';
 
 function App() {
+  const tabs = useTabStore((s) => s.tabs);
   const updateTab = useTabStore((s) => s.updateTab);
   const addTabWithData = useTabStore((s) => s.addTabWithData);
+  const setActiveTabId = useTabStore((s) => s.setActiveTabId);
   const restoreSession = useTabStore((s) => s.restoreSession);
+  const setLocale = useLocaleStore((s) => s.setLocale);
 
   // Drag-to-resize state
   const [splitPercent, setSplitPercent] = useState(50);
@@ -43,7 +47,26 @@ function App() {
       switch (message.type) {
         case 'loadRequest': {
           const request = message.payload as Partial<RequestTab>;
+          
+          // Check if the same request is already open in a tab
+          if (request.id && request.collectionId) {
+            const existingTab = tabs.find(
+              (t) => t.id === request.id && t.collectionId === request.collectionId
+            );
+            
+            if (existingTab) {
+              // Switch to the existing tab instead of creating a new one
+              setActiveTabId(existingTab.id);
+              return;
+            }
+          }
+          
+          // Otherwise, add a new tab with the request data
           addTabWithData(request || {});
+          return;
+        }
+        case 'setLocale': {
+          setLocale(message.payload as 'en' | 'zh-CN');
           return;
         }
         case 'loadTabState': {
@@ -90,7 +113,7 @@ function App() {
           break;
       }
     },
-    [updateTab, addTabWithData, restoreSession]
+    [updateTab, addTabWithData, restoreSession, tabs, setActiveTabId, setLocale]
   );
 
   useVscodeMessage(handleMessage);
@@ -100,9 +123,9 @@ function App() {
       <TabBar />
       <div
         ref={innerRef}
-        style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
       >
-        <div style={{ height: `${splitPercent}%`, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+        <div style={{ height: `${splitPercent}%`, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <RequestPanel />
         </div>
         <div
@@ -117,7 +140,7 @@ function App() {
           onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--button-bg)')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--border-color)')}
         />
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <ResponsePanel />
         </div>
       </div>

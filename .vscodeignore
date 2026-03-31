@@ -26,3 +26,5 @@ docs/
 
 # Build artifacts not needed
 dist-webview/index.html
+
+.api-pilot

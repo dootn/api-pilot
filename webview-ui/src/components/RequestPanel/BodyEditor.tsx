@@ -1,8 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTabStore } from '../../stores/tabStore';
-import type { RequestBody, KeyValuePair } from '../../stores/requestStore';
+import type { RequestBody, KeyValuePair, FormDataField } from '../../stores/requestStore';
 import { KeyValueEditor } from '../shared/KeyValueEditor';
+import { FormDataEditor } from '../shared/FormDataEditor';
 import { vscode } from '../../vscode';
+import { useI18n } from '../../i18n';
+import { useEnvironments } from '../../hooks/useEnvironments';
 
 const BODY_TYPES: { value: RequestBody['type']; label: string }[] = [
   { value: 'none', label: 'none' },
@@ -10,6 +13,7 @@ const BODY_TYPES: { value: RequestBody['type']; label: string }[] = [
   { value: 'form-data', label: 'form-data' },
   { value: 'x-www-form-urlencoded', label: 'urlencoded' },
   { value: 'raw', label: 'raw' },
+  { value: 'graphql', label: 'GraphQL' },
   { value: 'binary', label: 'file' },
 ];
 
@@ -24,6 +28,14 @@ const RAW_CONTENT_TYPES: { value: string; label: string }[] = [
 export function BodyEditor() {
   const { activeTabId, tabs, updateTab } = useTabStore();
   const tab = tabs.find((t) => t.id === activeTabId);
+  const t = useI18n();
+  const { environments, activeEnvId } = useEnvironments();
+
+  const knownVarNames = useMemo(() => {
+    const env = environments.find((e) => e.id === activeEnvId);
+    const vars = (env?.variables ?? []).filter((v) => v.enabled).map((v) => v.key);
+    return new Set(vars);
+  }, [environments, activeEnvId]);
 
   // Listen for filePicked response from extension
   useEffect(() => {
@@ -51,11 +63,18 @@ export function BodyEditor() {
     if ((type === 'json' || type === 'raw') && !newBody.raw) {
       newBody.raw = type === 'json' ? '{\n  \n}' : '';
     }
+    // Set default raw content type to text/plain if not set
+    if (type === 'raw' && !newBody.rawContentType) {
+      newBody.rawContentType = 'text/plain';
+    }
     if (type === 'x-www-form-urlencoded' && !newBody.urlEncoded) {
       newBody.urlEncoded = [{ key: '', value: '', enabled: true }];
     }
     if (type === 'form-data' && !newBody.formData) {
-      newBody.formData = [{ key: '', value: '', enabled: true }];
+      newBody.formData = [{ key: '', value: '', enabled: true, type: 'text' }];
+    }
+    if (type === 'graphql' && !newBody.graphql) {
+      newBody.graphql = { query: '', variables: '' };
     }
     setBody(newBody);
   };
@@ -85,9 +104,10 @@ export function BodyEditor() {
           </button>
         ))}
 
-        {/* Content-Type sub-selector for raw */}
+        {/* Content-Type sub-selector for raw (optional) */}
         {body.type === 'raw' && (
-          <span style={{ display: 'flex', gap: 2, marginLeft: 8, borderLeft: '1px solid var(--border-color)', paddingLeft: 8 }}>
+          <span style={{ display: 'flex', gap: 2, marginLeft: 8, borderLeft: '1px solid var(--border-color)', paddingLeft: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 10, opacity: 0.6 }}>类型:</span>
             {RAW_CONTENT_TYPES.map(({ value, label }) => (
               <button
                 key={value}
@@ -113,7 +133,7 @@ export function BodyEditor() {
 
       {body.type === 'none' && (
         <div className="empty-state" style={{ padding: '20px' }}>
-          <span style={{ opacity: 0.6 }}>This request does not have a body</span>
+          <span style={{ opacity: 0.6 }}>{t('noBodyMsg')}</span>
         </div>
       )}
 
@@ -122,7 +142,7 @@ export function BodyEditor() {
           className="body-textarea"
           value={body.raw || ''}
           onChange={(e) => setBody({ ...body, raw: e.target.value })}
-          placeholder={body.type === 'json' ? '{\n  "key": "value"\n}' : 'Enter raw body'}
+          placeholder={body.type === 'json' ? t('jsonBodyPlaceholder') : t('rawBodyPlaceholder')}
           spellCheck={false}
         />
       )}
@@ -131,14 +151,44 @@ export function BodyEditor() {
         <KeyValueEditor
           items={body.urlEncoded || [{ key: '', value: '', enabled: true }]}
           onChange={(items) => setBody({ ...body, urlEncoded: items })}
+          knownVarNames={knownVarNames}
         />
       )}
 
       {body.type === 'form-data' && (
-        <KeyValueEditor
-          items={body.formData || [{ key: '', value: '', enabled: true }]}
+        <FormDataEditor
+          items={body.formData || [{ key: '', value: '', enabled: true, type: 'text' }]}
           onChange={(items) => setBody({ ...body, formData: items })}
+          requestId={tab.id}
+          knownVarNames={knownVarNames}
         />
+      )}
+
+      {body.type === 'graphql' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '4px 8px' }}>
+          <div style={{ fontSize: 11, opacity: 0.6, paddingLeft: 2 }}>{t('graphqlQueryLabel')}</div>
+          <textarea
+            className="body-textarea"
+            value={body.graphql?.query || ''}
+            onChange={(e) =>
+              setBody({ ...body, graphql: { query: e.target.value, variables: body.graphql?.variables || '' } })
+            }
+            placeholder={t('graphqlQueryPlaceholder')}
+            spellCheck={false}
+            style={{ minHeight: 120 }}
+          />
+          <div style={{ fontSize: 11, opacity: 0.6, paddingLeft: 2, marginTop: 4 }}>{t('graphqlVariablesLabel')}</div>
+          <textarea
+            className="body-textarea"
+            value={body.graphql?.variables || ''}
+            onChange={(e) =>
+              setBody({ ...body, graphql: { query: body.graphql?.query || '', variables: e.target.value } })
+            }
+            placeholder={t('graphqlVarsPlaceholder')}
+            spellCheck={false}
+            style={{ minHeight: 72 }}
+          />
+        </div>
       )}
 
       {body.type === 'binary' && (
@@ -148,14 +198,14 @@ export function BodyEditor() {
             onClick={() => vscode.postMessage({ type: 'selectBinaryFile', requestId: tab.id })}
             style={{ alignSelf: 'flex-start' }}
           >
-            📂 Choose File
+            {t('chooseFile')}
           </button>
           {body.binaryName ? (
             <div style={{ fontSize: 12, color: 'var(--success-fg)' }}>
               ✓ {body.binaryName}
             </div>
           ) : (
-            <div style={{ fontSize: 12, opacity: 0.5 }}>No file selected</div>
+            <div style={{ fontSize: 12, opacity: 0.5 }}>{t('noFileSelected')}</div>
           )}
         </div>
       )}

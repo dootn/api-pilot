@@ -159,6 +159,21 @@ describe('CurlExporter', () => {
       expect(matches?.length).toBe(1);
     });
 
+    it('should keep user Content-Type for raw body export', () => {
+      const curl = exportCurl(
+        makeRequest({
+          method: 'POST',
+          headers: [
+            { key: 'Content-Type', value: 'application/custom', enabled: true },
+          ],
+          body: { type: 'raw', raw: 'hello', rawContentType: 'text/plain' },
+        })
+      );
+      expect(curl).toContain("-H 'Content-Type: application/custom'");
+      const matches = curl.match(/Content-Type/g);
+      expect(matches?.length).toBe(1);
+    });
+
     it('should include raw body', () => {
       const curl = exportCurl(
         makeRequest({

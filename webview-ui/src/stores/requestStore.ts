@@ -9,14 +9,26 @@ export interface KeyValuePair {
   description?: string;
 }
 
+export interface FormDataField {
+  key: string;
+  value: string;
+  enabled: boolean;
+  type: 'text' | 'file';
+  filePath?: string;
+  fileName?: string;
+  fileData?: string;  // base64 encoded file data
+  description?: string;
+}
+
 export interface RequestBody {
-  type: 'none' | 'json' | 'form-data' | 'x-www-form-urlencoded' | 'raw' | 'binary';
+  type: 'none' | 'json' | 'form-data' | 'x-www-form-urlencoded' | 'raw' | 'binary' | 'graphql';
   raw?: string;
   rawContentType?: string;
-  formData?: KeyValuePair[];
+  formData?: FormDataField[];
   urlEncoded?: KeyValuePair[];
   binaryPath?: string;
   binaryName?: string;
+  graphql?: { query: string; variables: string };
 }
 
 export interface AuthConfig {
@@ -29,6 +41,18 @@ export interface AuthConfig {
   in?: 'header' | 'query';
 }
 
+export interface TestResult {
+  name: string;
+  passed: boolean;
+  error?: string;
+}
+
+export interface ConsoleEntry {
+  level: 'log' | 'warn' | 'error';
+  args: string;
+  source: 'pre' | 'post';
+}
+
 export interface ApiResponse {
   status: number;
   statusText: string;
@@ -38,6 +62,8 @@ export interface ApiResponse {
   time: number;
   contentType?: string;
   bodyBase64?: string;
+  testResults?: TestResult[];
+  consoleEntries?: ConsoleEntry[];
 }
 
 interface RequestState {

@@ -125,6 +125,12 @@
         "category": "API Pilot"
       },
       {
+        "command": "apiPilot.duplicateFolder",
+        "title": "Duplicate Folder",
+        "category": "API Pilot",
+        "icon": "$(copy)"
+      },
+      {
         "command": "apiPilot.addSubfolder",
         "title": "Add Subfolder",
         "category": "API Pilot"
@@ -132,7 +138,26 @@
       {
         "command": "apiPilot.deleteRequest",
         "title": "Delete Request",
-        "category": "API Pilot"
+        "category": "API Pilot",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "apiPilot.renameRequest",
+        "title": "Rename Request",
+        "category": "API Pilot",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "apiPilot.duplicateRequest",
+        "title": "Duplicate Request",
+        "category": "API Pilot",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "apiPilot.moveRequest",
+        "title": "Move to...",
+        "category": "API Pilot",
+        "icon": "$(arrow-right)"
       },
       {
         "command": "apiPilot.openHistoryEntry",
@@ -168,14 +193,9 @@
           "group": "navigation@3"
         },
         {
-          "command": "apiPilot.importCurl",
-          "when": "view == apiPilot.history",
-          "group": "navigation@1"
-        },
-        {
           "command": "apiPilot.refreshHistory",
           "when": "view == apiPilot.history",
-          "group": "navigation@2"
+          "group": "navigation@1"
         },
         {
           "command": "apiPilot.clearHistory",
@@ -210,6 +230,11 @@
           "group": "1_modify@2"
         },
         {
+          "command": "apiPilot.duplicateFolder",
+          "when": "view == apiPilot.collections && viewItem == folder",
+          "group": "1_modify@3"
+        },
+        {
           "command": "apiPilot.deleteFolder",
           "when": "view == apiPilot.collections && viewItem == folder",
           "group": "2_delete"
@@ -218,6 +243,26 @@
           "command": "apiPilot.deleteRequest",
           "when": "view == apiPilot.collections && viewItem == request",
           "group": "2_delete"
+        },
+        {
+          "command": "apiPilot.renameRequest",
+          "when": "view == apiPilot.collections && viewItem == request",
+          "group": "inline@1"
+        },
+        {
+          "command": "apiPilot.duplicateRequest",
+          "when": "view == apiPilot.collections && viewItem == request",
+          "group": "1_modify@2"
+        },
+        {
+          "command": "apiPilot.moveRequest",
+          "when": "view == apiPilot.collections && viewItem == request",
+          "group": "inline@2"
+        },
+        {
+          "command": "apiPilot.deleteRequest",
+          "when": "view == apiPilot.collections && viewItem == request",
+          "group": "inline@3"
         },
         {
           "command": "apiPilot.openHistoryEntry",
@@ -235,6 +280,22 @@
           "group": "2_delete"
         }
       ]
+    },
+    "configuration": {
+      "title": "API Pilot",
+      "properties": {
+        "api-pilot.locale": {
+          "type": "string",
+          "default": "auto",
+          "enum": ["auto", "en", "zh-CN"],
+          "enumDescriptions": [
+            "Follow VS Code UI language",
+            "English",
+            "中文 (Chinese Simplified)"
+          ],
+          "description": "Display language for API Pilot UI. Requires webview reload to take effect."
+        }
+      }
     }
   },
   "scripts": {

@@ -1,5 +1,6 @@
 import { useTabStore } from '../../stores/tabStore';
 import type { AuthConfig } from '../../stores/requestStore';
+import { useI18n } from '../../i18n';
 
 const AUTH_TYPES: { value: AuthConfig['type']; label: string }[] = [
   { value: 'none', label: 'None' },
@@ -11,6 +12,7 @@ const AUTH_TYPES: { value: AuthConfig['type']; label: string }[] = [
 export function AuthEditor() {
   const { activeTabId, tabs, updateTab } = useTabStore();
   const tab = tabs.find((t) => t.id === activeTabId);
+  const t = useI18n();
   if (!tab) return null;
 
   const auth = tab.auth;
@@ -49,18 +51,18 @@ export function AuthEditor() {
 
       {auth.type === 'none' && (
         <div className="empty-state" style={{ padding: '20px' }}>
-          <span style={{ opacity: 0.6 }}>No authentication</span>
+          <span style={{ opacity: 0.6 }}>{t('noAuth')}</span>
         </div>
       )}
 
       {auth.type === 'bearer' && (
         <div className="auth-field">
-          <label>Token</label>
+          <label>{t('authToken')}</label>
           <input
             type="text"
             value={auth.token ?? ''}
             onChange={(e) => setAuth({ ...auth, token: e.target.value })}
-            placeholder="Enter bearer token"
+            placeholder={t('authTokenPlaceholder')}
             spellCheck={false}
           />
         </div>
@@ -69,22 +71,22 @@ export function AuthEditor() {
       {auth.type === 'basic' && (
         <>
           <div className="auth-field">
-            <label>Username</label>
+            <label>{t('authUsername')}</label>
             <input
               type="text"
               value={auth.username ?? ''}
               onChange={(e) => setAuth({ ...auth, username: e.target.value })}
-              placeholder="Username"
+              placeholder={t('authUsernamePlaceholder')}
               spellCheck={false}
             />
           </div>
           <div className="auth-field">
-            <label>Password</label>
+            <label>{t('authPassword')}</label>
             <input
               type="password"
               value={auth.password ?? ''}
               onChange={(e) => setAuth({ ...auth, password: e.target.value })}
-              placeholder="Password"
+              placeholder={t('authPasswordPlaceholder')}
             />
           </div>
         </>
@@ -93,27 +95,27 @@ export function AuthEditor() {
       {auth.type === 'apikey' && (
         <>
           <div className="auth-field">
-            <label>Key</label>
+            <label>{t('authKey')}</label>
             <input
               type="text"
               value={auth.key ?? ''}
               onChange={(e) => setAuth({ ...auth, key: e.target.value })}
-              placeholder="e.g. X-API-Key"
+              placeholder={t('authKeyPlaceholder')}
               spellCheck={false}
             />
           </div>
           <div className="auth-field">
-            <label>Value</label>
+            <label>{t('authValue')}</label>
             <input
               type="text"
               value={auth.value ?? ''}
               onChange={(e) => setAuth({ ...auth, value: e.target.value })}
-              placeholder="API key value"
+              placeholder={t('authValuePlaceholder')}
               spellCheck={false}
             />
           </div>
           <div className="auth-field">
-            <label>Add to</label>
+            <label>{t('authAddTo')}</label>
             <select
               className="method-select"
               value={auth.in ?? 'header'}

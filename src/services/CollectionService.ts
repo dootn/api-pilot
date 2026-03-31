@@ -162,7 +162,13 @@ export class CollectionService {
   private updateRequestRecursive(items: CollectionItem[], request: ApiRequest): boolean {
     for (const item of items) {
       if (item.type === 'request' && item.request?.id === request.id) {
+        const oldMethod = item.request.method;
+        const oldUrl = item.request.url;
         item.request = { ...request, updatedAt: Date.now() };
+        // Keep auto-generated name in sync when method/url changes
+        if (item.name === `${oldMethod} ${oldUrl}`) {
+          item.name = request.name || `${request.method} ${request.url}`;
+        }
         return true;
       }
       if (item.type === 'folder' && item.items) {
@@ -177,6 +183,252 @@ export class CollectionService {
     if (!col) return false;
     this.removeItemRecursive(col.items, itemName);
     return this.update(col);
+  }
+
+  renameRequest(collectionId: string, requestId: string, newName: string): boolean {
+    const col = this.getById(collectionId);
+    if (!col) return false;
+    const renamed = this.renameRequestRecursive(col.items, requestId, newName);
+    if (!renamed) return false;
+    return this.update(col);
+  }
+
+  private renameRequestRecursive(items: CollectionItem[], requestId: string, newName: string): boolean {
+    for (const item of items) {
+      if (item.type === 'request' && item.request?.id === requestId) {
+        item.name = newName;
+        if (item.request) item.request.name = newName;
+        return true;
+      }
+      if (item.type === 'folder' && item.items) {
+        if (this.renameRequestRecursive(item.items, requestId, newName)) return true;
+      }
+    }
+    return false;
+  }
+
+  /** Duplicate a request in the same collection */
+  duplicateRequest(collectionId: string, requestId: string): boolean {
+    const col = this.getById(collectionId);
+    if (!col) return false;
+
+    const { item: originalItem, parent } = this.findRequestWithParent(col.items, requestId);
+    if (!originalItem || originalItem.type !== 'request' || !originalItem.request) return false;
+
+    // Create a new request with a new ID
+    const newId = randomUUID();
+    const duplicatedRequest: ApiRequest = {
+      ...originalItem.request,
+      id: newId,
+      name: `${originalItem.request.name} (Copy)`,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    const duplicatedItem: CollectionItem = {
+      type: 'request',
+      name: duplicatedRequest.name,
+      request: duplicatedRequest,
+    };
+
+    // Insert the duplicated item right after the original
+    if (parent) {
+      const index = parent.findIndex((item) => item.type === 'request' && item.request?.id === requestId);
+      parent.splice(index + 1, 0, duplicatedItem);
+    }
+
+    return this.update(col);
+  }
+
+  /** Find a request item and its parent array */
+  private findRequestWithParent(
+    items: CollectionItem[],
+    requestId: string,
+    parent: CollectionItem[] = items
+  ): { item: CollectionItem | null; parent: CollectionItem[] } {
+    for (const item of items) {
+      if (item.type === 'request' && item.request?.id === requestId) {
+        return { item, parent };
+      }
+      if (item.type === 'folder' && item.items) {
+        const result = this.findRequestWithParent(item.items, requestId, item.items);
+        if (result.item) return result;
+      }
+    }
+    return { item: null, parent };
+  }
+
+  /** Duplicate a folder in the same collection */
+  duplicateFolder(collectionId: string, folderName: string): boolean {
+    const col = this.getById(collectionId);
+    if (!col) return false;
+
+    const { item: originalFolder, parent } = this.findFolderWithParent(col.items, folderName);
+    if (!originalFolder || originalFolder.type !== 'folder') return false;
+
+    // Recursively clone the folder and all its contents
+    const duplicatedFolder = this.cloneFolder(originalFolder);
+    duplicatedFolder.name = `${originalFolder.name} (Copy)`;
+
+    // Insert the duplicated folder right after the original
+    const index = parent.findIndex((item) => item.type === 'folder' && item.name === folderName);
+    parent.splice(index + 1, 0, duplicatedFolder);
+
+    return this.update(col);
+  }
+
+  /** Find a folder item and its parent array */
+  private findFolderWithParent(
+    items: CollectionItem[],
+    folderName: string,
+    parent: CollectionItem[] = items
+  ): { item: CollectionItem | null; parent: CollectionItem[] } {
+    for (const item of items) {
+      if (item.type === 'folder' && item.name === folderName) {
+        return { item, parent };
+      }
+      if (item.type === 'folder' && item.items) {
+        const result = this.findFolderWithParent(item.items, folderName, item.items);
+        if (result.item) return result;
+      }
+    }
+    return { item: null, parent };
+  }
+
+  /** Recursively clone a folder and all its contents with new IDs for requests */
+  private cloneFolder(folder: CollectionItem): CollectionItem {
+    if (folder.type !== 'folder') return folder;
+
+    const clonedItems: CollectionItem[] = [];
+    
+    for (const item of folder.items || []) {
+      if (item.type === 'request' && item.request) {
+        // Clone request with new ID
+        const newId = randomUUID();
+        const clonedRequest: ApiRequest = {
+          ...item.request,
+          id: newId,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        clonedItems.push({
+          type: 'request',
+          name: item.name,
+          request: clonedRequest,
+        });
+      } else if (item.type === 'folder') {
+        // Recursively clone subfolder
+        clonedItems.push(this.cloneFolder(item));
+      }
+    }
+
+    return {
+      type: 'folder',
+      name: folder.name,
+      items: clonedItems,
+    };
+  }
+
+  /** Move a request from its current collection to a target collection/folder */
+  moveRequest(
+    sourceCollectionId: string,
+    requestId: string,
+    targetCollectionId: string,
+    targetFolderId?: string
+  ): boolean {
+    const sourceCol = this.getById(sourceCollectionId);
+    if (!sourceCol) return false;
+
+    // Extract the request item from the source tree
+    const extracted = this.extractAndRemoveRequest(sourceCol.items, requestId);
+    if (!extracted) return false;
+
+    this.update(sourceCol);
+
+    const targetCol = sourceCollectionId === targetCollectionId ? sourceCol : this.getById(targetCollectionId);
+    if (!targetCol) return false;
+
+    const freshTarget = this.getById(targetCollectionId);
+    if (!freshTarget) return false;
+
+    if (targetFolderId) {
+      const folder = this.findFolder(freshTarget.items, targetFolderId);
+      if (folder && folder.items) {
+        folder.items.push(extracted);
+      } else {
+        freshTarget.items.push(extracted);
+      }
+    } else {
+      freshTarget.items.push(extracted);
+    }
+    return this.update(freshTarget);
+  }
+
+  /** Move any item (request or folder) from one location to another */
+  moveItem(    sourceCollectionId: string,
+    itemIdentifier: string, // requestId for requests, folder name for folders
+    itemType: 'request' | 'folder',
+    targetCollectionId: string,
+    targetFolderId?: string
+  ): boolean {
+    const sourceCol = this.getById(sourceCollectionId);
+    if (!sourceCol) return false;
+
+    // Extract the item from the source tree
+    const extracted = itemType === 'request' 
+      ? this.extractAndRemoveRequest(sourceCol.items, itemIdentifier)
+      : this.extractAndRemoveFolder(sourceCol.items, itemIdentifier);
+    
+    if (!extracted) return false;
+
+    this.update(sourceCol);
+
+    // Get fresh target collection
+    const freshTarget = this.getById(targetCollectionId);
+    if (!freshTarget) return false;
+
+    // Add to target location
+    if (targetFolderId) {
+      const folder = this.findFolder(freshTarget.items, targetFolderId);
+      if (folder && folder.items) {
+        folder.items.push(extracted);
+      } else {
+        freshTarget.items.push(extracted);
+      }
+    } else {
+      freshTarget.items.push(extracted);
+    }
+    return this.update(freshTarget);
+  }
+
+  private extractAndRemoveFolder(items: CollectionItem[], folderName: string): CollectionItem | null {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type === 'folder' && item.name === folderName) {
+        items.splice(i, 1);
+        return item;
+      }
+      if (item.type === 'folder' && item.items) {
+        const found = this.extractAndRemoveFolder(item.items, folderName);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  private extractAndRemoveRequest(items: CollectionItem[], requestId: string): CollectionItem | null {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type === 'request' && item.request?.id === requestId) {
+        items.splice(i, 1);
+        return item;
+      }
+      if (item.type === 'folder' && item.items) {
+        const found = this.extractAndRemoveRequest(item.items, requestId);
+        if (found) return found;
+      }
+    }
+    return null;
   }
 
   renameFolder(collectionId: string, folderName: string, newName: string): boolean {

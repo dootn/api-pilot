@@ -148,6 +148,7 @@ body {
 /* Tab Content */
 .tab-content {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 8px;
 }
@@ -419,6 +420,7 @@ body {
 
 .flex-1 {
   flex: 1;
+  min-height: 0;
 }
 
 .split-view {
@@ -432,7 +434,6 @@ body {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
 }
 
 .response-section {
@@ -440,7 +441,6 @@ body {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
 }
 
 /* Method colors */
@@ -865,3 +865,41 @@ body {
 .env-btn-danger:hover:not(:disabled) {
   background: rgba(241, 76, 76, 0.3);
 }
+
+/* ── Syntax Highlighting (highlight.js) ───────────────────────────────────── */
+/* VS Code injects body.vscode-dark / body.vscode-light / body.vscode-high-contrast */
+
+/* Dark & High-contrast themes */
+body.vscode-dark .hljs-attr,
+body.vscode-high-contrast .hljs-attr       { color: #9cdcfe; } /* JSON keys / XML attr names */
+body.vscode-dark .hljs-string,
+body.vscode-high-contrast .hljs-string     { color: #ce9178; } /* string values */
+body.vscode-dark .hljs-number,
+body.vscode-high-contrast .hljs-number     { color: #b5cea8; } /* numbers */
+body.vscode-dark .hljs-literal,
+body.vscode-high-contrast .hljs-literal    { color: #569cd6; } /* true / false / null */
+body.vscode-dark .hljs-name,
+body.vscode-high-contrast .hljs-name       { color: #4ec9b0; } /* XML/HTML tag names */
+body.vscode-dark .hljs-tag,
+body.vscode-high-contrast .hljs-tag        { color: #808080; } /* < > / */
+body.vscode-dark .hljs-comment,
+body.vscode-high-contrast .hljs-comment    { color: #6a9955; font-style: italic; }
+body.vscode-dark .hljs-keyword,
+body.vscode-high-contrast .hljs-keyword    { color: #c586c0; }
+body.vscode-dark .hljs-punctuation,
+body.vscode-high-contrast .hljs-punctuation { color: #d4d4d4; }
+body.vscode-dark .hljs-built_in,
+body.vscode-high-contrast .hljs-built_in   { color: #dcdcaa; }
+
+/* Light theme */
+body.vscode-light .hljs-attr              { color: #e50000; } /* JSON keys */
+body.vscode-light .hljs-string            { color: #a31515; } /* string values */
+body.vscode-light .hljs-number            { color: #098658; } /* numbers */
+body.vscode-light .hljs-literal           { color: #0000ff; } /* true / false / null */
+body.vscode-light .hljs-name              { color: #800000; } /* XML/HTML tag names */
+body.vscode-light .hljs-tag               { color: #000000; } /* < > / */
+body.vscode-light .hljs-comment           { color: #008000; font-style: italic; }
+body.vscode-light .hljs-keyword           { color: #af00db; }
+body.vscode-light .hljs-punctuation       { color: #000000; }
+body.vscode-light .hljs-built_in          { color: #795e26; }
+

@@ -35,6 +35,12 @@ export interface DeleteEnvironmentMessage {
   payload: { id: string };
 }
 
+export interface CopyAsCurlMessage {
+  type: 'copyAsCurl';
+  requestId: string;
+  payload: import('./index').ApiRequest;
+}
+
 // Extension -> Webview messages
 export interface RequestResultMessage {
   type: 'requestResult';

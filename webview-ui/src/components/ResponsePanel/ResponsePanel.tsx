@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useTabStore } from '../../stores/tabStore';
-import type { ApiResponse } from '../../stores/requestStore';
+import type { ApiResponse, TestResult, ConsoleEntry } from '../../stores/requestStore';
 import { vscode } from '../../vscode';
+import { SyntaxHighlighter, detectHighlightLang, langLabel } from './SyntaxHighlighter';
 
-type ResponseTab = 'body' | 'headers';
+type ResponseTab = 'body' | 'headers' | 'tests' | 'console';
 
 function formatJson(text: string): string {
   try {
@@ -11,15 +12,6 @@ function formatJson(text: string): string {
     return JSON.stringify(parsed, null, 2);
   } catch {
     return text;
-  }
-}
-
-function isJson(text: string): boolean {
-  try {
-    JSON.parse(text);
-    return true;
-  } catch {
-    return false;
   }
 }
 
@@ -221,8 +213,9 @@ export function ResponsePanel() {
 
   const mediaCategory = getMediaCategory(response.contentType);
   const isMediaBody = mediaCategory !== 'text';
-  const bodyIsJson = !isMediaBody && isJson(response.body);
-  const formattedBody = bodyIsJson ? formatJson(response.body) : response.body;
+  const highlightLang = isMediaBody ? 'text' : detectHighlightLang(response.contentType, response.body);
+  const formattedBody = highlightLang === 'json' ? formatJson(response.body) : response.body;
+  const bodyLangLabel = langLabel(highlightLang, response.contentType);
 
   return (
     <div className="response-panel">
@@ -266,13 +259,75 @@ export function ResponsePanel() {
         >
           Headers ({Object.keys(response.headers).length})
         </button>
+        {(response.testResults?.length ?? 0) > 0 && (
+          <button
+            className={`tab ${activeTab === 'tests' ? 'active' : ''}`}
+            onClick={() => setActiveTab('tests')}
+          >
+            Tests
+            <span
+              style={{
+                marginLeft: 5, fontSize: 10, fontWeight: 600, padding: '1px 5px',
+                borderRadius: 8, lineHeight: '14px', display: 'inline-block',
+                verticalAlign: 'middle',
+                background: response.testResults?.every((r) => r.passed)
+                  ? 'var(--success-fg, #4ec9b0)'
+                  : 'var(--error-fg, #f14c4c)',
+                color: '#fff',
+              }}
+            >
+              {response.testResults?.filter((r) => r.passed).length}/{response.testResults?.length}
+            </span>
+          </button>
+        )}
+        {(response.consoleEntries?.length ?? 0) > 0 && (
+          <button
+            className={`tab ${activeTab === 'console' ? 'active' : ''}`}
+            onClick={() => setActiveTab('console')}
+          >
+            Console
+            <span
+              style={{
+                marginLeft: 5, fontSize: 10, fontWeight: 600, padding: '1px 5px',
+                borderRadius: 8, lineHeight: '14px', display: 'inline-block',
+                verticalAlign: 'middle',
+                background: response.consoleEntries?.some((e) => e.level === 'error')
+                  ? 'var(--error-fg, #f14c4c)'
+                  : response.consoleEntries?.some((e) => e.level === 'warn')
+                  ? 'var(--warning-fg, #cca700)'
+                  : 'var(--badge-bg)',
+                color: response.consoleEntries?.some((e) => e.level === 'error') ||
+                  response.consoleEntries?.some((e) => e.level === 'warn') ? '#fff' : 'var(--badge-fg)',
+              }}
+            >
+              {response.consoleEntries?.length}
+            </span>
+          </button>
+        )}
       </div>
 
       <div className="response-body">
         {activeTab === 'body' && (
           isMediaBody
             ? <MediaBody response={response} tabUrl={tab?.url} />
-            : <pre>{formattedBody || '(empty response)'}</pre>
+            : (
+              <div style={{ position: 'relative' }}>
+                {bodyLangLabel && (
+                  <div style={{
+                    position: 'absolute', top: 6, right: 10, zIndex: 1,
+                    fontSize: 10, opacity: 0.4, pointerEvents: 'none',
+                    fontFamily: 'var(--vscode-editor-font-family, monospace)',
+                    userSelect: 'none',
+                  }}>
+                    {bodyLangLabel}
+                  </div>
+                )}
+                <SyntaxHighlighter
+                  code={formattedBody || '(empty response)'}
+                  lang={highlightLang}
+                />
+              </div>
+            )
         )}
 
         {activeTab === 'headers' && (
@@ -292,6 +347,69 @@ export function ResponsePanel() {
               ))}
             </tbody>
           </table>
+        )}
+
+        {activeTab === 'tests' && (
+          <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {(response.testResults ?? []).map((result: TestResult, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 8px',
+                  borderRadius: 4,
+                  background: result.passed
+                    ? 'rgba(78,201,176,0.08)'
+                    : 'rgba(241,76,76,0.08)',
+                  borderLeft: `3px solid ${
+                    result.passed ? 'var(--success-fg, #4ec9b0)' : 'var(--error-fg, #f14c4c)'
+                  }`,
+                }}
+              >
+                <span style={{ fontSize: 12, flexShrink: 0 }}>{result.passed ? '✓' : '✗'}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12 }}>{result.name}</div>
+                  {result.error && (
+                    <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2, wordBreak: 'break-word' }}>
+                      {result.error}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'console' && (
+          <div style={{ padding: '4px 0', fontFamily: 'var(--vscode-editor-font-family, monospace)', fontSize: 12 }}>
+            {(response.consoleEntries ?? []).map((entry: ConsoleEntry, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 6,
+                  padding: '3px 12px',
+                  borderBottom: '1px solid var(--border-color)',
+                  background:
+                    entry.level === 'error' ? 'rgba(241,76,76,0.06)' :
+                    entry.level === 'warn'  ? 'rgba(204,167,0,0.06)' :
+                    'transparent',
+                }}
+              >
+                <span
+                  style={{
+                    flexShrink: 0, fontSize: 10, marginTop: 1,
+                    color:
+                      entry.level === 'error' ? 'var(--error-fg, #f14c4c)' :
+                      entry.level === 'warn'  ? 'var(--warning-fg, #cca700)' :
+                      'var(--info-fg, #3794ff)',
+                  }}
+                >
+                  {entry.level === 'error' ? '✕' : entry.level === 'warn' ? '⚠' : 'ℹ'}
+                </span>
+                <span style={{ opacity: 0.4, flexShrink: 0, fontSize: 10, marginTop: 1 }}>[{entry.source}]</span>
+                <span style={{ wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>{entry.args}</span>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

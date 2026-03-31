@@ -13,11 +13,14 @@ export interface RequestTab {
   headers: KeyValuePair[];
   body: RequestBody;
   auth: AuthConfig;
-  activeTab: 'params' | 'headers' | 'body' | 'auth';
+  activeTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts';
   response: ApiResponse | null;
   responseError: string | null;
   loading: boolean;
   isDirty: boolean;
+  isPinned: boolean;
+  preScript?: string;
+  postScript?: string;
 }
 
 type PersistedTab = Omit<RequestTab, 'response' | 'responseError' | 'loading' | 'isDirty'>;
@@ -31,6 +34,9 @@ interface TabState {
   setActiveTabId: (id: string) => void;
   updateTab: (id: string, updates: Partial<RequestTab>) => void;
   renameTab: (id: string, name: string) => void;
+  reorderTabs: (fromId: string, toId: string) => void;
+  pinTab: (id: string, pinned: boolean) => void;
+  duplicateTab: (id: string) => void;
   getActiveTab: () => RequestTab | undefined;
   restoreSession: (tabs: RequestTab[], activeTabId: string) => void;
 }
@@ -52,6 +58,7 @@ function createDefaultTab(): RequestTab {
     responseError: null,
     loading: false,
     isDirty: false,
+    isPinned: false,
   };
 }
 
@@ -93,6 +100,8 @@ export const useTabStore = create<TabState>((set, get) => ({
 
   removeTab: (id) => {
     set((state) => {
+      const tab = state.tabs.find((t) => t.id === id);
+      if (!tab || tab.isPinned) return state;
       if (state.tabs.length <= 1) return state;
       const newTabs = state.tabs.filter((t) => t.id !== id);
       let newActiveId = state.activeTabId;
@@ -112,12 +121,78 @@ export const useTabStore = create<TabState>((set, get) => ({
     }));
   },
 
+  reorderTabs: (fromId, toId) => {
+    set((state) => {
+      const tabs = [...state.tabs];
+      const fromIdx = tabs.findIndex((t) => t.id === fromId);
+      const toIdx = tabs.findIndex((t) => t.id === toId);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return state;
+      // Pinned tabs cannot be dragged
+      if (tabs[fromIdx].isPinned) return state;
+      // Cannot drop an unpinned tab before a pinned tab
+      if (tabs[toIdx].isPinned) return state;
+      const [moved] = tabs.splice(fromIdx, 1);
+      tabs.splice(toIdx, 0, moved);
+      return { tabs };
+    });
+  },
+
+  pinTab: (id, pinned) => {
+    set((state) => ({
+      tabs: state.tabs.map((t) => (t.id === id ? { ...t, isPinned: pinned } : t)),
+    }));
+  },
+
   updateTab: (id, updates) => {
     set((state) => ({
-      tabs: state.tabs.map((t) =>
-        t.id === id ? { ...t, ...updates, isDirty: true } : t
-      ),
+      tabs: state.tabs.map((t) => {
+        if (t.id !== id) return t;
+        // If isDirty is explicitly provided in updates, use it; otherwise set to true
+        const shouldMarkDirty = updates.isDirty !== undefined ? updates.isDirty : true;
+        // Don't mark as dirty if only updating response, loading, or error fields
+        const isResponseUpdate = 
+          Object.keys(updates).length === 1 && 
+          ('response' in updates || 'loading' in updates || 'responseError' in updates);
+        return { 
+          ...t, 
+          ...updates, 
+          isDirty: isResponseUpdate ? t.isDirty : shouldMarkDirty 
+        };
+      }),
     }));
+  },
+
+  duplicateTab: (id) => {
+    set((state) => {
+      const tab = state.tabs.find((t) => t.id === id);
+      if (!tab) return state;
+      
+      const newId = `tab_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const duplicatedTab: RequestTab = {
+        ...tab,
+        id: newId,
+        name: tab.isCustomNamed ? `${tab.name} (Copy)` : tab.name,
+        // Clear response and loading state for duplicated tab
+        response: null,
+        responseError: null,
+        loading: false,
+        isDirty: false,
+        isPinned: false,
+        // Ensure params and headers have trailing empty rows
+        params: ensureTrailingEmpty(tab.params.filter((p) => p.key || p.value)),
+        headers: ensureTrailingEmpty(tab.headers.filter((h) => h.key || h.value)),
+      };
+      
+      // Insert the duplicated tab right after the original
+      const index = state.tabs.findIndex((t) => t.id === id);
+      const newTabs = [...state.tabs];
+      newTabs.splice(index + 1, 0, duplicatedTab);
+      
+      return {
+        tabs: newTabs,
+        activeTabId: newId, // Switch to the newly duplicated tab
+      };
+    });
   },
 
   getActiveTab: () => {

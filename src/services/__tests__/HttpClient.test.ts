@@ -152,6 +152,21 @@ describe('HttpClient', () => {
       expect(opts.headers['Content-Type']).toBe('application/json');
     });
 
+    it('should keep user Content-Type over auto body Content-Type', async () => {
+      await client.send(
+        makeRequest({
+          method: 'POST',
+          headers: [
+            { key: 'Content-Type', value: 'application/custom+json', enabled: true },
+          ],
+          body: { type: 'json', raw: '{}' },
+        }),
+        'req-1'
+      );
+      const opts = mockRequest.mock.calls[0][1] as any;
+      expect(opts.headers['Content-Type']).toBe('application/custom+json');
+    });
+
     it('should send form-urlencoded body', async () => {
       await client.send(
         makeRequest({

@@ -17,11 +17,14 @@ export function activate(context: vscode.ExtensionContext) {
   const envService = new EnvService(storageService);
   const historyService = new HistoryService(storageService);
 
-  // Register collection tree
+  // Register collection tree with drag and drop support
   const collectionTreeProvider = new CollectionTreeProvider(collectionService);
-  context.subscriptions.push(
-    vscode.window.registerTreeDataProvider('apiPilot.collections', collectionTreeProvider)
-  );
+  const collectionTreeView = vscode.window.createTreeView('apiPilot.collections', {
+    treeDataProvider: collectionTreeProvider,
+    dragAndDropController: collectionTreeProvider,
+    canSelectMany: false
+  });
+  context.subscriptions.push(collectionTreeView);
 
   // Register history tree
   const historyTreeProvider = new HistoryTreeProvider(historyService);
@@ -298,6 +301,20 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Duplicate folder in collection
+  context.subscriptions.push(
+    vscode.commands.registerCommand('apiPilot.duplicateFolder', async (item: { collectionId?: string; itemId?: string; label: string }) => {
+      if (!item.collectionId || !item.itemId) return;
+      const success = collectionService.duplicateFolder(item.collectionId, item.itemId);
+      if (success) {
+        collectionTreeProvider.refresh();
+        vscode.window.showInformationMessage(`Duplicated folder "${item.label}" with all its contents`);
+      } else {
+        vscode.window.showErrorMessage(`Failed to duplicate folder "${item.label}"`);
+      }
+    })
+  );
+
   // Add subfolder to a folder
   context.subscriptions.push(
     vscode.commands.registerCommand('apiPilot.addSubfolder', async (item: { collectionId?: string; itemId?: string }) => {
@@ -326,6 +343,89 @@ export function activate(context: vscode.ExtensionContext) {
       if (confirm === 'Delete') {
         collectionService.removeItem(item.collectionId, item.itemId);
         collectionTreeProvider.refresh();
+      }
+    })
+  );
+
+  // Rename request in collection
+  context.subscriptions.push(
+    vscode.commands.registerCommand('apiPilot.renameRequest', async (item: { collectionId?: string; itemId?: string; label: string }) => {
+      if (!item.collectionId || !item.itemId) return;
+      const newName = await vscode.window.showInputBox({
+        prompt: 'Rename request',
+        value: item.label,
+        validateInput: (v) => (v.trim() ? null : 'Name is required'),
+      });
+      if (newName) {
+        collectionService.renameRequest(item.collectionId, item.itemId, newName.trim());
+        collectionTreeProvider.refresh();
+      }
+    })
+  );
+
+  // Duplicate request in collection
+  context.subscriptions.push(
+    vscode.commands.registerCommand('apiPilot.duplicateRequest', async (item: { collectionId?: string; itemId?: string; label: string }) => {
+      if (!item.collectionId || !item.itemId) return;
+      const success = collectionService.duplicateRequest(item.collectionId, item.itemId);
+      if (success) {
+        collectionTreeProvider.refresh();
+        vscode.window.showInformationMessage(`Duplicated "${item.label}"`);
+      } else {
+        vscode.window.showErrorMessage(`Failed to duplicate "${item.label}"`);
+      }
+    })
+  );
+
+  // Move request to another collection/folder
+  context.subscriptions.push(
+    vscode.commands.registerCommand('apiPilot.moveRequest', async (item: { collectionId?: string; itemId?: string; label: string }) => {
+      if (!item.collectionId || !item.itemId) return;
+
+      const allCollections = collectionService.getAll();
+
+      // Build flat list of destinations: collection root + all folders
+      interface Destination { label: string; collectionId: string; folderId?: string; }
+      const destinations: Destination[] = [];
+      function addFolderItems(cols: typeof allCollections): void {
+        for (const col of cols) {
+          destinations.push({ label: `📁 ${col.name}`, collectionId: col.id });
+          function walkFolders(items: import('./types').CollectionItem[], prefix: string): void {
+            for (const it of items) {
+              if (it.type === 'folder') {
+                destinations.push({ label: `${prefix}📂 ${it.name}`, collectionId: col.id, folderId: it.name });
+                walkFolders(it.items || [], prefix + '  ');
+              }
+            }
+          }
+          walkFolders(col.items, '  ');
+        }
+      }
+      addFolderItems(allCollections);
+
+      if (destinations.length === 0) {
+        vscode.window.showWarningMessage('No collections available to move to.');
+        return;
+      }
+
+      const picked = await vscode.window.showQuickPick(
+        destinations.map((d) => ({ label: d.label, description: '', _dest: d })),
+        { placeHolder: `Move "${item.label}" to...` }
+      );
+      if (!picked) return;
+
+      const dest = picked._dest;
+      const success = collectionService.moveRequest(
+        item.collectionId,
+        item.itemId,
+        dest.collectionId,
+        dest.folderId
+      );
+      if (success) {
+        collectionTreeProvider.refresh();
+        vscode.window.showInformationMessage(`"${item.label}" moved to ${picked.label.trim()}.`);
+      } else {
+        vscode.window.showErrorMessage('Failed to move request.');
       }
     })
   );

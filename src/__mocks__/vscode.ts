@@ -7,6 +7,9 @@ export const workspace = {
       index: 0,
     },
   ],
+  getConfiguration: vi.fn(() => ({
+    get: vi.fn((_key: string, defaultValue?: unknown) => defaultValue),
+  })),
 };
 
 export const window = {
@@ -36,6 +39,13 @@ export const window = {
 export const commands = {
   registerCommand: vi.fn(),
   executeCommand: vi.fn(),
+};
+
+export const env = {
+  language: 'en',
+  clipboard: {
+    writeText: vi.fn(),
+  },
 };
 
 export const Uri = {

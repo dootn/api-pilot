@@ -1,11 +1,16 @@
+import { useMemo, useState } from 'react';
 import { useTabStore } from '../../stores/tabStore';
 import { KeyValueEditor } from '../shared/KeyValueEditor';
 import { HeadersEditor } from './HeadersEditor';
 import { BodyEditor } from './BodyEditor';
 import { AuthEditor } from './AuthEditor';
+import { ScriptEditor } from './ScriptEditor';
+import { CodeModal } from './CodeModal';
+import { useEnvironments } from '../../hooks/useEnvironments';
+import { useI18n, type TranslationKey } from '../../i18n';
 import type { RequestTab } from '../../stores/tabStore';
 
-type Tab = 'params' | 'headers' | 'body' | 'auth';
+type Tab = 'params' | 'headers' | 'body' | 'auth' | 'scripts';
 
 function getTabBadge(id: Tab, tab: RequestTab): string | number | null {
   switch (id) {
@@ -21,35 +26,48 @@ function getTabBadge(id: Tab, tab: RequestTab): string | number | null {
       return tab.body.type !== 'none' ? tab.body.type : null;
     case 'auth':
       return tab.auth.type !== 'none' ? tab.auth.type : null;
+    case 'scripts':
+      return (tab.preScript?.trim() || tab.postScript?.trim()) ? '●' : null;
     default:
       return null;
   }
 }
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'params', label: 'Params' },
-  { id: 'headers', label: 'Headers' },
-  { id: 'body', label: 'Body' },
-  { id: 'auth', label: 'Auth' },
+const TAB_DEFS: { id: Tab; key: TranslationKey }[] = [
+  { id: 'params',  key: 'tabParams'  },
+  { id: 'headers', key: 'tabHeaders' },
+  { id: 'body',    key: 'tabBody'    },
+  { id: 'auth',    key: 'tabAuth'    },
+  { id: 'scripts', key: 'tabScripts' },
 ];
 
 export function RequestTabs() {
   const { activeTabId, tabs, updateTab } = useTabStore();
   const tab = tabs.find((t) => t.id === activeTabId);
+  const { environments, activeEnvId } = useEnvironments();
+  const t = useI18n();
+  const [showCodeModal, setShowCodeModal] = useState(false);
+
+  const knownVarNames = useMemo(() => {
+    const env = environments.find((e) => e.id === activeEnvId);
+    const vars = (env?.variables ?? []).filter((v) => v.enabled).map((v) => v.key);
+    return new Set(vars);
+  }, [environments, activeEnvId]);
+
   if (!tab) return null;
 
   return (
     <div className="request-section">
       <div className="tabs">
-        {TABS.map((t) => {
-          const badge = getTabBadge(t.id, tab);
+        {TAB_DEFS.map((def) => {
+          const badge = getTabBadge(def.id, tab);
           return (
             <button
-              key={t.id}
-              className={`tab ${tab.activeTab === t.id ? 'active' : ''}`}
-              onClick={() => updateTab(tab.id, { activeTab: t.id })}
+              key={def.id}
+              className={`tab ${tab.activeTab === def.id ? 'active' : ''}`}
+              onClick={() => updateTab(tab.id, { activeTab: def.id })}
             >
-              {t.label}
+              {t(def.key)}
               {badge !== null && (
                 <span
                   style={{
@@ -58,10 +76,10 @@ export function RequestTabs() {
                     fontWeight: 600,
                     padding: '1px 5px',
                     borderRadius: 8,
-                    background: tab.activeTab === t.id
+                    background: tab.activeTab === def.id
                       ? 'var(--button-bg)'
                       : 'var(--badge-bg)',
-                    color: tab.activeTab === t.id
+                    color: tab.activeTab === def.id
                       ? 'var(--button-fg)'
                       : 'var(--badge-fg)',
                     lineHeight: '14px',
@@ -79,6 +97,16 @@ export function RequestTabs() {
             </button>
           );
         })}
+
+        {/* Code snippet button — placed after the last tab */}
+        <button
+          className="tab"
+          onClick={() => setShowCodeModal(true)}
+          style={{ marginLeft: 'auto', opacity: 0.75 }}
+          title="View code snippet (cURL / JS / Python)"
+        >
+          ⟨/⟩ Code
+        </button>
       </div>
 
       <div className="tab-content">
@@ -88,6 +116,7 @@ export function RequestTabs() {
             onChange={(params) => updateTab(tab.id, { params })}
             keyPlaceholder="Parameter"
             valuePlaceholder="Value"
+            knownVarNames={knownVarNames}
           />
         )}
 
@@ -95,13 +124,20 @@ export function RequestTabs() {
           <HeadersEditor
             items={tab.headers}
             onChange={(headers) => updateTab(tab.id, { headers })}
+            knownVarNames={knownVarNames}
           />
         )}
 
         {tab.activeTab === 'body' && <BodyEditor />}
 
         {tab.activeTab === 'auth' && <AuthEditor />}
+
+        {tab.activeTab === 'scripts' && <ScriptEditor />}
       </div>
+
+      {showCodeModal && tab && (
+        <CodeModal tab={tab} onClose={() => setShowCodeModal(false)} />
+      )}
     </div>
   );
 }

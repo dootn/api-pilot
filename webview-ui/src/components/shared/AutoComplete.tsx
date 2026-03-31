@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { renderVarHighlight } from '../../utils/varHighlight';
 
 interface AutoCompleteProps {
   value: string;
@@ -7,6 +8,8 @@ interface AutoCompleteProps {
   placeholder?: string;
   className?: string;
   onFocus?: () => void;
+  /** When provided, {{var}} tokens in the input are highlighted. */
+  knownVarNames?: Set<string>;
 }
 
 export function AutoComplete({
@@ -16,12 +19,24 @@ export function AutoComplete({
   placeholder,
   className = '',
   onFocus,
+  knownVarNames,
 }: AutoCompleteProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const bgRef = useRef<HTMLDivElement>(null);
+
+  // Sync horizontal scroll of backing highlight layer
+  useEffect(() => {
+    const input = inputRef.current;
+    const bg = bgRef.current;
+    if (!input || !bg) return;
+    const onScroll = () => { bg.scrollLeft = input.scrollLeft; };
+    input.addEventListener('scroll', onScroll);
+    return () => input.removeEventListener('scroll', onScroll);
+  });
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -95,12 +110,39 @@ export function AutoComplete({
     inputRef.current?.focus();
   };
 
+  const hasVars = !!knownVarNames && value.includes('{{');
+
   return (
     <div
       ref={containerRef}
       className="autocomplete-container"
-      style={{ position: 'relative', flex: 1 }}
+      style={{ position: 'relative', flex: 1, minWidth: 0 }}
     >
+      {hasVars && (
+        <div
+          ref={bgRef}
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 0,
+            padding: '4px 8px',
+            fontSize: '12px',
+            lineHeight: '1.4',
+            whiteSpace: 'pre',
+            overflow: 'hidden',
+            pointerEvents: 'none',
+            background: 'var(--input-bg, #3c3c3c)',
+            border: '1px solid transparent',
+            borderRadius: 3,
+            display: 'flex',
+            alignItems: 'center',
+            zIndex: 0,
+            color: 'var(--input-fg, #cccccc)',
+          }}
+        >
+          {renderVarHighlight(value, knownVarNames!)}
+        </div>
+      )}
       <input
         ref={inputRef}
         className={`kv-input ${className}`}
@@ -116,6 +158,13 @@ export function AutoComplete({
         placeholder={placeholder}
         spellCheck={false}
         autoComplete="off"
+        style={hasVars ? {
+          position: 'relative',
+          zIndex: 1,
+          color: 'transparent',
+          caretColor: 'var(--input-fg, #cccccc)',
+          background: 'transparent',
+        } : undefined}
       />
 
       {isOpen && suggestions.length > 0 && (

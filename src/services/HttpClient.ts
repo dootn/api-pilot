@@ -101,8 +101,9 @@ export class HttpClient {
     // Add auth headers
     this.applyAuth(apiRequest, headers);
 
-    // Add content-type if not set
-    if (!headers['Content-Type'] && !headers['content-type']) {
+    // Add content-type if not set (case-insensitive check preserves any user-supplied header)
+    const hasContentType = Object.keys(headers).some((k) => k.toLowerCase() === 'content-type');
+    if (!hasContentType) {
       if (apiRequest.body.type === 'json') {
         headers['Content-Type'] = 'application/json';
       } else if (apiRequest.body.type === 'x-www-form-urlencoded') {
@@ -134,7 +135,7 @@ export class HttpClient {
     }
   }
 
-  private buildBody(apiRequest: ApiRequest): string | Uint8Array | undefined {
+  private buildBody(apiRequest: ApiRequest): string | Uint8Array | FormData | undefined {
     if (['GET', 'HEAD', 'OPTIONS'].includes(apiRequest.method)) {
       return undefined;
     }
@@ -171,6 +172,22 @@ export class HttpClient {
           params.append(field.key, field.value);
         }
         return params.toString();
+      }
+      case 'form-data': {
+        const formData = new FormData();
+        const enabledFields = (apiRequest.body.formData || []).filter(f => f.enabled && f.key);
+        for (const field of enabledFields) {
+          if (field.type === 'file' && field.fileData && field.fileName) {
+            // Convert base64 to Blob and attach as file
+            const buffer = Buffer.from(field.fileData, 'base64');
+            const blob = new Blob([buffer]);
+            formData.append(field.key, blob, field.fileName);
+          } else {
+            // Regular text field
+            formData.append(field.key, field.value);
+          }
+        }
+        return formData;
       }
       default:
         return undefined;

@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useTabStore } from '../../stores/tabStore';
 import type { HttpMethod } from '../../stores/requestStore';
 import { vscode } from '../../vscode';
+import { useEnvironments } from '../../hooks/useEnvironments';
+import { renderVarHighlight } from '../../utils/varHighlight';
 
 const METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'];
 
@@ -88,13 +90,33 @@ function SaveColTree({
   );
 }
 
+/** Thin alias — delegates to the shared renderVarHighlight utility. */
+const renderHighlightedUrl = renderVarHighlight;
+
 export function UrlBar() {
   const { activeTabId, tabs, updateTab } = useTabStore();
   const [showSaveDropdown, setShowSaveDropdown] = useState(false);
   const [collections, setCollections] = useState<CollectionBrief[]>([]);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
   const saveDropdownRef = useRef<HTMLDivElement>(null);
+  const urlInputRef = useRef<HTMLInputElement>(null);
+  const [varSuggestions, setVarSuggestions] = useState<{ key: string; value: string }[]>([]);
+  const [showVarDropdown, setShowVarDropdown] = useState(false);
+  const [varActiveIdx, setVarActiveIdx] = useState(-1);
+  const { environments, activeEnvId } = useEnvironments();
   const tab = tabs.find((t) => t.id === activeTabId);
+
+  const activeEnvVars = useMemo(() => {
+    const env = environments.find((e) => e.id === activeEnvId);
+    return (env?.variables ?? []).filter((v) => v.enabled);
+  }, [environments, activeEnvId]);
+
+  const knownVarNames = useMemo(
+    () => new Set(activeEnvVars.map((v) => v.key)),
+    [activeEnvVars]
+  );
+
+  const urlHighlightRef = useRef<HTMLDivElement>(null);
 
   // Load collections and listen for response when save dropdown opens
   useEffect(() => {
@@ -122,6 +144,16 @@ export function UrlBar() {
     return () => window.removeEventListener('mousedown', close);
   }, [showSaveDropdown]);
 
+  // Sync horizontal scroll of backing highlight layer with the visible input
+  useEffect(() => {
+    const input = urlInputRef.current;
+    const bg = urlHighlightRef.current;
+    if (!input || !bg) return;
+    const onScroll = () => { bg.scrollLeft = input.scrollLeft; };
+    input.addEventListener('scroll', onScroll);
+    return () => input.removeEventListener('scroll', onScroll);
+  });
+
   if (!tab) return null;
 
   const handleSend = () => {
@@ -147,15 +179,71 @@ export function UrlBar() {
         headers: tab.headers.filter((h) => h.key),
         body: tab.body,
         auth: tab.auth,
+        preScript: tab.preScript,
+        postScript: tab.postScript,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       },
     });
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newUrl = e.target.value;
+    updateTab(tab.id, { url: newUrl });
+    const cursorPos = e.target.selectionStart ?? newUrl.length;
+    const beforeCursor = newUrl.substring(0, cursorPos);
+    const match = beforeCursor.match(/\{\{([^}]*)$/);
+    if (match) {
+      const partial = match[1].toLowerCase();
+      const filtered = activeEnvVars.filter((v) =>
+        v.key.toLowerCase().startsWith(partial)
+      );
+      setVarSuggestions(filtered);
+      setShowVarDropdown(filtered.length > 0);
+      setVarActiveIdx(-1);
+    } else {
+      setShowVarDropdown(false);
+    }
+  };
+
+  const handleVarSelect = (varKey: string) => {
+    const input = urlInputRef.current;
+    if (!input) return;
+    const url = tab.url;
+    const cursorPos = input.selectionStart ?? url.length;
+    const beforeCursor = url.substring(0, cursorPos);
+    const match = beforeCursor.match(/\{\{([^}]*)$/);
+    if (!match) return;
+    const startIdx = cursorPos - match[0].length;
+    const insertion = '{{' + varKey + '}}';
+    const newUrl = url.substring(0, startIdx) + insertion + url.substring(cursorPos);
+    updateTab(tab.id, { url: newUrl });
+    setShowVarDropdown(false);
+    const newCursor = startIdx + insertion.length;
+    setTimeout(() => {
+      input.setSelectionRange(newCursor, newCursor);
+      input.focus();
+    }, 0);
+  };
+
+  const handleUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       handleSend();
+      return;
+    }
+    if (!showVarDropdown) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setVarActiveIdx((prev) => Math.min(prev + 1, varSuggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setVarActiveIdx((prev) => Math.max(prev - 1, 0));
+    } else if ((e.key === 'Enter' || e.key === 'Tab') && varActiveIdx >= 0) {
+      e.preventDefault();
+      handleVarSelect(varSuggestions[varActiveIdx].key);
+    } else if (e.key === 'Escape') {
+      setShowVarDropdown(false);
+      setVarActiveIdx(-1);
     }
   };
 
@@ -184,6 +272,8 @@ export function UrlBar() {
       headers: tab!.headers.filter((h) => h.key),
       body: tab!.body,
       auth: tab!.auth,
+      preScript: tab!.preScript,
+      postScript: tab!.postScript,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -195,6 +285,8 @@ export function UrlBar() {
       type: 'updateCollectionRequest',
       payload: { collectionId: tab.collectionId, request: buildSaveRequest() },
     });
+    // Reset dirty flag after successful save
+    updateTab(tab.id, { isDirty: false });
     setSaveStatus('saved');
     setTimeout(() => setSaveStatus('idle'), 2000);
   }
@@ -226,15 +318,97 @@ export function UrlBar() {
         ))}
       </select>
 
-      <input
-        className="url-input"
-        type="text"
-        placeholder="Enter request URL (e.g. https://api.example.com/users)"
-        value={tab.url}
-        onChange={(e) => updateTab(tab.id, { url: e.target.value })}
-        onKeyDown={handleKeyDown}
-        spellCheck={false}
-      />
+      <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+        {/* Highlight backing layer: renders {{var}} tokens in colour */}
+        <div
+          ref={urlHighlightRef}
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 0,
+            padding: '6px 10px',
+            fontSize: '13px',
+            lineHeight: '1.4',
+            whiteSpace: 'pre',
+            overflow: 'hidden',
+            pointerEvents: 'none',
+            background: 'var(--input-bg, #3c3c3c)',
+            border: '1px solid transparent',
+            borderRadius: 3,
+            display: 'flex',
+            alignItems: 'center',
+            zIndex: 0,
+            color: 'var(--input-fg, #cccccc)',
+          }}
+        >
+          {renderHighlightedUrl(tab.url, knownVarNames)}
+        </div>
+        <input
+          ref={urlInputRef}
+          className="url-input"
+          type="text"
+          placeholder="Enter request URL (e.g. https://api.example.com/users)"
+          value={tab.url}
+          onChange={handleUrlChange}
+          onKeyDown={handleUrlKeyDown}
+          onBlur={() => setTimeout(() => setShowVarDropdown(false), 150)}
+          spellCheck={false}
+          style={{
+            width: '100%',
+            position: 'relative',
+            zIndex: 1,
+            color: 'transparent',
+            caretColor: 'var(--input-fg, #cccccc)',
+            background: 'transparent',
+          }}
+        />
+        {showVarDropdown && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              zIndex: 200,
+              marginTop: 2,
+              maxHeight: 220,
+              overflowY: 'auto',
+              background: 'var(--vscode-editorSuggestWidget-background, var(--input-bg))',
+              border: '1px solid var(--vscode-editorSuggestWidget-border, var(--border-color))',
+              borderRadius: 3,
+              boxShadow: '0 3px 10px rgba(0,0,0,0.35)',
+            }}
+          >
+            {varSuggestions.map((v, idx) => (
+              <div
+                key={v.key}
+                onMouseDown={(e) => { e.preventDefault(); handleVarSelect(v.key); }}
+                onMouseEnter={() => setVarActiveIdx(idx)}
+                style={{
+                  padding: '5px 10px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  gap: 12,
+                  alignItems: 'center',
+                  background: idx === varActiveIdx
+                    ? 'var(--vscode-list-activeSelectionBackground, #094771)'
+                    : 'transparent',
+                  color: idx === varActiveIdx
+                    ? 'var(--vscode-list-activeSelectionForeground, #fff)'
+                    : 'var(--panel-fg)',
+                }}
+              >
+                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{'{{'}{v.key}{'}}'}</span>
+                {v.value && (
+                  <span style={{ opacity: 0.55, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {v.value}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <button
         className={`send-btn ${tab.loading ? 'cancel' : ''}`}
@@ -250,7 +424,7 @@ export function UrlBar() {
           className={`save-btn ${saveStatus === 'saved' ? 'saved' : ''}`}
           onClick={handleDirectSave}
           title="Save (update bookmark)"
-          disabled={!tab.url.trim()}
+          disabled={!tab.url.trim() || !tab.isDirty}
         >
           {saveStatus === 'saved' ? '✓ Saved' : '💾 Save'}
         </button>
