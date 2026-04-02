@@ -2,19 +2,10 @@ import { useState } from 'react';
 import { useTabStore } from '../../stores/tabStore';
 import type { ApiResponse, TestResult, ConsoleEntry, SSLInfo } from '../../stores/requestStore';
 import { vscode } from '../../vscode';
-import { SyntaxHighlighter, detectHighlightLang, langLabel } from './SyntaxHighlighter';
+import { BodyViewer } from './BodyViewer';
 import { useI18n } from '../../i18n';
 
 type ResponseTab = 'body' | 'headers' | 'tests' | 'console' | 'ssl';
-
-function formatJson(text: string): string {
-  try {
-    const parsed = JSON.parse(text);
-    return JSON.stringify(parsed, null, 2);
-  } catch {
-    return text;
-  }
-}
 
 function getStatusClass(status: number): string {
   if (status >= 200 && status < 300) return 'success';
@@ -27,26 +18,6 @@ function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-type MediaCategory = 'image' | 'video' | 'audio' | 'pdf' | 'binary' | 'text';
-
-function getMediaCategory(contentType: string | undefined): MediaCategory {
-  if (!contentType) return 'text';
-  if (contentType.startsWith('image/')) return 'image';
-  if (contentType.startsWith('video/')) return 'video';
-  if (contentType.startsWith('audio/')) return 'audio';
-  if (contentType === 'application/pdf') return 'pdf';
-  if (
-    contentType === 'application/octet-stream' ||
-    contentType === 'application/zip' ||
-    contentType === 'application/x-zip-compressed' ||
-    contentType === 'application/x-tar' ||
-    contentType === 'application/gzip'
-  ) {
-    return 'binary';
-  }
-  return 'text';
 }
 
 function getFilenameFromResponse(response: ApiResponse, url?: string): string {
@@ -77,73 +48,6 @@ function downloadResponse(response: ApiResponse, url?: string) {
       body: response.body,
     },
   });
-}
-
-function MediaBody({ response, tabUrl: _tabUrl }: { response: ApiResponse; tabUrl?: string }) {
-  const category = getMediaCategory(response.contentType);
-
-  if (!response.bodyBase64 && category !== 'text') {
-    return <div className="empty-state">Binary content received but could not be rendered.</div>;
-  }
-
-  const dataUrl = response.bodyBase64 && response.contentType
-    ? `data:${response.contentType};base64,${response.bodyBase64}`
-    : undefined;
-
-  if (category === 'image' && dataUrl) {
-    return (
-      <div style={{ padding: 12 }}>
-        <img
-          src={dataUrl}
-          alt="response"
-          style={{ maxWidth: '100%', display: 'block', borderRadius: 4 }}
-        />
-      </div>
-    );
-  }
-
-  if (category === 'video' && dataUrl) {
-    return (
-      <div style={{ padding: 12 }}>
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-        <video controls style={{ maxWidth: '100%', display: 'block' }}>
-          <source src={dataUrl} type={response.contentType} />
-        </video>
-      </div>
-    );
-  }
-
-  if (category === 'audio' && dataUrl) {
-    return (
-      <div style={{ padding: 12 }}>
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-        <audio controls style={{ width: '100%', display: 'block' }}>
-          <source src={dataUrl} type={response.contentType} />
-        </audio>
-      </div>
-    );
-  }
-
-  if (category === 'pdf' && dataUrl) {
-    return (
-      <div style={{ padding: 12, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <embed
-          src={dataUrl}
-          type="application/pdf"
-          style={{ flex: 1, minHeight: 400, width: '100%', border: 'none', borderRadius: 4 }}
-        />
-      </div>
-    );
-  }
-
-  // binary or unrenderable
-  return (
-    <div style={{ padding: 12 }}>
-      <div style={{ marginBottom: 8, fontSize: 12, opacity: 0.7 }}>
-        {response.contentType || 'Binary'} · {formatSize(response.bodySize)}
-      </div>
-    </div>
-  );
 }
 
 export function ResponsePanel() {
@@ -233,12 +137,6 @@ export function ResponsePanel() {
       </div>
     );
   }
-
-  const mediaCategory = getMediaCategory(response.contentType);
-  const isMediaBody = mediaCategory !== 'text';
-  const highlightLang = isMediaBody ? 'text' : detectHighlightLang(response.contentType, response.body);
-  const formattedBody = highlightLang === 'json' ? formatJson(response.body) : response.body;
-  const bodyLangLabel = langLabel(highlightLang, response.contentType);
 
   return (
     <div className="response-panel">
@@ -367,26 +265,12 @@ export function ResponsePanel() {
 
       <div className="response-body">
         {activeTab === 'body' && (
-          isMediaBody
-            ? <MediaBody response={response} tabUrl={tab?.url} />
-            : (
-              <div style={{ position: 'relative' }}>
-                {bodyLangLabel && (
-                  <div style={{
-                    position: 'absolute', top: 6, right: 10, zIndex: 1,
-                    fontSize: 10, opacity: 0.4, pointerEvents: 'none',
-                    fontFamily: 'var(--vscode-editor-font-family, monospace)',
-                    userSelect: 'none',
-                  }}>
-                    {bodyLangLabel}
-                  </div>
-                )}
-                <SyntaxHighlighter
-                  code={formattedBody || '(empty response)'}
-                  lang={highlightLang}
-                />
-              </div>
-            )
+          <BodyViewer
+            body={response.body}
+            contentType={response.contentType}
+            bodyBase64={response.bodyBase64}
+            bodySize={response.bodySize}
+          />
         )}
 
         {activeTab === 'headers' && (

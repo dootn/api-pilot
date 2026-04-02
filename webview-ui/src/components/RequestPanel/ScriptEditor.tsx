@@ -1,15 +1,18 @@
 import { useState, useRef } from 'react';
 import { useTabStore } from '../../stores/tabStore';
 import { useI18n } from '../../i18n';
+import type { TranslationKey } from '../../i18n';
 
-const PRE_SCRIPT_EXAMPLES = [
+interface ScriptExample { labelKey: TranslationKey; code: string; }
+
+const PRE_SCRIPT_EXAMPLES: ScriptExample[] = [
   {
-    label: '设置环境变量',
+    labelKey: 'exPreSetEnvVar',
     code: `// Set environment variable
 pm.environment.set("variableName", "value");`,
   },
   {
-    label: '条件设置变量',
+    labelKey: 'exPreCondVar',
     code: `// Set variable based on condition
 const timestamp = new Date().toISOString();
 pm.environment.set("requestTime", timestamp);
@@ -17,14 +20,14 @@ pm.environment.set("requestTime", timestamp);
 // Use it in your request as {{requestTime}}`,
   },
   {
-    label: '修改请求头',
+    labelKey: 'exPreModifyHeaders',
     code: `// Modify request headers
 pm.request.headers["Authorization"] = "Bearer " + pm.environment.get("token");
 pm.request.headers["X-Custom-Header"] = "CustomValue";
 pm.request.headers["X-Timestamp"] = new Date().getTime();`,
   },
   {
-    label: '修改请求参数',
+    labelKey: 'exPreModifyParams',
     code: `// Modify query parameters
 pm.request.url.addQueryParams([
   { key: "timestamp", value: new Date().getTime() },
@@ -32,7 +35,7 @@ pm.request.url.addQueryParams([
 ]);`,
   },
   {
-    label: '修改请求体',
+    labelKey: 'exPreModifyBody',
     code: `// Modify request body
 const body = JSON.parse(pm.request.body.raw);
 body.timestamp = new Date().getTime();
@@ -40,7 +43,7 @@ body.userId = pm.environment.get("userId");
 pm.request.body.raw = JSON.stringify(body);`,
   },
   {
-    label: '生成动态数据',
+    labelKey: 'exPreGenData',
     code: `// Generate random data
 const randomId = Math.random().toString(36).substring(2, 15);
 const randomEmail = "user_" + randomId + "@example.com";
@@ -53,7 +56,7 @@ console.log("Generated ID:", randomId);
 console.log("Generated Email:", randomEmail);`,
   },
   {
-    label: '控制台调试',
+    labelKey: 'exPreConsoleDebug',
     code: `// Console log for debugging
 console.log("Request URL:", pm.request.url);
 console.log("Request Method:", pm.request.method);
@@ -62,9 +65,9 @@ console.log("Environment variable:", pm.environment.get("token"));`,
   },
 ];
 
-const POST_SCRIPT_EXAMPLES = [
+const POST_SCRIPT_EXAMPLES: ScriptExample[] = [
   {
-    label: '状态码断言',
+    labelKey: 'exPostStatusAssert',
     code: `// Assert response status code
 pm.test("Status code is 200", function () {
   pm.expect(pm.response.code).to.equal(200);
@@ -79,7 +82,7 @@ pm.test("Status code is not 404", function () {
 });`,
   },
   {
-    label: '响应数据断言',
+    labelKey: 'exPostBodyAssert',
     code: `// Assert response body
 pm.test("Response contains required field", function () {
   const data = pm.response.json();
@@ -100,7 +103,7 @@ pm.test("Response field has correct value", function () {
 });`,
   },
   {
-    label: '响应头断言',
+    labelKey: 'exPostHeaderAssert',
     code: `// Assert response headers
 pm.test("Response has content-type", function () {
   pm.expect(pm.response.headers.get("content-type")).to.include("application/json");
@@ -111,7 +114,7 @@ pm.test("Response has authorization header", function () {
 });`,
   },
   {
-    label: '解析JSON响应',
+    labelKey: 'exPostParseJson',
     code: `// Parse JSON response and extract data
 const jsonData = pm.response.json();
 console.log("Full response:", jsonData);
@@ -124,7 +127,7 @@ console.log("User email:", user.email);
 console.log("User created at:", user.createdAt);`,
   },
   {
-    label: '提取数据保存环境',
+    labelKey: 'exPostExtractSave',
     code: `// Extract data from response and save to environment
 const data = pm.response.json();
 
@@ -140,7 +143,7 @@ pm.environment.set("userRole", data.user.role);
 console.log("Saved userId:", pm.environment.get("userId"));`,
   },
   {
-    label: '条件断言',
+    labelKey: 'exPostCondAssert',
     code: `// Conditional assertions
 pm.test("Check response based on status", function () {
   const data = pm.response.json();
@@ -166,7 +169,7 @@ pm.test("Validate array elements", function () {
 });`,
   },
   {
-    label: '响应时间断言',
+    labelKey: 'exPostTimeAssert',
     code: `// Assert response time
 pm.test("Response time is less than 1 second", function () {
   pm.expect(pm.response.responseTime).to.be.below(1000);
@@ -177,7 +180,7 @@ pm.test("Response time is acceptable", function () {
 });`,
   },
   {
-    label: '数据变换和计算',
+    labelKey: 'exPostTransform',
     code: `// Transform and calculate response data
 const data = pm.response.json();
 
@@ -198,7 +201,7 @@ const userNames = users.map(u => u.name).join(", ");
 console.log("All user names:", userNames);`,
   },
   {
-    label: '循环数据保存',
+    labelKey: 'exPostLoopSave',
     code: `// Loop through response array and save values
 const data = pm.response.json();
 
@@ -216,19 +219,19 @@ users.forEach((user, index) => {
 console.log("Saved " + users.length + " user IDs");`,
   },
   {
-    label: '获取响应数据',
+    labelKey: 'exPostGetData',
     code: `// Parse JSON response
 const jsonData = pm.response.json();
 console.log("Response:", jsonData);`,
   },
   {
-    label: '设置环境变量',
+    labelKey: 'exPostSetEnvVar',
     code: `// Save response data to environment
 const jsonData = pm.response.json();
 pm.environment.set("token", jsonData.token);`,
   },
   {
-    label: '发送额外请求',
+    labelKey: 'exPostSendRequest',
     code: `// Send additional request
 pm.sendRequest({
   url: "https://api.example.com/endpoint",
@@ -244,7 +247,7 @@ pm.sendRequest({
 });`,
   },
   {
-    label: '控制台输出',
+    labelKey: 'exPostConsoleLog',
     code: `// Console log
 console.log("Status:", pm.response.code);
 console.log("Body:", pm.response.text());`,
@@ -306,7 +309,7 @@ export function ScriptEditor() {
               onClick={() => setShowPreExamples(!showPreExamples)}
               style={{ fontSize: 11, padding: '3px 8px' }}
             >
-              📝 插入示例
+              {t('insertExampleBtn')}
             </button>
             {showPreExamples && (
               <div
@@ -338,7 +341,7 @@ export function ScriptEditor() {
                     onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--vscode-list-hoverBackground, #2a2d2e)')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
-                    {example.label}
+                    {t(example.labelKey)}
                   </div>
                 ))}
               </div>
@@ -362,7 +365,7 @@ export function ScriptEditor() {
             onClick={() => updateTab(tab.id, { preScript: '' })}
             style={{ marginTop: 4, fontSize: 11, padding: '2px 8px', opacity: 0.6 }}
           >
-            ✕ Clear
+            {t('clearScriptBtn')}
           </button>
         )}
       </div>
@@ -384,7 +387,7 @@ export function ScriptEditor() {
               onClick={() => setShowPostExamples(!showPostExamples)}
               style={{ fontSize: 11, padding: '3px 8px' }}
             >
-              📝 插入示例
+              {t('insertExampleBtn')}
             </button>
             {showPostExamples && (
               <div
@@ -416,7 +419,7 @@ export function ScriptEditor() {
                     onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--vscode-list-hoverBackground, #2a2d2e)')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
-                    {example.label}
+                    {t(example.labelKey)}
                   </div>
                 ))}
               </div>
@@ -440,7 +443,7 @@ export function ScriptEditor() {
             onClick={() => updateTab(tab.id, { postScript: '' })}
             style={{ marginTop: 4, fontSize: 11, padding: '2px 8px', opacity: 0.6 }}
           >
-            ✕ Clear
+            {t('clearScriptBtn')}
           </button>
         )}
       </div>

@@ -19,6 +19,64 @@
   --info-fg: #3794ff;
 }
 
+/* react-json-view-lite — Chrome DevTools–inspired tree theme */
+.json-vsc-container {
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.json-vsc-child { margin: 0; padding: 0; }
+/* Property key colours */
+.json-vsc-label {
+  color: #e43140;
+  font-weight: 400;
+  margin-right: 2px;
+}
+.json-vsc-label-clickable {
+  color: #eb4b58;
+  font-weight: 400;
+  cursor: pointer;
+}
+.json-vsc-label-clickable:hover { text-decoration: none; }
+/* Value colours */
+.json-vsc-null    { color: #e86b17; font-style: italic; }
+.json-vsc-undef   { color: #f4a60a; font-style: italic; }
+.json-vsc-number  { color: #f14906; }
+.json-vsc-string  { color: #086ee1; }
+.json-vsc-boolean { color: #212225; }
+.json-vsc-other   { color: var(--panel-fg); }
+/* Punctuation: {} [] : , */
+.json-vsc-punct   { color: #424140; }
+/* Expand/collapse toggle arrows */
+.json-vsc-expand,
+.json-vsc-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 9px;
+  color: #191817;
+  cursor: pointer;
+  user-select: none;
+  margin-right: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.json-vsc-expand:hover,
+.json-vsc-collapse:hover  { color: var(--panel-fg); background: rgba(255,255,255,0.08); }
+.json-vsc-expand::after   { content: '▶'; }
+.json-vsc-collapse::after { content: '▼'; }
+/* Collapsed placeholder: {...} */
+.json-vsc-collapsed { color: #808080; font-size: 0.85em; }
+/* Indented children — subtle guide line like DevTools */
+.json-vsc-children {
+  padding-left: 1.4em;
+  margin: 0;
+  border-left: 1px solid rgba(180, 150, 120, 0.2);
+  margin-left: 6px;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
