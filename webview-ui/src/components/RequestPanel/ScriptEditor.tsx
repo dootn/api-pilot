@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useTabStore } from '../../stores/tabStore';
 import { useI18n } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
+import { ScriptDocs } from './ScriptDocs';
 
 interface ScriptExample { labelKey: TranslationKey; code: string; }
 
@@ -260,6 +261,7 @@ export function ScriptEditor() {
   const tab = tabs.find((tb) => tb.id === activeTabId);
   const [showPreExamples, setShowPreExamples] = useState(false);
   const [showPostExamples, setShowPostExamples] = useState(false);
+  const [showDocs, setShowDocs] = useState(false);
   const preExamplesRef = useRef<HTMLDivElement>(null);
   const postExamplesRef = useRef<HTMLDivElement>(null);
   const preTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -293,7 +295,9 @@ export function ScriptEditor() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '10px 12px', overflowY: 'auto' }}>
+    <>
+      {showDocs && <ScriptDocs onClose={() => setShowDocs(false)} />}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '10px 12px', overflowY: 'auto' }}>
       {/* Pre-request script */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, justifyContent: 'space-between' }}>
@@ -304,6 +308,13 @@ export function ScriptEditor() {
             )}
           </div>
           <div style={{ position: 'relative' }} ref={preExamplesRef}>
+            <button
+              className="save-btn"
+              onClick={() => setShowDocs(true)}
+              style={{ fontSize: 11, padding: '3px 8px', marginLeft: 4,marginRight: 4, opacity: 0.75 }}
+            >
+              {t('scriptDocsBtn')}
+            </button>
             <button
               className="save-btn"
               onClick={() => setShowPreExamples(!showPreExamples)}
@@ -448,5 +459,6 @@ export function ScriptEditor() {
         )}
       </div>
     </div>
+  </>
   );
 }

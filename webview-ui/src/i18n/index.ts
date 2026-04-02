@@ -35,6 +35,8 @@ const en = {
   postScriptPlaceholder: '// e.g. pm.test("Status is 200", () => pm.response.status === 200);',
   insertExampleBtn: '📝 Insert Example',
   clearScriptBtn: '✕ Clear',
+  scriptDocsBtn: '📜 API Docs',
+  scriptDocsTitle: 'Script API Reference',
   // ScriptEditor — example labels (pre-request)
   exPreSetEnvVar: 'Set ENV Variable',
   exPreCondVar: 'Conditional Variable',
@@ -234,6 +236,8 @@ const zhCN: Record<keyof typeof en, string> = {
   postScriptPlaceholder: '// 例如: pm.test("状态码为200", () => pm.response.status === 200);',
   insertExampleBtn: '📝 插入示例',
   clearScriptBtn: '✕ 清除',
+  scriptDocsBtn: '📜 API 文档',
+  scriptDocsTitle: '脚本 API 参考',
   // ScriptEditor — example labels (pre-request)
   exPreSetEnvVar: '设置环境变量',
   exPreCondVar: '条件设置变量',
