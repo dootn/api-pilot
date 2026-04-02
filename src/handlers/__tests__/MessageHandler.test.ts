@@ -101,6 +101,70 @@ describe('MessageHandler', () => {
       ).resolves.toBeUndefined();
     });
 
+    describe('importRequest', () => {
+      const curlInput = 'curl -X POST https://api.example.com/data -H "Content-Type: application/json"';
+
+      it('parses input and sends loadRequest with _newTab: false when newTab is false', async () => {
+        await handler.handle({ type: 'importRequest', payload: { input: curlInput, newTab: false } });
+        expect(webview.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'loadRequest',
+            payload: expect.objectContaining({
+              method: 'POST',
+              url: 'https://api.example.com/data',
+              _newTab: false,
+            }),
+          })
+        );
+      });
+
+      it('parses input and sends loadRequest with _newTab: true when newTab is true', async () => {
+        await handler.handle({ type: 'importRequest', payload: { input: curlInput, newTab: true } });
+        expect(webview.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'loadRequest',
+            payload: expect.objectContaining({
+              method: 'POST',
+              url: 'https://api.example.com/data',
+              _newTab: true,
+            }),
+          })
+        );
+      });
+
+      it('defaults _newTab to false when newTab is omitted', async () => {
+        await handler.handle({ type: 'importRequest', payload: { input: curlInput } });
+        expect(webview.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'loadRequest',
+            payload: expect.objectContaining({ _newTab: false }),
+          })
+        );
+      });
+
+      it('parses headers correctly from cURL input', async () => {
+        await handler.handle({ type: 'importRequest', payload: { input: curlInput, newTab: false } });
+        const call = (webview.postMessage as ReturnType<typeof vi.fn>).mock.calls[0][0];
+        const headers: { key: string; value: string; enabled: boolean }[] = call.payload.headers;
+        const contentType = headers.find((h) => h.key === 'Content-Type');
+        expect(contentType).toBeDefined();
+        expect(contentType?.value).toBe('application/json');
+      });
+
+      it('parses a simple GET URL and sends loadRequest', async () => {
+        await handler.handle({ type: 'importRequest', payload: { input: 'curl https://simple.example.com', newTab: false } });
+        expect(webview.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'loadRequest',
+            payload: expect.objectContaining({
+              method: 'GET',
+              url: 'https://simple.example.com',
+            }),
+          })
+        );
+      });
+    });
+
     it('should handle saveToCollection message', async () => {
       const col = collectionService.create('SaveHere');
       await handler.handle({

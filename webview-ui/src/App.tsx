@@ -13,6 +13,7 @@ import { vscode } from './vscode';
 
 function App() {
   const tabs = useTabStore((s) => s.tabs);
+  const activeTabId = useTabStore((s) => s.activeTabId);
   const updateTab = useTabStore((s) => s.updateTab);
   const addTabWithData = useTabStore((s) => s.addTabWithData);
   const setActiveTabId = useTabStore((s) => s.setActiveTabId);
@@ -72,23 +73,35 @@ function App() {
     (message: { type: string; requestId?: string; payload?: unknown }) => {
       switch (message.type) {
         case 'loadRequest': {
-          const request = message.payload as Partial<RequestTab>;
-          
-          // Check if the same request is already open in a tab
+          const raw = message.payload as Partial<RequestTab> & { _newTab?: boolean };
+          const { _newTab, ...request } = raw;
+
+          // If the imported request already exists as an open tab, switch to it
           if (request.id && request.collectionId) {
             const existingTab = tabs.find(
               (t) => t.id === request.id && t.collectionId === request.collectionId
             );
-            
             if (existingTab) {
-              // Switch to the existing tab instead of creating a new one
               setActiveTabId(existingTab.id);
               return;
             }
           }
-          
-          // Otherwise, add a new tab with the request data
-          addTabWithData(request || {});
+
+          if (_newTab) {
+            // Open in a new tab — strip id so a fresh UUID is generated
+            const { id: _id, ...requestWithoutId } = request;
+            addTabWithData({ ...requestWithoutId, collectionId: undefined });
+          } else if (activeTabId) {
+            // Fill current active tab with the imported data (no new tab)
+            updateTab(activeTabId, {
+              ...request,
+              id: activeTabId,          // keep current tab id
+              collectionId: undefined,  // break collection binding for imported requests
+              isDirty: true,
+            });
+          } else {
+            addTabWithData(request || {});
+          }
           return;
         }
         case 'setLocale': {
@@ -154,7 +167,7 @@ function App() {
           break;
       }
     },
-    [updateTab, addTabWithData, restoreSession, tabs, setActiveTabId, setLocale]
+    [updateTab, addTabWithData, restoreSession, tabs, activeTabId, setActiveTabId, setLocale]
   );
 
   useVscodeMessage(handleMessage);

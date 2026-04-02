@@ -20,11 +20,11 @@
 
 - **Collection Management** — Organize requests into collections with nested folders, persisted as JSON files.
 
-- **Environment Variables** — Define `{{variable}}` placeholders resolved at request time. Switch between environments via status bar.
+- **Environment Variables** — Define `{{variable}}` placeholders resolved at request time. Switch between environments via status bar. Hover over any `{{var}}` token to preview its current value. Active environment is persisted across restarts; a `Default` environment is always guaranteed.
 
 - **Request History** — Automatically records sent requests grouped by date, with quick replay.
 
-- **cURL Import/Export** — Paste a cURL command to import, or export any request as cURL.
+- **cURL Import/Export** — Paste a cURL command to import, or export any request as cURL. Variables are automatically resolved in the exported output.
 
 ### Editor Features
 
@@ -86,9 +86,10 @@ code --install-extension api-pilot-0.1.0.vsix
 
 ### Environment Variables
 
-1. Run `API Pilot: Select Environment` from the command palette or click the status bar item.
-2. Create a new environment or select an existing one.
-3. Use `{{variable_name}}` in URLs, headers, and body. They'll be resolved at send time.
+1. Click the environment name in the bottom-right corner of the tab bar (or run `API Pilot: Select Environment`).
+2. Select an environment, or open **Manage Environments** to create/edit variables.
+3. Use `{{variable_name}}` in URLs, headers, params, and body. They are resolved at send time and when exporting cURL/code snippets.
+4. Hover over any `{{variable_name}}` token in any input to see a tooltip showing the current resolved value.
 
 ### cURL Import
 

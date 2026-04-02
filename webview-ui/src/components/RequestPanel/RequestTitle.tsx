@@ -80,6 +80,29 @@ export function RequestTitle() {
     setEditingDescription(false);
   }
 
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importInput, setImportInput] = useState('');
+  const importTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (importModalOpen && importTextareaRef.current) {
+      importTextareaRef.current.focus();
+    }
+  }, [importModalOpen]);
+
+  function openImportModal() {
+    setImportInput('');
+    setImportModalOpen(true);
+  }
+
+  function commitImport(newTab: boolean) {
+    const trimmed = importInput.trim();
+    if (trimmed) {
+      vscode.postMessage({ type: 'importRequest', payload: { input: trimmed, newTab } });
+    }
+    setImportModalOpen(false);
+  }
+
   return (
     <div className="request-title-bar">
       <div className="request-title-header">
@@ -115,6 +138,13 @@ export function RequestTitle() {
             </button>
           </span>
         )}
+        <button
+          className="request-title-import-btn"
+          onClick={openImportModal}
+          title={t('quickImportBtn')}
+        >
+          {t('quickImportBtn')}
+        </button>
       </div>
 
       {isDescriptionExpanded && (
@@ -145,6 +175,36 @@ export function RequestTitle() {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {importModalOpen && (
+        <div className="import-modal-overlay" onClick={() => setImportModalOpen(false)}>
+          <div className="import-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="import-modal-title">{t('quickImportTitle')}</div>
+            <textarea
+              ref={importTextareaRef}
+              className="import-modal-textarea"
+              value={importInput}
+              onChange={(e) => setImportInput(e.target.value)}
+              placeholder={t('quickImportPlaceholder')}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setImportModalOpen(false);
+                e.stopPropagation();
+              }}
+            />
+            <div className="import-modal-actions">
+              <button className="import-modal-cancel" onClick={() => setImportModalOpen(false)}>
+                {t('quickImportCancel')}
+              </button>
+              <button className="import-modal-confirm" onClick={() => commitImport(false)} disabled={!importInput.trim()}>
+                {t('quickImportCurrentTab')}
+              </button>
+              <button className="import-modal-confirm import-modal-confirm--new-tab" onClick={() => commitImport(true)} disabled={!importInput.trim()}>
+                {t('quickImportNewTab')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

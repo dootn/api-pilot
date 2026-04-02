@@ -233,4 +233,35 @@ describe('CurlParser', () => {
       expect(result.body.raw).toContain('John');
     });
   });
+
+  describe('cookie flag (-b / --cookie)', () => {
+    it('should add Cookie header from -b flag', () => {
+      const result = parseCurl('curl -b "session=abc123" https://api.example.com');
+      const cookie = result.headers.find((h) => h.key === 'Cookie');
+      expect(cookie?.value).toBe('session=abc123');
+      expect(cookie?.enabled).toBe(true);
+    });
+
+    it('should add Cookie header from --cookie flag', () => {
+      const result = parseCurl('curl --cookie "token=xyz" https://api.example.com');
+      const cookie = result.headers.find((h) => h.key === 'Cookie');
+      expect(cookie?.value).toBe('token=xyz');
+    });
+
+    it('should handle multiple cookies in one -b value', () => {
+      const result = parseCurl(
+        'curl -b "a=1; b=2; c=3" https://api.example.com'
+      );
+      const cookie = result.headers.find((h) => h.key === 'Cookie');
+      expect(cookie?.value).toBe('a=1; b=2; c=3');
+    });
+
+    it('should merge multiple -b flags into one Cookie header', () => {
+      const result = parseCurl(
+        'curl -b "session=abc" -b "token=xyz" https://api.example.com'
+      );
+      const cookie = result.headers.find((h) => h.key === 'Cookie');
+      expect(cookie?.value).toBe('session=abc; token=xyz');
+    });
+  });
 });

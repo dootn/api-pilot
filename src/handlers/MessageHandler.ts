@@ -10,6 +10,7 @@ import { VariableResolver } from '../services/VariableResolver';
 import { WebviewMessage } from '../types/messages';
 import { ApiRequest, ConsoleEntry, CollectionItem, Environment, SSLInfo } from '../types';
 import { parseCurl } from '../services/CurlParser';
+import { parseRequest } from '../services/UniversalParser';
 
 const SESSION_DIR = 'session';
 const SESSION_FILE = 'tabs.json';
@@ -151,6 +152,9 @@ export class MessageHandler {
       case 'reorderCollections':
         this.handleReorderCollections(message.payload as { orderedIds: string[] });
         break;
+      case 'reorderCollectionItems':
+        this.handleReorderCollectionItems(message.payload as { sourceCollectionId: string; sourceFolderPath: string[]; sourceIndex: number; targetCollectionId: string; targetFolderPath: string[]; targetIndex: number });
+        break;
       // --- History CRUD ---
       case 'clearHistory':
         await this.handleClearHistory();
@@ -161,8 +165,8 @@ export class MessageHandler {
       case 'deleteHistoryGroup':
         await this.handleDeleteHistoryGroup(message.payload as { date: string; label: string });
         break;
-      case 'importCurl':
-        await this.handleImportCurl(message.payload as { curl: string });
+      case 'importRequest':
+        await this.handleImportRequest(message.payload as { input: string });
         break;
       default:
         console.warn(`Unknown message type: ${message.type}`);
@@ -620,6 +624,18 @@ export class MessageHandler {
     this.collectionService.setOrder(payload.orderedIds);
   }
 
+  private handleReorderCollectionItems(payload: { sourceCollectionId: string; sourceFolderPath: string[]; sourceIndex: number; targetCollectionId: string; targetFolderPath: string[]; targetIndex: number }): void {
+    if (!this.collectionService) return;
+    this.collectionService.moveItemByIndex(
+      payload.sourceCollectionId,
+      payload.sourceFolderPath,
+      payload.sourceIndex,
+      payload.targetCollectionId,
+      payload.targetFolderPath,
+      payload.targetIndex
+    );
+  }
+
   private async handleClearHistory(): Promise<void> {
     if (!this.historyService) return;
     const confirm = await vscode.window.showWarningMessage(
@@ -662,12 +678,12 @@ export class MessageHandler {
     }
   }
 
-  private async handleImportCurl(payload: { curl: string }): Promise<void> {
+  private async handleImportRequest(payload: { input: string; newTab?: boolean }): Promise<void> {
     try {
-      const request = parseCurl(payload.curl);
-      this.webview.postMessage({ type: 'loadRequest', payload: request });
+      const request = parseRequest(payload.input);
+      this.webview.postMessage({ type: 'loadRequest', payload: { ...request, _newTab: payload.newTab ?? false } });
     } catch (e) {
-      vscode.window.showErrorMessage(`Failed to parse cURL: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      vscode.window.showErrorMessage(`Failed to parse request: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   }
 

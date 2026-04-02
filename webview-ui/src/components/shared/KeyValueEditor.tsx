@@ -34,6 +34,10 @@ export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valueP
     onChange(newItems);
   };
 
+  const addItem = () => {
+    onChange([...items, { key: '', value: '', enabled: true }]);
+  };
+
   return (
     <div className="kv-editor">
       {items.map((item, index) => (
@@ -78,6 +82,7 @@ export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valueP
           </button>
         </div>
       ))}
+      <button className="kv-add-btn" onClick={addItem}>{t('addItem')}</button>
     </div>
   );
 }

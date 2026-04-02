@@ -124,6 +124,12 @@ const en = {
   requestAddDesc: 'Add description',
   requestEditDesc: 'Edit description',
   requestNoDesc: '(No description)',
+  quickImportBtn: 'Quick Import',
+  quickImportTitle: 'Quick Import',
+  quickImportPlaceholder: 'Paste cURL (bash) or fetch (Chrome/Node.js)...',
+  quickImportCurrentTab: 'Import to Current Tab',
+  quickImportNewTab: 'Open in New Tab',
+  quickImportCancel: 'Cancel',
   // CodeModal
   codeSnippetTitle: 'Code Snippet',
   codeSnippetCopy: 'Copy',
@@ -136,6 +142,7 @@ const en = {
   authQueryOption: 'Query Params',
   // HeadersEditor / KeyValueEditor / FormDataEditor
   removeItem: 'Remove',
+  addItem: '+ Add',
   formDataToggleType: 'Toggle text / file',
   // ResponsePanel
   respErrorPrefix: 'Error: ',
@@ -292,6 +299,12 @@ const zhCN: Record<keyof typeof en, string> = {
   requestAddDesc: '添加描述',
   requestEditDesc: '编辑描述',
   requestNoDesc: '（暂无描述）',
+  quickImportBtn: '快捷导入',
+  quickImportTitle: '快捷导入',
+  quickImportPlaceholder: '粘贴 cURL (bash) 或 fetch (Chrome/Node.js)...',
+  quickImportCurrentTab: '导入当前标签页',
+  quickImportNewTab: '导入到新标签页',
+  quickImportCancel: '取消',
   // CodeModal
   codeSnippetTitle: '代码片段',
   codeSnippetCopy: '复制',
@@ -304,6 +317,7 @@ const zhCN: Record<keyof typeof en, string> = {
   authQueryOption: 'Query 参数',
   // HeadersEditor / KeyValueEditor / FormDataEditor
   removeItem: '删除',
+  addItem: '+ 新增',
   formDataToggleType: '切换文本 / 文件',
   // ResponsePanel
   respErrorPrefix: '错误：',

@@ -89,6 +89,10 @@ export function FormDataEditor({
     onChange(newItems);
   };
 
+  const addItem = () => {
+    onChange([...items, { key: '', value: '', enabled: true, type: 'text' as const }]);
+  };
+
   return (
     <div className="kv-editor">
       {items.map((item, index) => (
@@ -185,6 +189,7 @@ export function FormDataEditor({
           </button>
         </div>
       ))}
+      <button className="kv-add-btn" onClick={addItem}>{t('addItem')}</button>
     </div>
   );
 }

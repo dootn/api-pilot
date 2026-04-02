@@ -544,4 +544,79 @@ export class CollectionService {
   setOrder(orderedIds: string[]): boolean {
     return this.storage.writeJson(COLLECTIONS_DIR, ORDER_FILE, { orderedIds });
   }
+
+  /** Reorder items within a collection at the given folder path (same parent) */
+  reorderItems(collectionId: string, folderPath: string[], fromIndex: number, toIndex: number): boolean {
+    const col = this.getById(collectionId);
+    if (!col) return false;
+
+    let items = col.items;
+    for (const folderName of folderPath) {
+      const folder = items.find((item) => item.type === 'folder' && item.name === folderName);
+      if (!folder || !folder.items) return false;
+      items = folder.items;
+    }
+
+    if (fromIndex < 0 || fromIndex >= items.length || toIndex < 0 || toIndex >= items.length) return false;
+    if (fromIndex === toIndex) return true;
+
+    const [moved] = items.splice(fromIndex, 1);
+    items.splice(toIndex, 0, moved);
+
+    return this.update(col);
+  }
+
+  /** Move an item by index from any location to any other location (supports cross-folder/cross-collection) */
+  moveItemByIndex(
+    sourceCollectionId: string,
+    sourceFolderPath: string[],
+    sourceIndex: number,
+    targetCollectionId: string,
+    targetFolderPath: string[],
+    targetIndex: number
+  ): boolean {
+    const isSameParent =
+      sourceCollectionId === targetCollectionId &&
+      JSON.stringify(sourceFolderPath) === JSON.stringify(targetFolderPath);
+
+    if (isSameParent) {
+      return this.reorderItems(sourceCollectionId, sourceFolderPath, sourceIndex, targetIndex);
+    }
+
+    const sourceCol = this.getById(sourceCollectionId);
+    if (!sourceCol) return false;
+
+    const isSameCollection = sourceCollectionId === targetCollectionId;
+    const targetCol = isSameCollection ? sourceCol : this.getById(targetCollectionId);
+    if (!targetCol) return false;
+
+    // Navigate to source items
+    let sourceItems = sourceCol.items;
+    for (const folderName of sourceFolderPath) {
+      const folder = sourceItems.find((item) => item.type === 'folder' && item.name === folderName);
+      if (!folder || !folder.items) return false;
+      sourceItems = folder.items;
+    }
+    if (sourceIndex < 0 || sourceIndex >= sourceItems.length) return false;
+
+    const [moved] = sourceItems.splice(sourceIndex, 1);
+
+    // Navigate to target items (note: for same collection, arrays share reference with sourceCol)
+    let targetItems = targetCol.items;
+    for (const folderName of targetFolderPath) {
+      const folder = targetItems.find((item) => item.type === 'folder' && item.name === folderName);
+      if (!folder || !folder.items) return false;
+      targetItems = folder.items;
+    }
+
+    const insertIdx = Math.min(targetIndex, targetItems.length);
+    targetItems.splice(insertIdx, 0, moved);
+
+    if (isSameCollection) {
+      return this.update(sourceCol);
+    }
+    const srcOk = this.update(sourceCol);
+    const tgtOk = this.update(targetCol);
+    return srcOk && tgtOk;
+  }
 }

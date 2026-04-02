@@ -14,6 +14,7 @@ interface Props {
 }
 
 export function HeadersEditor({ items, onChange, knownVarNames, varValues }: Props) {
+  const t = useI18n();
   const updateItem = (index: number, field: keyof KeyValuePair, value: string | boolean) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
@@ -33,6 +34,10 @@ export function HeadersEditor({ items, onChange, knownVarNames, varValues }: Pro
     onChange(newItems);
   };
 
+  const addItem = () => {
+    onChange([...items, { key: '', value: '', enabled: true }]);
+  };
+
   return (
     <div className="kv-editor">
       {items.map((item, index) => (
@@ -46,6 +51,7 @@ export function HeadersEditor({ items, onChange, knownVarNames, varValues }: Pro
           varValues={varValues}
         />
       ))}
+      <button className="kv-add-btn" onClick={addItem}>{t('addItem')}</button>
     </div>
   );
 }

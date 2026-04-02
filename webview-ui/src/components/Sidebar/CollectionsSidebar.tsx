@@ -45,6 +45,12 @@ export function CollectionsSidebar() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; target: ContextMenuTarget } | null>(null);
   const [draggingCollectionId, setDraggingCollectionId] = useState<string | null>(null);
   const [dragOverCollectionId, setDragOverCollectionId] = useState<string | null>(null);
+  const [dragOverColPos, setDragOverColPos] = useState<'before' | 'after'>('before');
+  interface ItemDragPath { collectionId: string; folderPath: string[]; index: number; isFolderItem?: boolean; itemName?: string; }
+  const [draggingItem, setDraggingItem] = useState<ItemDragPath | null>(null);
+  const [dragOverItem, setDragOverItem] = useState<ItemDragPath | null>(null);
+  const [dragOverItemPos, setDragOverItemPos] = useState<'before' | 'after' | 'into'>('before');
+  const [itemDragOverCollectionId, setItemDragOverCollectionId] = useState<string | null>(null);
   const addTabWithData = useTabStore((s) => s.addTabWithData);
   const tabs = useTabStore((s) => s.tabs);
   const setActiveTabId = useTabStore((s) => s.setActiveTabId);
@@ -131,29 +137,78 @@ export function CollectionsSidebar() {
   };
 
   const handleCollectionDragOver = (e: React.DragEvent, collectionId: string) => {
+    if (draggingItem) {
+      // An item is being dragged — allow dropping onto collection header
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+      setItemDragOverCollectionId(collectionId);
+      return;
+    }
+    if (!draggingCollectionId) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (collectionId !== draggingCollectionId) {
       setDragOverCollectionId(collectionId);
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      setDragOverColPos(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after');
     }
   };
 
   const handleCollectionDrop = (e: React.DragEvent, targetCollectionId: string) => {
     e.preventDefault();
+    // Item drag onto collection header — append to end of collection
+    if (draggingItem) {
+      const source = { ...draggingItem };
+      setCollections((prev) => {
+        const next = JSON.parse(JSON.stringify(prev)) as Collection[];
+        const sourceCol = next.find((c) => c.id === source.collectionId);
+        if (!sourceCol) return prev;
+        let sourceItems = sourceCol.items;
+        for (const fn of source.folderPath) {
+          const f = sourceItems.find((it) => it.type === 'folder' && it.name === fn);
+          if (!f || !f.items) return prev;
+          sourceItems = f.items;
+        }
+        if (source.index < 0 || source.index >= sourceItems.length) return prev;
+        const [moved] = sourceItems.splice(source.index, 1);
+        const targetCol = next.find((c) => c.id === targetCollectionId);
+        if (!targetCol) return prev;
+        targetCol.items.push(moved);
+        return next;
+      });
+      vscode.postMessage({
+        type: 'reorderCollectionItems',
+        payload: {
+          sourceCollectionId: source.collectionId,
+          sourceFolderPath: source.folderPath,
+          sourceIndex: source.index,
+          targetCollectionId,
+          targetFolderPath: [],
+          targetIndex: 999,
+        },
+      });
+      setDraggingItem(null);
+      setDragOverItem(null);
+      setItemDragOverCollectionId(null);
+      return;
+    }
     if (draggingCollectionId && draggingCollectionId !== targetCollectionId) {
-      // Reorder collections
       const fromIdx = collections.findIndex((c) => c.id === draggingCollectionId);
       const toIdx = collections.findIndex((c) => c.id === targetCollectionId);
       if (fromIdx !== -1 && toIdx !== -1) {
-        const reordered = [...collections];
-        const [moved] = reordered.splice(fromIdx, 1);
-        reordered.splice(toIdx, 0, moved);
-        setCollections(reordered);
-        // Send to backend
-        vscode.postMessage({
-          type: 'reorderCollections',
-          payload: { orderedIds: reordered.map((c) => c.id) },
-        });
+        const rawInsert = dragOverColPos === 'before' ? toIdx : toIdx + 1;
+        const adjustedIdx = fromIdx < rawInsert ? rawInsert - 1 : rawInsert;
+        if (fromIdx !== adjustedIdx) {
+          const reordered = [...collections];
+          const [moved] = reordered.splice(fromIdx, 1);
+          reordered.splice(adjustedIdx, 0, moved);
+          setCollections(reordered);
+          vscode.postMessage({
+            type: 'reorderCollections',
+            payload: { orderedIds: reordered.map((c) => c.id) },
+          });
+        }
       }
     }
     setDraggingCollectionId(null);
@@ -163,40 +218,248 @@ export function CollectionsSidebar() {
   const handleCollectionDragEnd = () => {
     setDraggingCollectionId(null);
     setDragOverCollectionId(null);
+    setItemDragOverCollectionId(null);
   };
 
-  const renderItems = (items: CollectionItem[], collectionId: string, depth: number): React.ReactNode => {
+  // Drag and drop handlers for items within collections
+  const handleItemDragStart = (e: React.DragEvent, itemPath: ItemDragPath) => {
+    e.stopPropagation();
+    setDraggingItem(itemPath);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleItemDragOver = (e: React.DragEvent, itemPath: ItemDragPath) => {
+    if (!draggingItem) return;
+    const isSelf =
+      itemPath.collectionId === draggingItem.collectionId &&
+      JSON.stringify(itemPath.folderPath) === JSON.stringify(draggingItem.folderPath) &&
+      itemPath.index === draggingItem.index;
+    if (isSelf) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverItem(itemPath);
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    if (itemPath.isFolderItem) {
+      // 3-zone: top 30% = before, middle 40% = into, bottom 30% = after
+      const ratio = (e.clientY - rect.top) / rect.height;
+      setDragOverItemPos(ratio < 0.3 ? 'before' : ratio > 0.7 ? 'after' : 'into');
+    } else {
+      setDragOverItemPos(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after');
+    }
+  };
+
+  const handleItemDrop = (e: React.DragEvent, targetPath: ItemDragPath) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggingItem) return;
+
+    const isSelf =
+      targetPath.collectionId === draggingItem.collectionId &&
+      JSON.stringify(targetPath.folderPath) === JSON.stringify(draggingItem.folderPath) &&
+      targetPath.index === draggingItem.index;
+    if (isSelf) {
+      setDraggingItem(null);
+      setDragOverItem(null);
+      return;
+    }
+
+    const isSameParent =
+      targetPath.collectionId === draggingItem.collectionId &&
+      JSON.stringify(targetPath.folderPath) === JSON.stringify(draggingItem.folderPath);
+
+    const sourceIndex = draggingItem.index;
+
+    // 'into' means append inside the target folder
+    if (dragOverItemPos === 'into' && targetPath.isFolderItem && targetPath.itemName) {
+      const targetFolderPath = [...targetPath.folderPath, targetPath.itemName];
+      setCollections((prev) => {
+        const next = JSON.parse(JSON.stringify(prev)) as Collection[];
+        const sourceCol = next.find((c) => c.id === draggingItem.collectionId);
+        if (!sourceCol) return prev;
+        let sourceItems = sourceCol.items;
+        for (const fn of draggingItem.folderPath) {
+          const f = sourceItems.find((it) => it.type === 'folder' && it.name === fn);
+          if (!f || !f.items) return prev;
+          sourceItems = f.items;
+        }
+        if (sourceIndex < 0 || sourceIndex >= sourceItems.length) return prev;
+        const [moved] = sourceItems.splice(sourceIndex, 1);
+        const targetCol = next.find((c) => c.id === targetPath.collectionId);
+        if (!targetCol) return prev;
+        let targetItems = targetCol.items;
+        for (const fn of targetFolderPath) {
+          const f = targetItems.find((it) => it.type === 'folder' && it.name === fn);
+          if (!f || !f.items) { f && (f.items = []); if (f) targetItems = f.items!; else return prev; }
+          else targetItems = f.items;
+        }
+        targetItems.push(moved);
+        return next;
+      });
+      // Auto-expand the target folder
+      const depthOfFolder = targetPath.folderPath.length + 1;
+      const folderKey = `${targetPath.collectionId}-${depthOfFolder}-${targetPath.index}-${targetPath.itemName}`;
+      setExpandedIds((prev) => { const next = new Set(prev); next.add(folderKey); return next; });
+      vscode.postMessage({
+        type: 'reorderCollectionItems',
+        payload: {
+          sourceCollectionId: draggingItem.collectionId,
+          sourceFolderPath: draggingItem.folderPath,
+          sourceIndex,
+          targetCollectionId: targetPath.collectionId,
+          targetFolderPath,
+          targetIndex: 999,
+        },
+      });
+      setDraggingItem(null);
+      setDragOverItem(null);
+      return;
+    }
+
+    const rawInsert = dragOverItemPos === 'before' ? targetPath.index : targetPath.index + 1;
+    const targetIndex = isSameParent && sourceIndex < rawInsert ? rawInsert - 1 : rawInsert;
+
+    if (isSameParent && sourceIndex === targetIndex) {
+      setDraggingItem(null);
+      setDragOverItem(null);
+      return;
+    }
+
+    const source = { ...draggingItem };
+    const target = { collectionId: targetPath.collectionId, folderPath: targetPath.folderPath, index: targetIndex };
+
+    setCollections((prev) => {
+      const next = JSON.parse(JSON.stringify(prev)) as Collection[];
+
+      // Navigate to source items
+      const sourceCol = next.find((c) => c.id === source.collectionId);
+      if (!sourceCol) return prev;
+      let sourceItems = sourceCol.items;
+      for (const fn of source.folderPath) {
+        const f = sourceItems.find((it) => it.type === 'folder' && it.name === fn);
+        if (!f || !f.items) return prev;
+        sourceItems = f.items;
+      }
+      if (source.index < 0 || source.index >= sourceItems.length) return prev;
+
+      const [moved] = sourceItems.splice(source.index, 1);
+
+      // Navigate to target items
+      const targetCol = next.find((c) => c.id === target.collectionId);
+      if (!targetCol) return prev;
+      let targetItems = targetCol.items;
+      for (const fn of target.folderPath) {
+        const f = targetItems.find((it) => it.type === 'folder' && it.name === fn);
+        if (!f || !f.items) return prev;
+        targetItems = f.items;
+      }
+
+      const insertIdx = Math.min(target.index, targetItems.length);
+      targetItems.splice(insertIdx, 0, moved);
+      return next;
+    });
+
+    vscode.postMessage({
+      type: 'reorderCollectionItems',
+      payload: {
+        sourceCollectionId: source.collectionId,
+        sourceFolderPath: source.folderPath,
+        sourceIndex: source.index,
+        targetCollectionId: target.collectionId,
+        targetFolderPath: target.folderPath,
+        targetIndex: target.index,
+      },
+    });
+
+    setDraggingItem(null);
+    setDragOverItem(null);
+  };
+
+  const handleItemDragEnd = () => {
+    setDraggingItem(null);
+    setDragOverItem(null);
+    setItemDragOverCollectionId(null);
+  };
+
+  const renderItems = (items: CollectionItem[], collectionId: string, depth: number, folderPath: string[] = []): React.ReactNode => {
     return items.map((item, idx) => {
       const key = `${collectionId}-${depth}-${idx}-${item.name}`;
+      const itemPath: ItemDragPath = { collectionId, folderPath, index: idx, isFolderItem: item.type === 'folder', itemName: item.name };
+      const folderPathKey = JSON.stringify(folderPath);
+      const dragOverFolderKey = JSON.stringify(dragOverItem?.folderPath);
+      const draggingFolderKey = JSON.stringify(draggingItem?.folderPath);
+      const isBeforeIndicator =
+        dragOverItem?.collectionId === collectionId &&
+        dragOverFolderKey === folderPathKey &&
+        dragOverItem?.index === idx &&
+        dragOverItemPos === 'before';
+      const isAfterIndicator =
+        dragOverItem?.collectionId === collectionId &&
+        dragOverFolderKey === folderPathKey &&
+        dragOverItem?.index === idx &&
+        dragOverItemPos === 'after';
+      const isIntoIndicator =
+        dragOverItem?.collectionId === collectionId &&
+        dragOverFolderKey === folderPathKey &&
+        dragOverItem?.index === idx &&
+        dragOverItemPos === 'into';
+      const isDraggingThis =
+        draggingItem?.collectionId === collectionId &&
+        draggingFolderKey === folderPathKey &&
+        draggingItem?.index === idx;
       if (item.type === 'folder') {
         const expanded = expandedIds.has(key);
+        const folderClass = [
+          'sidebar-tree-item sidebar-folder',
+          isDraggingThis ? 'dragging' : '',
+          isBeforeIndicator ? 'drag-indicator-before' : '',
+          isAfterIndicator ? 'drag-indicator-after' : '',
+          isIntoIndicator ? 'drag-indicator-into' : '',
+        ].filter(Boolean).join(' ');
         return (
           <div key={key}>
             <div
-              className="sidebar-tree-item sidebar-folder"
+              className={folderClass}
               style={{ paddingLeft: 8 + depth * 14 }}
+              draggable
               onClick={() => toggleExpanded(key)}
               onContextMenu={(e) =>
                 showContextMenu(e, { kind: 'folder', collectionId, folderName: item.name, label: item.name })
               }
+              onDragStart={(e) => handleItemDragStart(e, itemPath)}
+              onDragOver={(e) => handleItemDragOver(e, itemPath)}
+              onDrop={(e) => handleItemDrop(e, itemPath)}
+              onDragEnd={handleItemDragEnd}
             >
               <span className="sidebar-arrow">{expanded ? '▼' : '▶'}</span>
               <span className="sidebar-folder-icon">📂</span>
               <span className="sidebar-item-label">{item.name}</span>
             </div>
             {expanded && item.items && item.items.length > 0 && (
-              <div>{renderItems(item.items, collectionId, depth + 1)}</div>
+              <div>{renderItems(item.items, collectionId, depth + 1, [...folderPath, item.name])}</div>
             )}
           </div>
         );
       } else if (item.type === 'request' && item.request) {
         const method = item.request.method || 'GET';
+        const requestClass = [
+          'sidebar-tree-item sidebar-request',
+          isDraggingThis ? 'dragging' : '',
+          isBeforeIndicator ? 'drag-indicator-before' : '',
+          isAfterIndicator ? 'drag-indicator-after' : '',
+        ].filter(Boolean).join(' ');
         return (
           <div
             key={key}
-            className="sidebar-tree-item sidebar-request"
+            className={requestClass}
             style={{ paddingLeft: 8 + depth * 14 }}
+            draggable
+            onDragStart={(e) => handleItemDragStart(e, itemPath)}
+            onDragOver={(e) => handleItemDragOver(e, itemPath)}
+            onDrop={(e) => handleItemDrop(e, itemPath)}
+            onDragEnd={handleItemDragEnd}
             onClick={(e) => {
+              if (draggingItem) return;
               const forceNewTab = e.ctrlKey || e.metaKey;
               openRequest(item, collectionId, forceNewTab);
             }}
@@ -242,14 +505,31 @@ export function CollectionsSidebar() {
         ) : (
           collections.map((col) => {
             const expanded = expandedIds.has(col.id);
+            const colClass = [
+              'sidebar-tree-item sidebar-collection',
+              draggingCollectionId === col.id ? 'dragging' : '',
+              dragOverCollectionId === col.id && dragOverColPos === 'before' ? 'drag-indicator-before' : '',
+              dragOverCollectionId === col.id && dragOverColPos === 'after' ? 'drag-indicator-after' : '',
+              itemDragOverCollectionId === col.id ? 'drag-indicator-into' : '',
+            ].filter(Boolean).join(' ');
             return (
               <div key={col.id}>
                 <div
-                  className="sidebar-tree-item sidebar-collection"
+                  className={colClass}
+                  draggable
                   onClick={() => toggleExpanded(col.id)}
                   onContextMenu={(e) =>
                     showContextMenu(e, { kind: 'collection', id: col.id, name: col.name })
                   }
+                  onDragStart={(e) => handleCollectionDragStart(e, col.id)}
+                  onDragOver={(e) => handleCollectionDragOver(e, col.id)}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                      setItemDragOverCollectionId(null);
+                    }
+                  }}
+                  onDrop={(e) => handleCollectionDrop(e, col.id)}
+                  onDragEnd={handleCollectionDragEnd}
                 >
                   <span className="sidebar-arrow">{expanded ? '▼' : '▶'}</span>
                   <span className="sidebar-folder-icon">📁</span>

@@ -6,9 +6,12 @@ import { ApiRequest, KeyValuePair } from '../types';
 export function parseCurl(curlCommand: string): ApiRequest {
   // Normalize: remove line continuations and extra whitespace
   let cmd = curlCommand
-    .replace(/\\\n/g, ' ')
-    .replace(/\\\r\n/g, ' ')
+    .replace(/\\\r\n/g, ' ')   // Unix \ continuation (CRLF)
+    .replace(/\\\n/g, ' ')     // Unix \ continuation (LF)
+    .replace(/\^\r\n/g, ' ')   // Windows ^ continuation (CRLF)
+    .replace(/\^\n/g, ' ')     // Windows ^ continuation (LF)
     .trim();
+
 
   // Remove leading "curl" word
   if (cmd.toLowerCase().startsWith('curl')) {
@@ -81,6 +84,16 @@ export function parseCurl(curlCommand: string): ApiRequest {
           username,
           password: passwordParts.join(':'),
         };
+      }
+    } else if (token === '-b' || token === '--cookie') {
+      i++;
+      if (i < tokens.length) {
+        const existing = result.headers.find((h) => h.key.toLowerCase() === 'cookie');
+        if (existing) {
+          existing.value = `${existing.value}; ${tokens[i]}`;
+        } else {
+          result.headers.push({ key: 'Cookie', value: tokens[i], enabled: true });
+        }
       }
     } else if (token === '--compressed' || token === '-s' || token === '--silent' || token === '-k' || token === '--insecure' || token === '-L' || token === '--location' || token === '-v' || token === '--verbose') {
       // Skip common flags
