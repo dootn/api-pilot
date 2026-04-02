@@ -7,6 +7,11 @@ export interface TestResult {
   error?: string;
 }
 
+export interface EnvVariableUpdate {
+  key: string;
+  value: string;
+}
+
 /**
  * Runs pre/post scripts in a Node.js VM sandbox.
  * NOTE: vm.runInNewContext does NOT provide full security isolation.
@@ -15,17 +20,18 @@ export interface TestResult {
 export class ScriptRunner {
   private readonly timeout = 3000;
 
-  /** Run the pre-request script. Returns a (potentially modified) copy of the request. */
+  /** Run the pre-request script. Returns a (potentially modified) copy of the request and updated env vars. */
   runPreScript(
     script: string,
     request: ApiRequest,
     envVariables: KeyValuePair[],
     consoleEntries?: ConsoleEntry[],
-  ): ApiRequest {
-    if (!script.trim()) return request;
+  ): { request: ApiRequest; envUpdates: EnvVariableUpdate[] } {
+    if (!script.trim()) return { request, envUpdates: [] };
 
     const mutableReq: ApiRequest = JSON.parse(JSON.stringify(request));
-    const pm = this.buildPmContext(mutableReq, null, envVariables);
+    const envUpdates: EnvVariableUpdate[] = [];
+    const pm = this.buildPmContext(mutableReq, null, envVariables, [], envUpdates);
 
     try {
       vm.runInNewContext(
@@ -39,21 +45,22 @@ export class ScriptRunner {
       console.error('[ScriptRunner] pre-request error:', msg);
     }
 
-    return mutableReq;
+    return { request: mutableReq, envUpdates };
   }
 
-  /** Run the post-response script. Returns collected test results. */
+  /** Run the post-response script. Returns collected test results and updated env vars. */
   runPostScript(
     script: string,
     request: ApiRequest,
     response: ApiResponse,
     envVariables: KeyValuePair[],
     consoleEntries?: ConsoleEntry[],
-  ): TestResult[] {
-    if (!script.trim()) return [];
+  ): { testResults: TestResult[]; envUpdates: EnvVariableUpdate[] } {
+    if (!script.trim()) return { testResults: [], envUpdates: [] };
 
     const testResults: TestResult[] = [];
-    const pm = this.buildPmContext(request, response, envVariables, testResults);
+    const envUpdates: EnvVariableUpdate[] = [];
+    const pm = this.buildPmContext(request, response, envVariables, testResults, envUpdates);
 
     try {
       vm.runInNewContext(
@@ -67,7 +74,7 @@ export class ScriptRunner {
       console.error('[ScriptRunner] post-response error:', msg);
     }
 
-    return testResults;
+    return { testResults, envUpdates };
   }
 
   private buildPmContext(
@@ -75,6 +82,7 @@ export class ScriptRunner {
     response: ApiResponse | null,
     envVariables: KeyValuePair[],
     testResults: TestResult[] = [],
+    envUpdates: EnvVariableUpdate[] = [],
   ) {
     const localVars: Record<string, unknown> = {};
 
@@ -138,8 +146,16 @@ export class ScriptRunner {
           }
         : null,
       environment: {
-        get: (key: string) => envVariables.find((v) => v.key === key && v.enabled)?.value ?? null,
-        set: (_key: string, _value: string) => { /* mutation not persisted in this release */ },
+        get: (key: string) => {
+          // Values set in this script execution take priority over the original env
+          for (let i = envUpdates.length - 1; i >= 0; i--) {
+            if (envUpdates[i].key === key) return envUpdates[i].value;
+          }
+          return envVariables.find((v) => v.key === key && v.enabled)?.value ?? null;
+        },
+        set: (key: string, value: string) => {
+          envUpdates.push({ key, value: String(value) });
+        },
       },
       variables: {
         get: (key: string) => localVars[key] ?? null,

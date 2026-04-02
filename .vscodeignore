@@ -23,6 +23,7 @@ docs/
 .eslintrc*
 .prettierrc*
 *.vsix
+**/*.js.map
 
 # Build artifacts not needed
 dist-webview/index.html

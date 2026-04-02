@@ -122,8 +122,8 @@ export function AuthEditor() {
               onChange={(e) => setAuth({ ...auth, in: e.target.value as 'header' | 'query' })}
               style={{ width: '100%' }}
             >
-              <option value="header">Header</option>
-              <option value="query">Query Params</option>
+              <option value="header">{t('authHeaderOption')}</option>
+              <option value="query">{t('authQueryOption')}</option>
             </select>
           </div>
         </>

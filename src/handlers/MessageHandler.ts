@@ -6,8 +6,10 @@ import { EnvService } from '../services/EnvService';
 import { HistoryService } from '../services/HistoryService';
 import { StorageService } from '../services/StorageService';
 import { exportCurl } from '../services/CurlExporter';
+import { VariableResolver } from '../services/VariableResolver';
 import { WebviewMessage } from '../types/messages';
-import { ApiRequest, ConsoleEntry, Environment } from '../types';
+import { ApiRequest, ConsoleEntry, CollectionItem, Environment, SSLInfo } from '../types';
+import { parseCurl } from '../services/CurlParser';
 
 const SESSION_DIR = 'session';
 const SESSION_FILE = 'tabs.json';
@@ -103,6 +105,65 @@ export class MessageHandler {
       case 'ready':
         this.handleReady();
         break;
+      // --- Collection CRUD ---
+      case 'getHistory':
+        this.handleGetHistory();
+        break;
+      case 'createCollection':
+        await this.handleCreateCollection();
+        break;
+      case 'renameCollection':
+        await this.handleRenameCollection(message.payload as { id: string; currentName: string });
+        break;
+      case 'deleteCollection':
+        await this.handleDeleteCollection(message.payload as { id: string; name: string });
+        break;
+      case 'addFolder':
+        await this.handleAddFolder(message.payload as { collectionId: string });
+        break;
+      case 'renameFolder':
+        await this.handleRenameFolder(message.payload as { collectionId: string; folderName: string });
+        break;
+      case 'deleteFolder':
+        await this.handleDeleteFolder(message.payload as { collectionId: string; folderName: string; label: string });
+        break;
+      case 'duplicateFolder':
+        this.handleDuplicateFolder(message.payload as { collectionId: string; folderName: string });
+        break;
+      case 'addSubfolder':
+        await this.handleAddSubfolder(message.payload as { collectionId: string; parentFolderName: string });
+        break;
+      case 'deleteRequest':
+        await this.handleDeleteRequest(message.payload as { collectionId: string; requestId: string; name: string });
+        break;
+      case 'renameRequest':
+        await this.handleRenameRequest(message.payload as { collectionId: string; requestId: string; currentName: string });
+        break;
+      case 'syncRequestName':
+        this.handleSyncRequestName(message.payload as { collectionId: string; requestId: string; newName: string });
+        break;
+      case 'duplicateRequest':
+        this.handleDuplicateRequest(message.payload as { collectionId: string; requestId: string });
+        break;
+      case 'moveRequest':
+        await this.handleMoveRequest(message.payload as { collectionId: string; requestId: string; name: string });
+        break;
+      case 'reorderCollections':
+        this.handleReorderCollections(message.payload as { orderedIds: string[] });
+        break;
+      // --- History CRUD ---
+      case 'clearHistory':
+        await this.handleClearHistory();
+        break;
+      case 'deleteHistoryEntry':
+        await this.handleDeleteHistoryEntry(message.payload as { id: string });
+        break;
+      case 'deleteHistoryGroup':
+        await this.handleDeleteHistoryGroup(message.payload as { date: string; label: string });
+        break;
+      case 'importCurl':
+        await this.handleImportCurl(message.payload as { curl: string });
+        break;
       default:
         console.warn(`Unknown message type: ${message.type}`);
     }
@@ -138,8 +199,11 @@ export class MessageHandler {
       const consoleEntries: ConsoleEntry[] = [];
 
       // Run pre-request script (may modify headers, params, url, etc.)
+      let envUpdates: Array<{ key: string; value: string }> = [];
       if (apiRequest.preScript?.trim()) {
-        apiRequest = this.scriptRunner.runPreScript(apiRequest.preScript, apiRequest, envVariables, consoleEntries);
+        const result = this.scriptRunner.runPreScript(apiRequest.preScript, apiRequest, envVariables, consoleEntries);
+        apiRequest = result.request;
+        envUpdates = [...envUpdates, ...result.envUpdates];
       }
 
       this.webview.postMessage({
@@ -148,15 +212,46 @@ export class MessageHandler {
         payload: { status: 'sending' },
       });
 
-      const response = await this.httpClient.send(apiRequest, requestId, envVariables);
+      const response = await this.httpClient.send(
+        apiRequest,
+        requestId,
+        envVariables,
+        vscode.workspace.getConfiguration('api-pilot').get<number>('requestTimeout', 30000),
+      );
 
       // Run post-response script and collect test results
-      const testResults = apiRequest.postScript?.trim()
-        ? this.scriptRunner.runPostScript(apiRequest.postScript, apiRequest, response, envVariables, consoleEntries)
-        : [];
+      let testResults: unknown[] = [];
+      if (apiRequest.postScript?.trim()) {
+        const result = this.scriptRunner.runPostScript(apiRequest.postScript, apiRequest, response, envVariables, consoleEntries);
+        testResults = result.testResults;
+        envUpdates = [...envUpdates, ...result.envUpdates];
+      }
+
+      // Apply environment variable updates if there's an active environment
+      if (envUpdates.length > 0 && this.envService) {
+        const activeEnvId = this.envService.getActiveEnvId();
+        if (activeEnvId) {
+          const env = this.envService.getById(activeEnvId);
+          if (env) {
+            // Update or add variables
+            for (const update of envUpdates) {
+              const existingVar = env.variables.find(v => v.key === update.key);
+              if (existingVar) {
+                existingVar.value = update.value;
+              } else {
+                env.variables.push({ key: update.key, value: update.value, enabled: true });
+              }
+            }
+            this.envService.update(env);
+            // Broadcast the updated environments so the webview refreshes immediately
+            this.broadcastEnvironments();
+          }
+        }
+      }
 
       // Record to history
-      this.historyService?.add(apiRequest, response);
+      const maxHistory = vscode.workspace.getConfiguration('api-pilot').get<number>('maxHistory', 1000);
+      this.historyService?.add(apiRequest, response, maxHistory);
       this.onHistoryChanged?.();
 
       this.webview.postMessage({
@@ -166,10 +261,24 @@ export class MessageHandler {
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // For HTTPS requests, collect SSL info separately so the user can inspect
+      // the certificate even when the request fails (e.g. cert expired, untrusted CA).
+      let sslInfo: SSLInfo | undefined;
+      const rawUrl = apiRequest?.url?.trim() ?? '';
+      const resolvedUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : 'http://' + rawUrl;
+      if (resolvedUrl.toLowerCase().startsWith('https://')) {
+        try {
+          sslInfo = await this.httpClient.collectSSLInfo(resolvedUrl);
+        } catch {
+          // ignore — SSL info collection is best-effort
+        }
+      }
+
       this.webview.postMessage({
         type: 'requestError',
         requestId,
-        payload: { message: errorMessage },
+        payload: { message: errorMessage, sslInfo },
       });
     }
   }
@@ -280,8 +389,9 @@ export class MessageHandler {
         this.webview.postMessage({ type: 'loadTabState', payload: session });
       }
     }
-    // Also send current environments
+    // Send current environments and collections
     this.handleGetEnvironments();
+    this.handleGetCollections();
     // Send locale based on settings then VS Code language
     const configLocale = vscode.workspace.getConfiguration('api-pilot').get<string>('locale', 'auto');
     let locale = 'en';
@@ -291,6 +401,274 @@ export class MessageHandler {
       locale = configLocale;
     }
     this.webview.postMessage({ type: 'setLocale', payload: locale });
+  }
+
+  private handleGetHistory(): void {
+    if (!this.historyService) {
+      this.webview.postMessage({ type: 'history', payload: { groups: [] } });
+      return;
+    }
+    const groups = this.historyService.getDateGroups();
+    const result = groups.map((g) => ({
+      date: g.date,
+      label: this.formatDateLabel(g.date),
+      entries: this.historyService!.getByDate(g.date),
+    }));
+    this.webview.postMessage({ type: 'history', payload: { groups: result } });
+  }
+
+  private formatDateLabel(dateKey: string): string {
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+    if (dateKey === todayKey) return 'Today';
+    if (dateKey === yesterdayKey) return 'Yesterday';
+    return dateKey;
+  }
+
+  private async handleCreateCollection(): Promise<void> {
+    if (!this.collectionService) return;
+    const name = await vscode.window.showInputBox({
+      prompt: 'Enter collection name',
+      placeHolder: 'My Collection',
+      validateInput: (v) => (v.trim() ? null : 'Name is required'),
+    });
+    if (name) {
+      this.collectionService.create(name.trim());
+      this.onCollectionChanged?.();
+      this.handleGetCollections();
+    }
+  }
+
+  private async handleRenameCollection(payload: { id: string; currentName: string }): Promise<void> {
+    if (!this.collectionService) return;
+    const newName = await vscode.window.showInputBox({
+      prompt: 'Rename collection',
+      value: payload.currentName,
+      validateInput: (v) => (v.trim() ? null : 'Name is required'),
+    });
+    if (newName) {
+      this.collectionService.rename(payload.id, newName.trim());
+      this.onCollectionChanged?.();
+      this.handleGetCollections();
+    }
+  }
+
+  private async handleDeleteCollection(payload: { id: string; name: string }): Promise<void> {
+    if (!this.collectionService) return;
+    const confirm = await vscode.window.showWarningMessage(
+      `Delete collection "${payload.name}"?`,
+      { modal: true },
+      'Delete'
+    );
+    if (confirm === 'Delete') {
+      this.collectionService.delete(payload.id);
+      this.onCollectionChanged?.();
+      this.handleGetCollections();
+    }
+  }
+
+  private async handleAddFolder(payload: { collectionId: string }): Promise<void> {
+    if (!this.collectionService) return;
+    const name = await vscode.window.showInputBox({
+      prompt: 'Enter folder name',
+      placeHolder: 'New Folder',
+      validateInput: (v) => (v.trim() ? null : 'Name is required'),
+    });
+    if (name) {
+      this.collectionService.addFolder(payload.collectionId, name.trim());
+      this.onCollectionChanged?.();
+      this.handleGetCollections();
+    }
+  }
+
+  private async handleRenameFolder(payload: { collectionId: string; folderName: string }): Promise<void> {
+    if (!this.collectionService) return;
+    const newName = await vscode.window.showInputBox({
+      prompt: 'Rename folder',
+      value: payload.folderName,
+      validateInput: (v) => (v.trim() ? null : 'Name is required'),
+    });
+    if (newName) {
+      this.collectionService.renameFolder(payload.collectionId, payload.folderName, newName.trim());
+      this.onCollectionChanged?.();
+      this.handleGetCollections();
+    }
+  }
+
+  private async handleDeleteFolder(payload: { collectionId: string; folderName: string; label: string }): Promise<void> {
+    if (!this.collectionService) return;
+    const confirm = await vscode.window.showWarningMessage(
+      `Delete folder "${payload.label}" and all its contents?`,
+      { modal: true },
+      'Delete'
+    );
+    if (confirm === 'Delete') {
+      this.collectionService.removeItem(payload.collectionId, payload.folderName);
+      this.onCollectionChanged?.();
+      this.handleGetCollections();
+    }
+  }
+
+  private handleDuplicateFolder(payload: { collectionId: string; folderName: string }): void {
+    if (!this.collectionService) return;
+    this.collectionService.duplicateFolder(payload.collectionId, payload.folderName);
+    this.onCollectionChanged?.();
+    this.handleGetCollections();
+  }
+
+  private async handleAddSubfolder(payload: { collectionId: string; parentFolderName: string }): Promise<void> {
+    if (!this.collectionService) return;
+    const name = await vscode.window.showInputBox({
+      prompt: 'Subfolder name',
+      placeHolder: 'New Folder',
+      validateInput: (v) => (v.trim() ? null : 'Name is required'),
+    });
+    if (name) {
+      this.collectionService.addFolder(payload.collectionId, name.trim(), payload.parentFolderName);
+      this.onCollectionChanged?.();
+      this.handleGetCollections();
+    }
+  }
+
+  private async handleDeleteRequest(payload: { collectionId: string; requestId: string; name: string }): Promise<void> {
+    if (!this.collectionService) return;
+    const confirm = await vscode.window.showWarningMessage(
+      `Delete "${payload.name}"?`,
+      { modal: true },
+      'Delete'
+    );
+    if (confirm === 'Delete') {
+      this.collectionService.removeItem(payload.collectionId, payload.requestId);
+      this.onCollectionChanged?.();
+      this.handleGetCollections();
+    }
+  }
+
+  private async handleRenameRequest(payload: { collectionId: string; requestId: string; currentName: string }): Promise<void> {
+    if (!this.collectionService) return;
+    const newName = await vscode.window.showInputBox({
+      prompt: 'Rename request',
+      value: payload.currentName,
+      validateInput: (v) => (v.trim() ? null : 'Name is required'),
+    });
+    if (newName) {
+      this.collectionService.renameRequest(payload.collectionId, payload.requestId, newName.trim());
+      this.onCollectionChanged?.();
+      this.handleGetCollections();
+      // Notify webview so any open tab for this request updates its name
+      this.webview.postMessage({
+        type: 'requestRenamed',
+        payload: { collectionId: payload.collectionId, requestId: payload.requestId, newName: newName.trim() },
+      });
+    }
+  }
+
+  private handleSyncRequestName(payload: { collectionId: string; requestId: string; newName: string }): void {
+    if (!this.collectionService) return;
+    this.collectionService.renameRequest(payload.collectionId, payload.requestId, payload.newName);
+    this.onCollectionChanged?.();
+  }
+
+  private handleDuplicateRequest(payload: { collectionId: string; requestId: string }): void {
+    if (!this.collectionService) return;
+    this.collectionService.duplicateRequest(payload.collectionId, payload.requestId);
+    this.onCollectionChanged?.();
+    this.handleGetCollections();
+  }
+
+  private async handleMoveRequest(payload: { collectionId: string; requestId: string; name: string }): Promise<void> {
+    if (!this.collectionService) return;
+    const allCollections = this.collectionService.getAll();
+
+    interface Destination { label: string; collectionId: string; folderId?: string; }
+    const destinations: Destination[] = [];
+    for (const col of allCollections) {
+      destinations.push({ label: `📁 ${col.name}`, collectionId: col.id });
+      const walkFolders = (items: CollectionItem[], prefix: string): void => {
+        for (const item of items) {
+          if (item.type === 'folder') {
+            destinations.push({ label: `${prefix}📂 ${item.name}`, collectionId: col.id, folderId: item.name });
+            walkFolders(item.items || [], prefix + '  ');
+          }
+        }
+      };
+      walkFolders(col.items, '  ');
+    }
+
+    if (destinations.length === 0) {
+      vscode.window.showWarningMessage('No collections available to move to.');
+      return;
+    }
+
+    const destLabels = destinations.map((d) => d.label);
+    const picked = await vscode.window.showQuickPick(destLabels, { placeHolder: `Move "${payload.name}" to...` });
+    if (!picked) return;
+
+    const dest = destinations[destLabels.indexOf(picked)];
+    const success = this.collectionService.moveRequest(payload.collectionId, payload.requestId, dest.collectionId, dest.folderId);
+    if (success) {
+      this.onCollectionChanged?.();
+      this.handleGetCollections();
+    }
+  }
+
+  private handleReorderCollections(payload: { orderedIds: string[] }): void {
+    if (!this.collectionService) return;
+    this.collectionService.setOrder(payload.orderedIds);
+  }
+
+  private async handleClearHistory(): Promise<void> {
+    if (!this.historyService) return;
+    const confirm = await vscode.window.showWarningMessage(
+      'Clear all request history?',
+      { modal: true },
+      'Clear'
+    );
+    if (confirm === 'Clear') {
+      this.historyService.clear();
+      this.onHistoryChanged?.();
+      this.handleGetHistory();
+    }
+  }
+
+  private async handleDeleteHistoryEntry(payload: { id: string }): Promise<void> {
+    if (!this.historyService) return;
+    const confirm = await vscode.window.showWarningMessage(
+      'Delete this history entry?',
+      { modal: true },
+      'Delete'
+    );
+    if (confirm === 'Delete') {
+      this.historyService.deleteEntry(payload.id);
+      this.onHistoryChanged?.();
+      this.handleGetHistory();
+    }
+  }
+
+  private async handleDeleteHistoryGroup(payload: { date: string; label: string }): Promise<void> {
+    if (!this.historyService) return;
+    const confirm = await vscode.window.showWarningMessage(
+      `Delete all history for "${payload.label}"?`,
+      { modal: true },
+      'Delete'
+    );
+    if (confirm === 'Delete') {
+      this.historyService.deleteGroup(payload.date);
+      this.onHistoryChanged?.();
+      this.handleGetHistory();
+    }
+  }
+
+  private async handleImportCurl(payload: { curl: string }): Promise<void> {
+    try {
+      const request = parseCurl(payload.curl);
+      this.webview.postMessage({ type: 'loadRequest', payload: request });
+    } catch (e) {
+      vscode.window.showErrorMessage(`Failed to parse cURL: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
   }
 
   private handleSaveTabState(session: TabSession): void {
@@ -354,7 +732,10 @@ export class MessageHandler {
   }
 
   private async handleCopyAsCurl(request: ApiRequest): Promise<void> {
-    const curl = exportCurl(request);
+    const envVariables = this.envService?.getActiveVariables() || [];
+    const resolver = new VariableResolver();
+    const resolved = envVariables.length > 0 ? resolver.resolveObject(request, envVariables) : request;
+    const curl = exportCurl(resolved);
     await vscode.env.clipboard.writeText(curl);
     vscode.window.showInformationMessage('cURL copied to clipboard.');
   }

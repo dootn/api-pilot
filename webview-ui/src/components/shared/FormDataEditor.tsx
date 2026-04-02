@@ -2,6 +2,7 @@ import { type FormDataField } from '../../stores/requestStore';
 import { VarInput } from '../../utils/varHighlight';
 import { vscode } from '../../vscode';
 import { useEffect } from 'react';
+import { useI18n } from '../../i18n';
 
 interface Props {
   items: FormDataField[];
@@ -11,6 +12,8 @@ interface Props {
   valuePlaceholder?: string;
   /** When provided, {{var}} tokens in key/value cells are highlighted. */
   knownVarNames?: Set<string>;
+  /** When provided, tooltip on {{var}} shows resolved value. */
+  varValues?: Map<string, string>;
 }
 
 export function FormDataEditor({ 
@@ -19,8 +22,10 @@ export function FormDataEditor({
   requestId,
   keyPlaceholder = 'Key', 
   valuePlaceholder = 'Value', 
-  knownVarNames 
+  knownVarNames,
+  varValues
 }: Props) {
+  const t = useI18n();
   
   // Listen for file picked messages
   useEffect(() => {
@@ -109,7 +114,7 @@ export function FormDataEditor({
               minWidth: 38,
               fontWeight: item.type === 'file' ? 600 : 400,
             }}
-            title="Toggle text/file"
+            title={t('formDataToggleType')}
           >
             {item.type === 'file' ? '📎' : 'T'}
           </button>
@@ -120,6 +125,7 @@ export function FormDataEditor({
             value={item.key}
             onChange={(v) => updateItem(index, 'key', v)}
             knownVarNames={knownVarNames}
+            varValues={varValues}
             spellCheck={false}
           />
           
@@ -130,6 +136,7 @@ export function FormDataEditor({
               value={item.value}
               onChange={(v) => updateItem(index, 'value', v)}
               knownVarNames={knownVarNames}
+              varValues={varValues}
               spellCheck={false}
             />
           ) : (
@@ -154,7 +161,7 @@ export function FormDataEditor({
                   opacity: item.key ? 1 : 0.5,
                 }}
               >
-                选择文件
+                {t('chooseFile')}
               </button>
               {item.fileName && (
                 <span style={{ fontSize: 11, color: 'var(--success-fg)' }}>
@@ -163,7 +170,7 @@ export function FormDataEditor({
               )}
               {!item.fileName && item.key && (
                 <span style={{ fontSize: 11, opacity: 0.5 }}>
-                  未选择文件
+                  {t('noFileSelected')}
                 </span>
               )}
             </div>
@@ -172,7 +179,7 @@ export function FormDataEditor({
           <button
             className="kv-delete-btn"
             onClick={() => removeItem(index)}
-            title="Remove"
+            title={t('removeItem')}
           >
             ×
           </button>

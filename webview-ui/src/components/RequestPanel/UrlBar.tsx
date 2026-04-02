@@ -4,10 +4,11 @@ import type { HttpMethod } from '../../stores/requestStore';
 import { vscode } from '../../vscode';
 import { useEnvironments } from '../../hooks/useEnvironments';
 import { renderVarHighlight } from '../../utils/varHighlight';
+import { useI18n } from '../../i18n';
 
-const METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'];
+const DEFAULT_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'];
 
-const METHOD_CLASSES: Record<HttpMethod, string> = {
+const METHOD_CLASSES: Record<string, string> = {
   GET: 'method-get',
   POST: 'method-post',
   PUT: 'method-put',
@@ -95,6 +96,7 @@ const renderHighlightedUrl = renderVarHighlight;
 
 export function UrlBar() {
   const { activeTabId, tabs, updateTab } = useTabStore();
+  const t = useI18n();
   const [showSaveDropdown, setShowSaveDropdown] = useState(false);
   const [collections, setCollections] = useState<CollectionBrief[]>([]);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
@@ -113,6 +115,11 @@ export function UrlBar() {
 
   const knownVarNames = useMemo(
     () => new Set(activeEnvVars.map((v) => v.key)),
+    [activeEnvVars]
+  );
+
+  const varValues = useMemo(
+    () => new Map(activeEnvVars.map((v) => [v.key, v.value])),
     [activeEnvVars]
   );
 
@@ -181,6 +188,7 @@ export function UrlBar() {
         auth: tab.auth,
         preScript: tab.preScript,
         postScript: tab.postScript,
+        sslVerify: tab.sslVerify ?? true,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       },
@@ -293,12 +301,13 @@ export function UrlBar() {
 
   function handleSaveAs(collectionId: string, folderId?: string) {
     if (!tab) return;
-    const newId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const req = { ...buildSaveRequest(), id: newId };
+    const req = buildSaveRequest(); // uses tab.id — keeps collection request id in sync with the tab id
     vscode.postMessage({
       type: 'saveToCollection',
       payload: { collectionId, folderId, request: req },
     });
+    // Update the tab so that it is now bound to this collection, and clear dirty flag
+    updateTab(tab.id, { collectionId, isDirty: false });
     setSaveStatus('saved');
     setShowSaveDropdown(false);
     setTimeout(() => setSaveStatus('idle'), 2000);
@@ -306,43 +315,130 @@ export function UrlBar() {
 
   return (
     <div className="url-bar">
-      <select
-        className={`method-select ${METHOD_CLASSES[tab.method]}`}
-        value={tab.method}
-        onChange={(e) => updateTab(tab.id, { method: e.target.value as HttpMethod })}
-      >
-        {METHODS.map((m) => (
-          <option key={m} value={m}>
-            {m}
-          </option>
-        ))}
-      </select>
-
-      <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-        {/* Highlight backing layer: renders {{var}} tokens in colour */}
-        <div
-          ref={urlHighlightRef}
-          aria-hidden
-          style={{
-            position: 'absolute',
-            inset: 0,
-            padding: '6px 10px',
-            fontSize: '13px',
-            lineHeight: '1.4',
-            whiteSpace: 'pre',
-            overflow: 'hidden',
-            pointerEvents: 'none',
-            background: 'var(--input-bg, #3c3c3c)',
-            border: '1px solid transparent',
-            borderRadius: 3,
-            display: 'flex',
-            alignItems: 'center',
-            zIndex: 0,
-            color: 'var(--input-fg, #cccccc)',
+      <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+        <select
+          className={`method-select ${METHOD_CLASSES[tab.method] || 'method-get'}`}
+          value={tab.method}
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value === '__custom__') {
+              updateTab(tab.id, { method: value as any });
+            } else {
+              updateTab(tab.id, { method: value as HttpMethod });
+            }
           }}
         >
-          {renderHighlightedUrl(tab.url, knownVarNames)}
-        </div>
+          {DEFAULT_METHODS.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+          {/* Show current method if it's not in default list */}
+          {!DEFAULT_METHODS.includes(tab.method as any) && tab.method !== '__custom__' && (
+            <option key={tab.method} value={tab.method}>
+              {tab.method}
+            </option>
+          )}
+          <option value="__custom__">{t('urlCustomMethod')}</option>
+        </select>
+        {(tab.method as string) === '__custom__' && (
+          <input
+            type="text"
+            placeholder="Enter method"
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: '100%',
+              height: '100%',
+              background: 'var(--input-bg)',
+              color: 'var(--input-fg)',
+              border: '1px solid var(--input-border)',
+              borderRadius: 3,
+              padding: '6px 8px',
+              fontSize: 12,
+              fontWeight: 600,
+              textTransform: 'uppercase',
+            }}
+            autoFocus
+            onBlur={(e) => {
+              const custom = e.target.value.trim().toUpperCase();
+              if (custom) {
+                updateTab(tab.id, { method: custom as HttpMethod });
+              } else {
+                updateTab(tab.id, { method: 'GET' });
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const custom = (e.target as HTMLInputElement).value.trim().toUpperCase();
+                if (custom) {
+                  updateTab(tab.id, { method: custom as HttpMethod });
+                } else {
+                  updateTab(tab.id, { method: 'GET' });
+                }
+                (e.target as HTMLInputElement).blur();
+              } else if (e.key === 'Escape') {
+                updateTab(tab.id, { method: 'GET' });
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+          />
+        )}
+        {/* Delete button for custom methods (not in the default list) */}
+        {!DEFAULT_METHODS.includes(tab.method as any) && (tab.method as string) !== '__custom__' && (
+          <button
+            title={t('urlRemoveCustomMethod')}
+            onClick={() => updateTab(tab.id, { method: 'GET' })}
+            style={{
+              position: 'absolute',
+              right: -18,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'none',
+              border: 'none',
+              color: 'var(--vscode-errorForeground, #f48771)',
+              cursor: 'pointer',
+              fontSize: 12,
+              lineHeight: 1,
+              padding: '1px 2px',
+              opacity: 0.7,
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+        {/* Highlight backing layer: only active when URL contains {{vars}} */}
+        {tab.url.includes('{{') && (
+          <div
+            ref={urlHighlightRef}
+            aria-hidden
+            style={{
+              position: 'absolute',
+              inset: 0,
+              padding: '6px 10px',
+              fontSize: '13px',
+              lineHeight: '1.4',
+              whiteSpace: 'pre',
+              overflow: 'hidden',
+              pointerEvents: 'none',
+              background: 'var(--input-bg, #3c3c3c)',
+              border: '1px solid transparent',
+              borderRadius: 3,
+              display: 'flex',
+              alignItems: 'center',
+              zIndex: 0,
+              color: 'var(--input-fg, #cccccc)',
+            }}
+          >
+            {renderHighlightedUrl(tab.url, knownVarNames, varValues)}
+          </div>
+        )}
         <input
           ref={urlInputRef}
           className="url-input"
@@ -357,9 +453,9 @@ export function UrlBar() {
             width: '100%',
             position: 'relative',
             zIndex: 1,
-            color: 'transparent',
-            caretColor: 'var(--input-fg, #cccccc)',
-            background: 'transparent',
+            ...(tab.url.includes('{{')
+              ? { color: 'transparent', caretColor: 'var(--input-fg, #cccccc)', background: 'transparent' }
+              : {}),
           }}
         />
         {showVarDropdown && (
@@ -415,18 +511,40 @@ export function UrlBar() {
         onClick={handleSend}
         disabled={!tab.url.trim() && !tab.loading}
       >
-        {tab.loading ? 'Cancel' : 'Send'}
+        {tab.loading ? t('urlCancel') : t('urlSend')}
       </button>
+
+      {/* SSL verify toggle — only meaningful for HTTPS */}
+      {tab.url.trim().toLowerCase().startsWith('https') && (
+        <button
+          className="ssl-toggle-btn"
+          title={(tab.sslVerify ?? true) ? t('urlSslVerifyOn') : t('urlSslVerifyOff')}
+          onClick={() => updateTab(tab.id, { sslVerify: !(tab.sslVerify ?? true) })}
+          style={{
+            background: 'none',
+            border: '1px solid var(--border-color, #555)',
+            borderRadius: 4,
+            cursor: 'pointer',
+            padding: '4px 7px',
+            fontSize: 14,
+            lineHeight: 1,
+            opacity: (tab.sslVerify ?? true) ? 1 : 0.6,
+            color: (tab.sslVerify ?? true) ? 'var(--vscode-terminal-ansiGreen, #4ec9b0)' : 'var(--vscode-errorForeground, #f48771)',
+          }}
+        >
+          {(tab.sslVerify ?? true) ? '🔒' : '🔓'}
+        </button>
+      )}
 
       {/* Save: update existing collection item (only when opened from a bookmark) */}
       {tab.collectionId && (
         <button
           className={`save-btn ${saveStatus === 'saved' ? 'saved' : ''}`}
           onClick={handleDirectSave}
-          title="Save (update bookmark)"
+          title={t('urlSaveTitleUpdate')}
           disabled={!tab.url.trim() || !tab.isDirty}
         >
-          {saveStatus === 'saved' ? '✓ Saved' : '💾 Save'}
+          {saveStatus === 'saved' ? t('urlSavedBtn') : t('urlSaveBtn')}
         </button>
       )}
 
@@ -435,17 +553,17 @@ export function UrlBar() {
         <button
           className="save-btn"
           onClick={() => { setShowSaveDropdown((v) => !v); }}
-          title="Save As — add to a collection"
+          title={t('urlSaveTitleAs')}
           disabled={!tab.url.trim()}
         >
-          {tab.collectionId ? '📋 Save As' : '💾 Save As'}
+          {tab.collectionId ? t('urlSaveAsBtn') : t('urlSaveNewBtn')}
         </button>
 
         {showSaveDropdown && (
           <div className="save-dropdown">
             {collections.length === 0 ? (
               <div style={{ padding: '8px 12px', fontSize: 12, opacity: 0.6 }}>
-                No collections. Create one in the sidebar.
+                {t('urlNoCollections')}
               </div>
             ) : (
               collections.map((col) => (

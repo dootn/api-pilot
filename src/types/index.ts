@@ -40,6 +40,7 @@ export type AuthConfig =
 export interface ApiRequest {
   id: string;
   name: string;
+  description?: string;
   method: HttpMethod;
   url: string;
   params: KeyValuePair[];
@@ -48,6 +49,7 @@ export interface ApiRequest {
   auth: AuthConfig;
   preScript?: string;
   postScript?: string;
+  sslVerify?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -64,6 +66,30 @@ export interface ConsoleEntry {
   source: 'pre' | 'post';
 }
 
+export interface SSLCertificate {
+  subject: Record<string, string>;
+  issuer: Record<string, string>;
+  validFrom: string;
+  validTo: string;
+  serialNumber: string;
+  fingerprint: string;
+  signatureAlgorithm: string;
+  subjectAltNames?: string[];
+}
+
+export interface SSLInfo {
+  authorized: boolean;
+  authorizationError?: string;
+  protocol: string;
+  cipher: {
+    name: string;
+    version: string;
+  };
+  certificate?: SSLCertificate;
+  certificateChain?: SSLCertificate[];
+  peerCertificate?: Record<string, any>;
+}
+
 export interface ApiResponse {
   status: number;
   statusText: string;
@@ -75,6 +101,7 @@ export interface ApiResponse {
   bodyBase64?: string;
   testResults?: TestResult[];
   consoleEntries?: ConsoleEntry[];
+  sslInfo?: SSLInfo;
 }
 
 export interface HistoryEntry {

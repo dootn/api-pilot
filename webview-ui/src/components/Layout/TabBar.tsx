@@ -21,10 +21,8 @@ interface ContextMenu {
 }
 
 export function TabBar() {
-  const { tabs, activeTabId, setActiveTabId, addTab, removeTab, renameTab, reorderTabs, pinTab, duplicateTab } = useTabStore();
+  const { tabs, activeTabId, setActiveTabId, addTab, removeTab, reorderTabs, pinTab, duplicateTab, updateTab } = useTabStore();
   const { environments, activeEnvId, switchEnv } = useEnvironments();
-  const [editingTabId, setEditingTabId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState('');
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const [showEnvDropdown, setShowEnvDropdown] = useState(false);
   const [showEnvManager, setShowEnvManager] = useState(false);
@@ -33,18 +31,8 @@ export function TabBar() {
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const inputRef = useRef<HTMLInputElement>(null);
   const envDropdownRef = useRef<HTMLDivElement>(null);
   const tabsScrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (editingTabId && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editingTabId]);
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
@@ -53,24 +41,6 @@ export function TabBar() {
     if (!el) return;
     setCanScrollLeft(el.scrollLeft > 0);
     setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
-    
-    // Calculate pagination
-    const scrollWidth = el.scrollWidth;
-    const clientWidth = el.clientWidth;
-    const scrollLeft = el.scrollLeft;
-    
-    if (scrollWidth > clientWidth) {
-      // Calculate total pages (approximate, treating each viewport as a page)
-      const pages = Math.ceil(scrollWidth / clientWidth);
-      setTotalPages(pages);
-      
-      // Calculate current page based on scroll position
-      const page = Math.min(pages, Math.floor(scrollLeft / clientWidth) + 1);
-      setCurrentPage(page);
-    } else {
-      setTotalPages(1);
-      setCurrentPage(1);
-    }
   }, []);
 
   useEffect(() => {
@@ -87,25 +57,17 @@ export function TabBar() {
   }, [updateScrollState]);
 
 
-  function scrollToPage(pageNum: number) {
-    const el = tabsScrollRef.current;
-    if (!el) return;
-    const targetScroll = (pageNum - 1) * el.clientWidth;
-    el.scrollTo({ left: targetScroll, behavior: 'smooth' });
-  }
-
-  function nextPage() {
-    if (currentPage < totalPages) {
-      scrollToPage(currentPage + 1);
-    }
-  }
-
-  function prevPage() {
-    if (currentPage > 1) {
-      scrollToPage(currentPage - 1);
-    }
-  }
   useEffect(() => { updateScrollState(); }, [tabs, updateScrollState]);
+
+  // Scroll the active tab into the visible area of the tab bar
+  useEffect(() => {
+    const container = tabsScrollRef.current;
+    if (!container) return;
+    const activeEl = container.querySelector<HTMLElement>(`[data-tab-id="${activeTabId}"]`);
+    if (!activeEl) return;
+    // scrollIntoView with inline:'nearest' avoids over-scrolling
+    activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [activeTabId]);
 
   useEffect(() => {
     const el = tabsScrollRef.current;
@@ -120,9 +82,6 @@ export function TabBar() {
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
 
-  function scrollTabs(delta: number) {
-    tabsScrollRef.current?.scrollBy({ left: delta, behavior: 'smooth' });
-  }
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -146,23 +105,6 @@ export function TabBar() {
     window.addEventListener('mousedown', close);
     return () => window.removeEventListener('mousedown', close);
   }, [showEnvDropdown]);
-
-  function startRename(tabId: string, tab: { name: string; url: string; isCustomNamed: boolean }) {
-    setEditingTabId(tabId);
-    setEditingName(tab.isCustomNamed ? tab.name : (tab.url || tab.name));
-  }
-
-  function commitRename() {
-    if (editingTabId) {
-      const trimmed = editingName.trim();
-      if (trimmed) renameTab(editingTabId, trimmed);
-    }
-    setEditingTabId(null);
-  }
-
-  function cancelRename() {
-    setEditingTabId(null);
-  }
 
   function openContextMenu(e: React.MouseEvent, tabId: string) {
     e.preventDefault();
@@ -215,7 +157,10 @@ export function TabBar() {
       <div style={{ display: 'flex', flex: 1, minWidth: 0, alignItems: 'center' }}>
         {canScrollLeft && (
           <button
-            onClick={() => scrollTabs(-120)}
+            onClick={() => {
+              const el = tabsScrollRef.current;
+              if (el) el.scrollBy({ left: -el.clientWidth, behavior: 'smooth' });
+            }}
             style={{ background: 'transparent', border: 'none', color: 'var(--panel-fg)', cursor: 'pointer', padding: '0 5px', fontSize: 16, flexShrink: 0, opacity: 0.7, alignSelf: 'stretch', display: 'flex', alignItems: 'center' }}
             title={t('scrollLeft')}
           >‹</button>
@@ -224,7 +169,13 @@ export function TabBar() {
         {tabs.map((tab) => (
           <div
             key={tab.id}
-            onClick={() => setActiveTabId(tab.id)}
+            data-tab-id={tab.id}
+            className={`tabbar-tab${tab.id === activeTabId ? ' active' : ''}`}
+            onClick={(e) => {
+              setActiveTabId(tab.id);
+              // Force scroll even if this tab was already active (e.g. half-visible)
+              (e.currentTarget as HTMLElement).scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            }}
             onContextMenu={(e) => openContextMenu(e, tab.id)}
             draggable={!tab.isPinned}
             onDragStart={(e) => !tab.isPinned && handleDragStart(e, tab.id)}
@@ -232,30 +183,10 @@ export function TabBar() {
             onDrop={(e) => handleDrop(e, tab.id)}
             onDragEnd={handleDragEnd}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '6px 12px',
-              cursor: 'pointer',
-              fontSize: 12,
-              whiteSpace: 'nowrap',
-              background:
-                tab.id === activeTabId
-                  ? 'var(--tab-active-bg)'
-                  : 'transparent',
-              borderBottom:
-                tab.id === activeTabId
-                  ? '2px solid var(--button-bg)'
-                  : '2px solid transparent',
               borderLeft: tab.id === dragOverTabId && tab.id !== draggingTabId
                 ? '2px solid var(--button-bg)'
-                : '2px solid transparent',
-              color:
-                tab.id === activeTabId
-                  ? 'var(--vscode-tab-activeForeground, #fff)'
-                  : 'var(--vscode-tab-inactiveForeground, #999)',
+                : undefined,
               opacity: tab.id === draggingTabId ? 0.4 : 1,
-              minWidth: 80,
             }}
           >
             <span
@@ -272,61 +203,19 @@ export function TabBar() {
               <span style={{ fontSize: 9, opacity: 0.7, lineHeight: 1 }} title={t('pinnedHint')}>📌</span>
             )}
 
-            {editingTabId === tab.id ? (
-              <input
-                ref={inputRef}
-                value={editingName}
-                onChange={(e) => setEditingName(e.target.value)}
-                onBlur={commitRename}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitRename();
-                  else if (e.key === 'Escape') cancelRename();
-                  e.stopPropagation();
-                }}
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  width: 100,
-                  fontSize: 12,
-                  background: 'var(--input-bg, var(--vscode-input-background))',
-                  color: 'var(--panel-fg)',
-                  border: '1px solid var(--button-bg)',
-                  borderRadius: 3,
-                  padding: '1px 4px',
-                  outline: 'none',
-                }}
-              />
-            ) : (
-              <span
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  startRename(tab.id, tab);
-                }}
-                title={t('doubleClickRename')}
-                style={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  maxWidth: 120,
-                }}
-              >
+            <span className="tabbar-tab-label">
                 {tab.isCustomNamed ? tab.name : (tab.url || tab.name)}
               </span>
-            )}
 
             {tab.isDirty && (
               <span style={{ color: 'var(--warning-fg)', fontSize: 8 }}>●</span>
             )}
             {tabs.length > 1 && !tab.isPinned && (
               <span
+                className="tabbar-tab-close"
                 onClick={(e) => {
                   e.stopPropagation();
                   removeTab(tab.id);
-                }}
-                style={{
-                  marginLeft: 4,
-                  opacity: 0.5,
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  lineHeight: 1,
                 }}
                 title={t('closeTabHint')}
               >
@@ -338,59 +227,16 @@ export function TabBar() {
         </div>
         {canScrollRight && (
           <button
-            onClick={() => scrollTabs(120)}
+            onClick={() => {
+              const el = tabsScrollRef.current;
+              if (el) el.scrollBy({ left: el.clientWidth, behavior: 'smooth' });
+            }}
             style={{ background: 'transparent', border: 'none', color: 'var(--panel-fg)', cursor: 'pointer', padding: '0 5px', fontSize: 16, flexShrink: 0, opacity: 0.7, alignSelf: 'stretch', display: 'flex', alignItems: 'center' }}
             title={t('scrollRight')}
           >›</button>
         )}
       </div>
 
-      {/* Pagination indicator */}
-      {totalPages > 1 && (
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 4, 
-          padding: '0 8px',
-          borderLeft: '1px solid var(--border-color)',
-          fontSize: 11,
-          color: 'var(--panel-fg)',
-          opacity: 0.7,
-          flexShrink: 0,
-        }}>
-          <button
-            onClick={prevPage}
-            disabled={currentPage === 1}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--panel-fg)',
-              cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-              padding: '2px 4px',
-              fontSize: 14,
-              opacity: currentPage === 1 ? 0.3 : 0.7,
-            }}
-            title="上一页"
-          >◀</button>
-          <span style={{ minWidth: 35, textAlign: 'center' }}>
-            {currentPage}/{totalPages}
-          </span>
-          <button
-            onClick={nextPage}
-            disabled={currentPage === totalPages}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--panel-fg)',
-              cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-              padding: '2px 4px',
-              fontSize: 14,
-              opacity: currentPage === totalPages ? 0.3 : 0.7,
-            }}
-            title="下一页"
-          >▶</button>
-        </div>
-      )}
 
       <button
         onClick={addTab}
@@ -455,22 +301,6 @@ export function TabBar() {
         >
           <div
             onClick={() => {
-              closeContextMenu();
-              startRename(contextMenuTab.id, contextMenuTab);
-            }}
-            style={{
-              padding: '6px 14px',
-              cursor: 'pointer',
-              fontSize: 12,
-              color: 'var(--panel-fg)',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--vscode-list-hoverBackground, #2a2d2e)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-          >
-            {t('renameTab')}
-          </div>
-          <div
-            onClick={() => {
               pinTab(contextMenuTab.id, !contextMenuTab.isPinned);
               closeContextMenu();
             }}
@@ -530,13 +360,6 @@ export function TabBar() {
         className="env-dropdown"
         style={{ position: 'fixed', top: envDropdownPos.top, right: envDropdownPos.right, left: 'auto' }}
       >
-        <div
-          className={`env-dropdown-item ${!activeEnvId ? 'selected' : ''}`}
-          onClick={() => { switchEnv(null); setShowEnvDropdown(false); setEnvDropdownPos(null); }}
-        >
-          <span className="env-dropdown-dot">○</span>
-          {t('noEnvironment')}
-        </div>
         {environments.map((env) => (
           <div
             key={env.id}

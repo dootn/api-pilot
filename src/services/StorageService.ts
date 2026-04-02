@@ -128,4 +128,10 @@ export class StorageService {
   isAvailable(): boolean {
     return this.basePath !== null;
   }
+
+  fileExists(subDir: string, fileName: string): boolean {
+    if (!this.basePath) return false;
+    const filePath = path.join(this.basePath, subDir, fileName);
+    return fs.existsSync(filePath);
+  }
 }

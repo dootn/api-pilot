@@ -3,11 +3,36 @@ import { StorageService } from './StorageService';
 import { Environment, KeyValuePair } from '../types';
 
 const ENVIRONMENTS_DIR = 'environments';
+const SETTINGS_FILE = 'settings.json';
+
+interface Settings {
+  activeEnvId?: string | null;
+}
 
 export class EnvService {
   private activeEnvId: string | null = null;
 
-  constructor(private storage: StorageService) {}
+  constructor(private storage: StorageService) {
+    // Create a default environment if none exist
+    if (this.getAll().length === 0) {
+      const defaultEnv = this.create('Default');
+      this.activeEnvId = defaultEnv.id;
+      this.saveSettings();
+      return;
+    }
+
+    // Restore the previously active environment across restarts
+    const settings = this.storage.readJson<Settings>('', SETTINGS_FILE);
+    if (settings?.activeEnvId) {
+      const env = this.getById(settings.activeEnvId);
+      this.activeEnvId = env ? settings.activeEnvId : null;
+    }
+  }
+
+  private saveSettings(): void {
+    const current = this.storage.readJson<Settings>('', SETTINGS_FILE) ?? {};
+    this.storage.writeJson('', SETTINGS_FILE, { ...current, activeEnvId: this.activeEnvId });
+  }
 
   getAll(): Environment[] {
     const files = this.storage.listFiles(ENVIRONMENTS_DIR);
@@ -45,7 +70,14 @@ export class EnvService {
     if (this.activeEnvId === id) {
       this.activeEnvId = null;
     }
-    return this.storage.deleteFile(ENVIRONMENTS_DIR, `${id}.json`);
+    const result = this.storage.deleteFile(ENVIRONMENTS_DIR, `${id}.json`);
+    // Always keep at least one environment
+    if (this.getAll().length === 0) {
+      const defaultEnv = this.create('Default');
+      this.activeEnvId = defaultEnv.id;
+      this.saveSettings();
+    }
+    return result;
   }
 
   getActiveEnvId(): string | null {
@@ -54,6 +86,7 @@ export class EnvService {
 
   setActiveEnvId(id: string | null): void {
     this.activeEnvId = id;
+    this.saveSettings();
   }
 
   getActiveVariables(): KeyValuePair[] {

@@ -54,6 +54,12 @@ export function RequestTabs() {
     return new Set(vars);
   }, [environments, activeEnvId]);
 
+  const varValues = useMemo(() => {
+    const env = environments.find((e) => e.id === activeEnvId);
+    const vars = (env?.variables ?? []).filter((v) => v.enabled);
+    return new Map(vars.map((v) => [v.key, v.value]));
+  }, [environments, activeEnvId]);
+
   if (!tab) return null;
 
   return (
@@ -103,7 +109,7 @@ export function RequestTabs() {
           className="tab"
           onClick={() => setShowCodeModal(true)}
           style={{ marginLeft: 'auto', opacity: 0.75 }}
-          title="View code snippet (cURL / JS / Python)"
+          title={t('viewCodeSnippet')}
         >
           ⟨/⟩ Code
         </button>
@@ -117,6 +123,7 @@ export function RequestTabs() {
             keyPlaceholder="Parameter"
             valuePlaceholder="Value"
             knownVarNames={knownVarNames}
+            varValues={varValues}
           />
         )}
 
@@ -125,6 +132,7 @@ export function RequestTabs() {
             items={tab.headers}
             onChange={(headers) => updateTab(tab.id, { headers })}
             knownVarNames={knownVarNames}
+            varValues={varValues}
           />
         )}
 

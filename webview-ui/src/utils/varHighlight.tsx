@@ -5,10 +5,14 @@ import { useRef, useEffect } from 'react';
  * - Known variables (exist in the active environment) → teal/success colour
  * - Unknown variables → amber/warning colour
  * Background is kept transparent so the input background shows through.
+ *
+ * When `varValues` is provided, hovering over a {{var}} mark shows a tooltip
+ * with the resolved value.
  */
 export function renderVarHighlight(
   text: string,
-  knownVars: Set<string>
+  knownVars: Set<string>,
+  varValues?: Map<string, string>
 ): React.ReactNode {
   if (!text) return null;
   const parts: React.ReactNode[] = [];
@@ -22,15 +26,21 @@ export function renderVarHighlight(
       parts.push(text.substring(lastIndex, match.index));
     }
     const isKnown = knownVars.has(match[1]);
+    const resolvedValue = varValues?.get(match[1].trim());
+    const tooltip = isKnown
+      ? `${match[1].trim()} = ${resolvedValue ?? ''}`
+      : `${match[1].trim()} (undefined)`;
     parts.push(
       <mark
         key={key++}
+        title={tooltip}
         style={{
           background: 'transparent',
           color: isKnown
             ? 'var(--success-fg, #4ec9b0)'
             : 'var(--warning-fg, #cca700)',
           fontWeight: 600,
+          cursor: 'help',
         }}
       >
         {match[0]}
@@ -56,6 +66,8 @@ interface VarInputProps {
   placeholder?: string;
   spellCheck?: boolean;
   knownVarNames?: Set<string>;
+  /** When provided, tooltip on {{var}} shows resolved value. Must accompany knownVarNames. */
+  varValues?: Map<string, string>;
   /** Padding of the backing highlight div — must match the actual input's padding exactly */
   bgPadding?: string;
   /** Font-size of the backing highlight div — must match the actual input's font-size */
@@ -80,6 +92,7 @@ export function VarInput({
   placeholder,
   spellCheck = false,
   knownVarNames,
+  varValues,
   bgPadding = '4px 8px',
   bgFontSize = '12px',
 }: VarInputProps) {
@@ -138,7 +151,7 @@ export function VarInput({
             color: 'var(--input-fg, #cccccc)',
           }}
         >
-          {renderVarHighlight(value, knownVarNames)}
+          {renderVarHighlight(value, knownVarNames, varValues)}
         </div>
       )}
       <input

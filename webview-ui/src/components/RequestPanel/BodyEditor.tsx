@@ -37,6 +37,12 @@ export function BodyEditor() {
     return new Set(vars);
   }, [environments, activeEnvId]);
 
+  const varValues = useMemo(() => {
+    const env = environments.find((e) => e.id === activeEnvId);
+    const vars = (env?.variables ?? []).filter((v) => v.enabled);
+    return new Map(vars.map((v) => [v.key, v.value]));
+  }, [environments, activeEnvId]);
+
   // Listen for filePicked response from extension
   useEffect(() => {
     if (!tab) return;
@@ -152,6 +158,7 @@ export function BodyEditor() {
           items={body.urlEncoded || [{ key: '', value: '', enabled: true }]}
           onChange={(items) => setBody({ ...body, urlEncoded: items })}
           knownVarNames={knownVarNames}
+          varValues={varValues}
         />
       )}
 
@@ -161,6 +168,7 @@ export function BodyEditor() {
           onChange={(items) => setBody({ ...body, formData: items })}
           requestId={tab.id}
           knownVarNames={knownVarNames}
+          varValues={varValues}
         />
       )}
 

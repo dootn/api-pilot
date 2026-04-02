@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { vscode } from '../../vscode';
 import { KeyValueEditor } from '../shared/KeyValueEditor';
 import type { KeyValuePair } from '../../stores/requestStore';
+import { useI18n } from '../../i18n';
 
 interface Environment {
   id: string;
@@ -132,6 +133,7 @@ export function EnvManager({ onClose }: Props) {
   }
 
   const selectedEnv = environments.find((e) => e.id === selectedEnvId);
+  const t = useI18n();
 
   return (
     <div
@@ -141,21 +143,20 @@ export function EnvManager({ onClose }: Props) {
       <div className="env-manager-panel">
         {/* Header */}
         <div className="env-manager-header">
-          <span style={{ fontWeight: 600, fontSize: 13 }}>Environments</span>
-          <button className="env-manager-close" onClick={onClose} title="Close">×</button>
+          <span style={{ fontWeight: 600, fontSize: 13 }}>{t('envManagerTitle')}</span>
+          <button className="env-manager-close" onClick={onClose} title={t('envCloseTitle')}>×</button>
         </div>
 
         <div className="env-manager-body">
           {/* Left: environment list */}
           <div className="env-list">
             <div className="env-list-header">
-              <span style={{ fontSize: 11, opacity: 0.6, textTransform: 'uppercase' }}>Environments</span>
-              <button className="env-add-btn" onClick={handleCreate} title="New Environment">+ New</button>
+              <span style={{ fontSize: 11, opacity: 0.6, textTransform: 'uppercase' }}>{t('envListLabel')}</span>
+              <button className="env-add-btn" onClick={handleCreate} title={t('envNewBtnTitle')}>{t('envNewBtn')}</button>
             </div>
             {environments.length === 0 && (
-              <div style={{ padding: '12px 8px', fontSize: 12, opacity: 0.5 }}>No environments yet</div>
-            )}
-            {environments.map((env) => (
+              <div style={{ padding: '12px 8px', fontSize: 12, opacity: 0.5 }}>{t('envNoEnvironments')}</div>
+            )}            {environments.map((env) => (
               <div
                 key={env.id}
                 className={`env-list-item ${env.id === selectedEnvId ? 'selected' : ''}`}
@@ -164,8 +165,7 @@ export function EnvManager({ onClose }: Props) {
                 <button
                   className={`env-active-btn ${env.id === activeEnvId ? 'active' : ''}`}
                   onClick={(e) => { e.stopPropagation(); handleSetActive(env.id); }}
-                  title={env.id === activeEnvId ? 'Deactivate' : 'Set as active'}
-                >
+                  title={env.id === activeEnvId ? t('envDeactivate') : t('envSetActive')}>
                   {env.id === activeEnvId ? '●' : '○'}
                 </button>
 
@@ -196,7 +196,7 @@ export function EnvManager({ onClose }: Props) {
                 ) : (
                   <span
                     onDoubleClick={(e) => startRename(env, e)}
-                    title="Double-click to rename"
+                    title={t('envDoubleClickRename')}
                     style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}
                   >
                     {env.name}
@@ -212,7 +212,7 @@ export function EnvManager({ onClose }: Props) {
           <div className="env-editor">
             {!selectedEnv ? (
               <div className="empty-state" style={{ padding: 24 }}>
-                Select or create an environment
+                {t('envSelectOrCreate')}
               </div>
             ) : (
               <>
@@ -222,11 +222,11 @@ export function EnvManager({ onClose }: Props) {
                     className="env-name-input"
                     value={draftName}
                     onChange={(e) => { setDraftName(e.target.value); setIsDirty(true); }}
-                    placeholder="Environment name"
+                    placeholder={t('envNamePlaceholder')}
                     spellCheck={false}
                   />
                   {isDirty && (
-                    <span style={{ fontSize: 10, color: 'var(--warning-fg)', marginLeft: 6 }}>unsaved</span>
+                    <span style={{ fontSize: 10, color: 'var(--warning-fg)', marginLeft: 6 }}>{t('envUnsaved')}</span>
                   )}
                 </div>
 
@@ -242,9 +242,9 @@ export function EnvManager({ onClose }: Props) {
                 <div className="env-editor-footer">
                   {confirmDeleteId === selectedEnv.id ? (
                     <>
-                      <span style={{ fontSize: 12, color: 'var(--error-fg)', marginRight: 8 }}>Delete "{selectedEnv.name}"?</span>
-                      <button className="env-btn env-btn-danger" onClick={() => handleDelete(selectedEnv.id)}>Delete</button>
-                      <button className="env-btn" onClick={() => setConfirmDeleteId(null)} style={{ marginLeft: 4 }}>Cancel</button>
+                      <span style={{ fontSize: 12, color: 'var(--error-fg)', marginRight: 8 }}>{t('envDeleteConfirm')} "{selectedEnv.name}"</span>
+                      <button className="env-btn env-btn-danger" onClick={() => handleDelete(selectedEnv.id)}>{t('envDeleteBtn')}</button>
+                      <button className="env-btn" onClick={() => setConfirmDeleteId(null)} style={{ marginLeft: 4 }}>{t('closeBtn')}</button>
                     </>
                   ) : (
                     <>
@@ -253,13 +253,13 @@ export function EnvManager({ onClose }: Props) {
                         onClick={() => setConfirmDeleteId(selectedEnv.id)}
                         style={{ color: 'var(--error-fg)', border: '1px solid var(--error-fg)', marginRight: 'auto' }}
                       >
-                        🗑 Delete
+                        {t('envDeleteBtn')}
                       </button>
                       <button className="env-btn" onClick={() => selectEnv(selectedEnv)} disabled={!isDirty}>
-                        Discard
+                        {t('envDiscardBtn')}
                       </button>
                       <button className="env-btn env-btn-primary" onClick={handleSave} disabled={!isDirty} style={{ marginLeft: 6 }}>
-                        💾 Save
+                        {t('envSaveBtn')}
                       </button>
                     </>
                   )}

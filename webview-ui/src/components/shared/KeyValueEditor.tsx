@@ -1,5 +1,6 @@
 import { type KeyValuePair } from '../../stores/requestStore';
 import { VarInput } from '../../utils/varHighlight';
+import { useI18n } from '../../i18n';
 
 interface Props {
   items: KeyValuePair[];
@@ -8,9 +9,12 @@ interface Props {
   valuePlaceholder?: string;
   /** When provided, {{var}} tokens in key/value cells are highlighted. */
   knownVarNames?: Set<string>;
+  /** When provided, tooltip on {{var}} shows resolved value. */
+  varValues?: Map<string, string>;
 }
 
-export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valuePlaceholder = 'Value', knownVarNames }: Props) {
+export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valuePlaceholder = 'Value', knownVarNames, varValues }: Props) {
+  const t = useI18n();
   const updateItem = (index: number, field: keyof KeyValuePair, value: string | boolean) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
@@ -46,6 +50,7 @@ export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valueP
             value={item.key}
             onChange={(v) => updateItem(index, 'key', v)}
             knownVarNames={knownVarNames}
+            varValues={varValues}
             spellCheck={false}
           />
           <VarInput
@@ -54,12 +59,20 @@ export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valueP
             value={item.value}
             onChange={(v) => updateItem(index, 'value', v)}
             knownVarNames={knownVarNames}
+            varValues={varValues}
+            spellCheck={false}
+          />
+          <VarInput
+            className="kv-input kv-input-desc"
+            placeholder="Description"
+            value={item.description ?? ''}
+            onChange={(v) => updateItem(index, 'description', v)}
             spellCheck={false}
           />
           <button
             className="kv-delete-btn"
             onClick={() => removeItem(index)}
-            title="Remove"
+            title={t('removeItem')}
           >
             ×
           </button>

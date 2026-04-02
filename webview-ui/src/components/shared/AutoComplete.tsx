@@ -10,6 +10,8 @@ interface AutoCompleteProps {
   onFocus?: () => void;
   /** When provided, {{var}} tokens in the input are highlighted. */
   knownVarNames?: Set<string>;
+  /** When provided, tooltip on {{var}} shows resolved value. */
+  varValues?: Map<string, string>;
 }
 
 export function AutoComplete({
@@ -20,6 +22,7 @@ export function AutoComplete({
   className = '',
   onFocus,
   knownVarNames,
+  varValues,
 }: AutoCompleteProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -140,7 +143,7 @@ export function AutoComplete({
             color: 'var(--input-fg, #cccccc)',
           }}
         >
-          {renderVarHighlight(value, knownVarNames!)}
+          {renderVarHighlight(value, knownVarNames!, varValues)}
         </div>
       )}
       <input

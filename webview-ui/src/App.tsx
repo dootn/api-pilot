@@ -2,10 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { TabBar } from './components/Layout/TabBar';
 import { RequestPanel } from './components/RequestPanel/RequestPanel';
 import { ResponsePanel } from './components/ResponsePanel/ResponsePanel';
+import { CollectionsSidebar } from './components/Sidebar/CollectionsSidebar';
+import { HistorySidebar } from './components/Sidebar/HistorySidebar';
 import { useVscodeMessage } from './hooks/useVscodeMessage';
 import { useTabStore, type RequestTab } from './stores/tabStore';
 import type { ApiResponse } from './stores/requestStore';
 import { useLocaleStore } from './stores/localeStore';
+import { useI18n } from './i18n';
 import { vscode } from './vscode';
 
 function App() {
@@ -15,8 +18,15 @@ function App() {
   const setActiveTabId = useTabStore((s) => s.setActiveTabId);
   const restoreSession = useTabStore((s) => s.restoreSession);
   const setLocale = useLocaleStore((s) => s.setLocale);
+  const t = useI18n();
 
-  // Drag-to-resize state
+  // Sidebar tab: 'collections' | 'history'
+  const [sidebarTab, setSidebarTab] = useState<'collections' | 'history'>('collections');
+  // Sidebar width (resizable)
+  const [sidebarWidth, setSidebarWidth] = useState(240);
+  const sidebarResizingRef = useRef(false);
+
+  // Drag-to-resize state (request/response vertical split)
   const [splitPercent, setSplitPercent] = useState(50);
   const innerRef = useRef<HTMLDivElement>(null);
 
@@ -30,6 +40,22 @@ function App() {
       setSplitPercent(pct);
     };
     const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, []);
+
+  const handleSidebarResizerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    sidebarResizingRef.current = true;
+    const onMove = (ev: MouseEvent) => {
+      if (!sidebarResizingRef.current) return;
+      setSidebarWidth(Math.min(Math.max(ev.clientX, 160), 480));
+    };
+    const onUp = () => {
+      sidebarResizingRef.current = false;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
@@ -69,6 +95,15 @@ function App() {
           setLocale(message.payload as 'en' | 'zh-CN');
           return;
         }
+        case 'requestRenamed': {
+          // Sidebar renamed a bookmark — update the matching open tab's name without dirtying it
+          const { requestId, newName } = message.payload as { collectionId: string; requestId: string; newName: string };
+          const target = tabs.find((t) => t.id === requestId);
+          if (target) {
+            updateTab(requestId, { name: newName, isCustomNamed: true, isDirty: false });
+          }
+          return;
+        }
         case 'loadTabState': {
           const session = message.payload as {
             tabs: Omit<RequestTab, 'response' | 'responseError' | 'loading' | 'isDirty'>[];
@@ -95,20 +130,26 @@ function App() {
       if (!tabId) return;
 
       switch (message.type) {
-        case 'requestResult':
+        case 'requestResult': {
+          const res = message.payload as ApiResponse;
           updateTab(tabId, {
-            response: message.payload as ApiResponse,
+            response: res,
+            sslInfo: res.sslInfo,
             responseError: null,
             loading: false,
           });
           break;
-        case 'requestError':
+        }
+        case 'requestError': {
+          const errPayload = message.payload as { message: string; sslInfo?: import('./stores/requestStore').SSLInfo };
           updateTab(tabId, {
-            responseError: (message.payload as { message: string })?.message || 'Unknown error',
+            responseError: errPayload?.message || 'Unknown error',
+            sslInfo: errPayload?.sslInfo,
             response: null,
             loading: false,
           });
           break;
+        }
         case 'requestProgress':
           break;
       }
@@ -119,29 +160,87 @@ function App() {
   useVscodeMessage(handleMessage);
 
   return (
-    <div className="split-view">
-      <TabBar />
-      <div
-        ref={innerRef}
-        style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
-      >
-        <div style={{ height: `${splitPercent}%`, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <RequestPanel />
+    <div style={{ display: 'flex', height: '100vh', background: 'var(--panel-bg)', flexDirection: 'row', border: '1px solid #ccc', borderRadius: '6px', overflow: 'hidden' }}>
+      {/* Left sidebar */}
+      <div style={{ width: sidebarWidth, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', gap: '0px', borderBottom: '1px solid var(--border-color)' }}>
+          <button
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              border: 'none',
+              background: sidebarTab === 'collections' ? 'var(--button-bg)' : 'transparent',
+              color: sidebarTab === 'collections' ? 'var(--button-fg)' : 'var(--panel-fg)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: sidebarTab === 'collections' ? '600' : '400',
+              borderBottom: sidebarTab === 'collections' ? '2px solid var(--accent-color)' : 'none',
+            }}
+            onClick={() => setSidebarTab('collections')}
+          >
+            {t('sidebarCollections')}
+          </button>
+          <button
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              border: 'none',
+              background: sidebarTab === 'history' ? 'var(--button-bg)' : 'transparent',
+              color: sidebarTab === 'history' ? 'var(--button-fg)' : 'var(--panel-fg)',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: sidebarTab === 'history' ? '600' : '400',
+              borderBottom: sidebarTab === 'history' ? '2px solid var(--accent-color)' : 'none',
+            }}
+            onClick={() => setSidebarTab('history')}
+          >
+            {t('sidebarHistory')}
+          </button>
         </div>
+        <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+          {sidebarTab === 'collections' ? <CollectionsSidebar /> : <HistorySidebar />}
+        </div>
+      </div>
+
+      {/* Sidebar resize handle */}
+      <div
+        style={{
+          width: 4,
+          cursor: 'col-resize',
+          background: 'var(--border-color)',
+          flexShrink: 0,
+          transition: 'background 0.15s',
+        }}
+        onMouseDown={handleSidebarResizerMouseDown}
+        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--accent-color)')}
+        onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--border-color)')}
+      />
+
+      {/* Main editor area */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <TabBar />
         <div
-          style={{
-            height: 5,
-            cursor: 'row-resize',
-            background: 'var(--border-color)',
-            flexShrink: 0,
-            transition: 'background 0.15s',
-          }}
-          onMouseDown={handleDividerMouseDown}
-          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--button-bg)')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--border-color)')}
-        />
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <ResponsePanel />
+          ref={innerRef}
+          style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
+        >
+          <div style={{ height: `${splitPercent}%`, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <RequestPanel />
+          </div>
+          <div
+            style={{
+              height: 5,
+              cursor: 'row-resize',
+              background: 'var(--border-color)',
+              flexShrink: 0,
+              transition: 'background 0.15s',
+            }}
+            onMouseDown={handleDividerMouseDown}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--button-bg)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--border-color)')}
+          />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <ResponsePanel />
+          </div>
         </div>
       </div>
     </div>

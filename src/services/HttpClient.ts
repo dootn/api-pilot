@@ -1,5 +1,6 @@
-import { request } from 'undici';
-import { ApiRequest, ApiResponse, KeyValuePair } from '../types';
+import { request, Agent } from 'undici';
+import * as tls from 'tls';
+import { ApiRequest, ApiResponse, KeyValuePair, SSLInfo, SSLCertificate } from '../types';
 import { VariableResolver } from './VariableResolver';
 import { isBinaryContentType } from './contentTypeUtils';
 
@@ -7,7 +8,7 @@ export class HttpClient {
   private abortControllers = new Map<string, AbortController>();
   private variableResolver = new VariableResolver();
 
-  async send(apiRequest: ApiRequest, requestId: string, envVariables?: KeyValuePair[]): Promise<ApiResponse> {
+  async send(apiRequest: ApiRequest, requestId: string, envVariables?: KeyValuePair[], timeoutMs?: number): Promise<ApiResponse> {
     const controller = new AbortController();
     this.abortControllers.set(requestId, controller);
 
@@ -22,11 +23,19 @@ export class HttpClient {
       const headers = this.buildHeaders(resolvedRequest);
       const body = this.buildBody(resolvedRequest);
 
+      // When SSL verification is explicitly disabled, use a custom Agent
+      const sslVerify = resolvedRequest.sslVerify ?? true;
+      const dispatcher = sslVerify ? undefined : new Agent({ connect: { rejectUnauthorized: false } });
+
+      const effectiveTimeout = timeoutMs ?? 30000;
       const response = await request(url, {
         method: resolvedRequest.method,
         headers,
         body,
         signal: controller.signal,
+        headersTimeout: effectiveTimeout,
+        bodyTimeout: effectiveTimeout,
+        ...(dispatcher ? { dispatcher } : {}),
       });
 
       const flatHeaders = this.flattenHeaders(response.headers);
@@ -49,6 +58,16 @@ export class HttpClient {
 
       const endTime = Date.now();
 
+      // Collect SSL information for HTTPS requests
+      let sslInfo: SSLInfo | undefined;
+      if (url.startsWith('https://')) {
+        try {
+          sslInfo = await this.collectSSLInfo(url);
+        } catch (error) {
+          console.error('Failed to collect SSL info:', error);
+        }
+      }
+
       return {
         status: response.statusCode,
         statusText: this.getStatusText(response.statusCode),
@@ -58,6 +77,7 @@ export class HttpClient {
         time: endTime - startTime,
         contentType: contentType || undefined,
         bodyBase64,
+        sslInfo,
       };
     } finally {
       this.abortControllers.delete(requestId);
@@ -210,13 +230,130 @@ export class HttpClient {
 
   private getStatusText(status: number): string {
     const statusTexts: Record<number, string> = {
-      200: 'OK', 201: 'Created', 204: 'No Content',
-      301: 'Moved Permanently', 302: 'Found', 304: 'Not Modified',
-      400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden',
-      404: 'Not Found', 405: 'Method Not Allowed', 408: 'Request Timeout',
-      409: 'Conflict', 422: 'Unprocessable Entity', 429: 'Too Many Requests',
-      500: 'Internal Server Error', 502: 'Bad Gateway', 503: 'Service Unavailable',
+      100: 'Continue', 101: 'Switching Protocols', 102: 'Processing', 103: 'Early Hints',
+      200: 'OK', 201: 'Created', 202: 'Accepted', 203: 'Non-Authoritative Information',
+      204: 'No Content', 205: 'Reset Content', 206: 'Partial Content', 207: 'Multi-Status',
+      208: 'Already Reported', 226: 'IM Used',
+      300: 'Multiple Choices', 301: 'Moved Permanently', 302: 'Found',
+      303: 'See Other', 304: 'Not Modified', 305: 'Use Proxy',
+      307: 'Temporary Redirect', 308: 'Permanent Redirect',
+      400: 'Bad Request', 401: 'Unauthorized', 402: 'Payment Required',
+      403: 'Forbidden', 404: 'Not Found', 405: 'Method Not Allowed',
+      406: 'Not Acceptable', 407: 'Proxy Authentication Required', 408: 'Request Timeout',
+      409: 'Conflict', 410: 'Gone', 411: 'Length Required',
+      412: 'Precondition Failed', 413: 'Content Too Large', 414: 'URI Too Long',
+      415: 'Unsupported Media Type', 416: 'Range Not Satisfiable', 417: 'Expectation Failed',
+      418: "I'm a Teapot", 421: 'Misdirected Request', 422: 'Unprocessable Content',
+      423: 'Locked', 424: 'Failed Dependency', 425: 'Too Early',
+      426: 'Upgrade Required', 428: 'Precondition Required', 429: 'Too Many Requests',
+      431: 'Request Header Fields Too Large', 451: 'Unavailable For Legal Reasons',
+      500: 'Internal Server Error', 501: 'Not Implemented', 502: 'Bad Gateway',
+      503: 'Service Unavailable', 504: 'Gateway Timeout', 505: 'HTTP Version Not Supported',
+      506: 'Variant Also Negotiates', 507: 'Insufficient Storage', 508: 'Loop Detected',
+      510: 'Not Extended', 511: 'Network Authentication Required',
     };
     return statusTexts[status] || '';
+  }
+
+  public async collectSSLInfo(url: string): Promise<SSLInfo> {
+    return new Promise((resolve, reject) => {
+      const urlObj = new URL(url);
+      let settled = false;
+
+      // Use an absolute setTimeout so the Promise always settles,
+      // regardless of DNS hang or socket assignment state.
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          socket.destroy();
+          reject(new Error('SSL info collection timeout'));
+        }
+      }, 5000);
+
+      // Use tls.connect directly — no HTTP request needed.
+      // A pure TLS handshake is enough to get certificate / cipher info.
+      const socket = tls.connect({
+        host: urlObj.hostname,
+        port: Number(urlObj.port) || 443,
+        rejectUnauthorized: false,
+        servername: urlObj.hostname, // SNI support
+      });
+
+      socket.on('secureConnect', () => {
+        if (settled) return;
+        clearTimeout(timer);
+        settled = true;
+
+        const peerCert = socket.getPeerCertificate(true);
+        const cipher = socket.getCipher();
+        const protocol = socket.getProtocol();
+
+        const sslInfo: SSLInfo = {
+          authorized: socket.authorized,
+          authorizationError: socket.authorizationError?.message,
+          protocol: protocol || 'unknown',
+          cipher: {
+            name: cipher?.name || 'unknown',
+            version: cipher?.version || 'unknown',
+          },
+        };
+
+        if (peerCert && Object.keys(peerCert).length > 0) {
+          sslInfo.certificate = this.parseCertificate(peerCert);
+          sslInfo.certificateChain = this.parseCertificateChain(peerCert);
+        }
+
+        socket.destroy();
+        resolve(sslInfo);
+      });
+
+      socket.on('error', (err) => {
+        if (!settled) {
+          clearTimeout(timer);
+          settled = true;
+          reject(err);
+        }
+      });
+    });
+  }
+
+  private parseCertificate(cert: any): SSLCertificate {
+    return {
+      subject: cert.subject || {},
+      issuer: cert.issuer || {},
+      validFrom: cert.valid_from || '',
+      validTo: cert.valid_to || '',
+      serialNumber: cert.serialNumber || '',
+      fingerprint: cert.fingerprint || cert.fingerprint256 || '',
+      signatureAlgorithm: cert.sigalg || '',
+      subjectAltNames: cert.subjectaltname?.split(', ') || [],
+    };
+  }
+
+  private parseCertificateChain(cert: any): SSLCertificate[] {
+    const chain: SSLCertificate[] = [];
+    const seen = new Set<string>();
+    let current = cert;
+
+    while (current) {
+      const fp = current.fingerprint256 || current.fingerprint;
+      if (fp && seen.has(fp)) {
+        break;
+      }
+      if (fp) seen.add(fp);
+
+      chain.push(this.parseCertificate(current));
+
+      // Stop at self-signed root (issuer === subject)
+      if (current.issuerCertificate &&
+          JSON.stringify(current.issuerCertificate.subject) === JSON.stringify(current.issuerCertificate.issuer)) {
+        chain.push(this.parseCertificate(current.issuerCertificate));
+        break;
+      }
+
+      current = current.issuerCertificate;
+    }
+
+    return chain;
   }
 }

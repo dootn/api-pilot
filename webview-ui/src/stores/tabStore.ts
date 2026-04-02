@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { HttpMethod, KeyValuePair, RequestBody, AuthConfig, ApiResponse } from './requestStore';
+import type { HttpMethod, KeyValuePair, RequestBody, AuthConfig, ApiResponse, SSLInfo } from './requestStore';
 import { vscode } from '../vscode';
 
 export interface RequestTab {
@@ -21,6 +21,9 @@ export interface RequestTab {
   isPinned: boolean;
   preScript?: string;
   postScript?: string;
+  description?: string;
+  sslVerify?: boolean;
+  sslInfo?: SSLInfo;
 }
 
 type PersistedTab = Omit<RequestTab, 'response' | 'responseError' | 'loading' | 'isDirty'>;
@@ -42,7 +45,7 @@ interface TabState {
 }
 
 function createDefaultTab(): RequestTab {
-  const id = `tab_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const id = crypto.randomUUID();
   return {
     id,
     name: 'New Request',
@@ -59,6 +62,7 @@ function createDefaultTab(): RequestTab {
     loading: false,
     isDirty: false,
     isPinned: false,
+    sslVerify: true,
   };
 }
 
@@ -117,7 +121,7 @@ export const useTabStore = create<TabState>((set, get) => ({
 
   renameTab: (id, name) => {
     set((state) => ({
-      tabs: state.tabs.map((t) => (t.id === id ? { ...t, name, isCustomNamed: true } : t)),
+      tabs: state.tabs.map((t) => (t.id === id ? { ...t, name, isCustomNamed: true, isDirty: true } : t)),
     }));
   },
 
@@ -167,7 +171,7 @@ export const useTabStore = create<TabState>((set, get) => ({
       const tab = state.tabs.find((t) => t.id === id);
       if (!tab) return state;
       
-      const newId = `tab_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const newId = crypto.randomUUID();
       const duplicatedTab: RequestTab = {
         ...tab,
         id: newId,

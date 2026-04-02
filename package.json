@@ -2,7 +2,7 @@
   "name": "api-pilot",
   "displayName": "API Pilot",
   "description": "A powerful API debugging tool for VS Code, similar to Postman",
-  "version": "0.1.0",
+  "version": "0.2.13",
   "publisher": "api-pilot",
   "repository": {
     "type": "git",
@@ -15,30 +15,11 @@
     "Testing",
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "api-pilot",
-          "title": "API Pilot",
-          "icon": "resources/icon.svg"
-        }
-      ]
-    },
-    "views": {
-      "api-pilot": [
-        {
-          "id": "apiPilot.collections",
-          "name": "Collections"
-        },
-        {
-          "id": "apiPilot.history",
-          "name": "History"
-        }
-      ]
-    },
     "commands": [
       {
         "command": "apiPilot.newRequest",
@@ -175,112 +156,6 @@
         "category": "API Pilot"
       }
     ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "apiPilot.newRequest",
-          "when": "view == apiPilot.collections",
-          "group": "navigation@1"
-        },
-        {
-          "command": "apiPilot.newCollection",
-          "when": "view == apiPilot.collections",
-          "group": "navigation@2"
-        },
-        {
-          "command": "apiPilot.refreshCollections",
-          "when": "view == apiPilot.collections",
-          "group": "navigation@3"
-        },
-        {
-          "command": "apiPilot.refreshHistory",
-          "when": "view == apiPilot.history",
-          "group": "navigation@1"
-        },
-        {
-          "command": "apiPilot.clearHistory",
-          "when": "view == apiPilot.history",
-          "group": "navigation@3"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "apiPilot.renameCollection",
-          "when": "view == apiPilot.collections && viewItem == collection",
-          "group": "1_modify@1"
-        },
-        {
-          "command": "apiPilot.addFolder",
-          "when": "view == apiPilot.collections && viewItem == collection",
-          "group": "1_modify@2"
-        },
-        {
-          "command": "apiPilot.deleteCollection",
-          "when": "view == apiPilot.collections && viewItem == collection",
-          "group": "2_delete"
-        },
-        {
-          "command": "apiPilot.addSubfolder",
-          "when": "view == apiPilot.collections && viewItem == folder",
-          "group": "1_modify@1"
-        },
-        {
-          "command": "apiPilot.renameFolder",
-          "when": "view == apiPilot.collections && viewItem == folder",
-          "group": "1_modify@2"
-        },
-        {
-          "command": "apiPilot.duplicateFolder",
-          "when": "view == apiPilot.collections && viewItem == folder",
-          "group": "1_modify@3"
-        },
-        {
-          "command": "apiPilot.deleteFolder",
-          "when": "view == apiPilot.collections && viewItem == folder",
-          "group": "2_delete"
-        },
-        {
-          "command": "apiPilot.deleteRequest",
-          "when": "view == apiPilot.collections && viewItem == request",
-          "group": "2_delete"
-        },
-        {
-          "command": "apiPilot.renameRequest",
-          "when": "view == apiPilot.collections && viewItem == request",
-          "group": "inline@1"
-        },
-        {
-          "command": "apiPilot.duplicateRequest",
-          "when": "view == apiPilot.collections && viewItem == request",
-          "group": "1_modify@2"
-        },
-        {
-          "command": "apiPilot.moveRequest",
-          "when": "view == apiPilot.collections && viewItem == request",
-          "group": "inline@2"
-        },
-        {
-          "command": "apiPilot.deleteRequest",
-          "when": "view == apiPilot.collections && viewItem == request",
-          "group": "inline@3"
-        },
-        {
-          "command": "apiPilot.openHistoryEntry",
-          "when": "view == apiPilot.history && viewItem == entry",
-          "group": "1_open"
-        },
-        {
-          "command": "apiPilot.deleteHistoryEntry",
-          "when": "view == apiPilot.history && viewItem == entry",
-          "group": "2_delete"
-        },
-        {
-          "command": "apiPilot.deleteHistoryGroup",
-          "when": "view == apiPilot.history && viewItem == dateGroup",
-          "group": "2_delete"
-        }
-      ]
-    },
     "configuration": {
       "title": "API Pilot",
       "properties": {
@@ -294,6 +169,20 @@
             "中文 (Chinese Simplified)"
           ],
           "description": "Display language for API Pilot UI. Requires webview reload to take effect."
+        },
+        "api-pilot.maxHistory": {
+          "type": "number",
+          "default": 1000,
+          "minimum": 10,
+          "maximum": 10000,
+          "description": "Maximum total number of history entries to keep across all days. When the limit is reached, the oldest entries are removed automatically."
+        },
+        "api-pilot.requestTimeout": {
+          "type": "number",
+          "default": 30000,
+          "minimum": 1000,
+          "maximum": 300000,
+          "description": "Global request timeout in milliseconds. Applies to both receiving response headers and downloading the response body. Default: 30000 (30 s)."
         }
       }
     }

@@ -3,76 +3,84 @@ import { MessageHandler } from '../handlers/MessageHandler';
 import { CollectionService } from '../services/CollectionService';
 import { EnvService } from '../services/EnvService';
 import { HistoryService } from '../services/HistoryService';
+import { StorageService } from '../services/StorageService';
 
 export interface WebviewServices {
   collectionService?: CollectionService;
   envService?: EnvService;
   historyService?: HistoryService;
-  storageService?: import('../services/StorageService').StorageService;
+  storageService?: StorageService;
   onCollectionChanged?: () => void;
   onHistoryChanged?: () => void;
 }
 
-export class WebviewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = 'apiPilot.mainPanel';
+export class WebviewProvider {
+  private panel: vscode.WebviewPanel | undefined;
+  private messageHandler: MessageHandler | undefined;
 
-  private static services: WebviewServices = {};
-  private static currentPanel: vscode.WebviewPanel | undefined;
-  private view?: vscode.WebviewView;
-  private messageHandler?: MessageHandler;
+  constructor(
+    private readonly extensionUri: vscode.Uri,
+    private readonly services: WebviewServices = {}
+  ) {}
 
-  constructor(private readonly extensionUri: vscode.Uri, services?: WebviewServices) {
-    if (services) {
-      WebviewProvider.services = services;
+  /** Open the panel (or reveal it) and show the modal UI. */
+  revealOrCreate(): void {
+    if (this.panel) {
+      this.panel.reveal(vscode.ViewColumn.One);
+      this.panel.webview.postMessage({ type: 'showModal' });
+    } else {
+      this._createPanel();
     }
   }
 
-  resolveWebviewView(
-    webviewView: vscode.WebviewView,
-    _context: vscode.WebviewViewResolveContext,
-    _token: vscode.CancellationToken
-  ): void {
-    this.view = webviewView;
+  /** Send an arbitrary message to the webview, if the panel is alive. */
+  notifyWebview(message: { type: string; payload?: unknown }): void {
+    this.panel?.webview.postMessage(message);
+  }
 
-    webviewView.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [
-        vscode.Uri.joinPath(this.extensionUri, 'dist-webview'),
-        vscode.Uri.joinPath(this.extensionUri, 'webview-ui'),
-      ],
-    };
-
-    this.messageHandler = new MessageHandler(
-      webviewView.webview,
-      WebviewProvider.services.collectionService,
-      WebviewProvider.services.envService,
-      WebviewProvider.services.historyService,
-      WebviewProvider.services.storageService,
-      WebviewProvider.services.onCollectionChanged,
-      WebviewProvider.services.onHistoryChanged
+  private _createPanel(): void {
+    const panel = vscode.window.createWebviewPanel(
+      'apiPilot.panel',
+      'API Pilot',
+      vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [
+          vscode.Uri.joinPath(this.extensionUri, 'dist-webview'),
+        ],
+      }
     );
 
-    webviewView.webview.onDidReceiveMessage((message) => {
+    this.panel = panel;
+
+    this.messageHandler = new MessageHandler(
+      panel.webview,
+      this.services.collectionService,
+      this.services.envService,
+      this.services.historyService,
+      this.services.storageService,
+      this.services.onCollectionChanged,
+      this.services.onHistoryChanged
+    );
+
+    panel.webview.onDidReceiveMessage((message) => {
       this.messageHandler?.handle(message);
     });
 
-    webviewView.webview.html = this.getHtmlForWebview(webviewView.webview);
-
-    webviewView.onDidDispose(() => {
+    panel.onDidDispose(() => {
       this.messageHandler?.dispose();
+      this.panel = undefined;
+      this.messageHandler = undefined;
     });
+
+    panel.webview.html = this._getHtml(panel.webview);
   }
 
-  private getHtmlForWebview(webview: vscode.Webview): string {
+  private _getHtml(webview: vscode.Webview): string {
     const distPath = vscode.Uri.joinPath(this.extensionUri, 'dist-webview');
-
-    const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(distPath, 'index.js')
-    );
-    const styleUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(distPath, 'index.css')
-    );
-
+    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(distPath, 'index.js'));
+    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(distPath, 'index.css'));
     const nonce = getNonce();
 
     return `<!DOCTYPE html>
@@ -89,77 +97,6 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
-  }
-
-  public static createPanel(extensionUri: vscode.Uri): vscode.WebviewPanel {
-    // If panel already exists, reveal it and return
-    if (WebviewProvider.currentPanel) {
-      WebviewProvider.currentPanel.reveal(vscode.ViewColumn.One);
-      return WebviewProvider.currentPanel;
-    }
-
-    const panel = vscode.window.createWebviewPanel(
-      'apiPilot.panel',
-      'API Pilot',
-      vscode.ViewColumn.One,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [
-          vscode.Uri.joinPath(extensionUri, 'dist-webview'),
-          vscode.Uri.joinPath(extensionUri, 'webview-ui'),
-        ],
-      }
-    );
-
-    // Store the panel reference
-    WebviewProvider.currentPanel = panel;
-
-    const messageHandler = new MessageHandler(
-      panel.webview,
-      WebviewProvider.services.collectionService,
-      WebviewProvider.services.envService,
-      WebviewProvider.services.historyService,
-      WebviewProvider.services.storageService,
-      WebviewProvider.services.onCollectionChanged,
-      WebviewProvider.services.onHistoryChanged
-    );
-
-    panel.webview.onDidReceiveMessage((message) => {
-      messageHandler.handle(message);
-    });
-
-    panel.onDidDispose(() => {
-      messageHandler.dispose();
-      // Clear the panel reference when disposed
-      WebviewProvider.currentPanel = undefined;
-    });
-
-    const distPath = vscode.Uri.joinPath(extensionUri, 'dist-webview');
-    const scriptUri = panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(distPath, 'index.js')
-    );
-    const styleUri = panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(distPath, 'index.css')
-    );
-    const nonce = getNonce();
-
-    panel.webview.html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${panel.webview.cspSource} data: blob:; media-src ${panel.webview.cspSource} data: blob:; style-src ${panel.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${panel.webview.cspSource};">
-  <link rel="stylesheet" href="${styleUri}">
-  <title>API Pilot</title>
-</head>
-<body>
-  <div id="root"></div>
-  <script nonce="${nonce}" src="${scriptUri}"></script>
-</body>
-</html>`;
-
-    return panel;
   }
 }
 

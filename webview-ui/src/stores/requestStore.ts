@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD' | string;
 
 export interface KeyValuePair {
   key: string;
@@ -53,6 +53,30 @@ export interface ConsoleEntry {
   source: 'pre' | 'post';
 }
 
+export interface SSLCertificate {
+  subject: Record<string, string>;
+  issuer: Record<string, string>;
+  validFrom: string;
+  validTo: string;
+  serialNumber: string;
+  fingerprint: string;
+  signatureAlgorithm: string;
+  subjectAltNames?: string[];
+}
+
+export interface SSLInfo {
+  authorized: boolean;
+  authorizationError?: string;
+  protocol: string;
+  cipher: {
+    name: string;
+    version: string;
+  };
+  certificate?: SSLCertificate;
+  certificateChain?: SSLCertificate[];
+  peerCertificate?: Record<string, any>;
+}
+
 export interface ApiResponse {
   status: number;
   statusText: string;
@@ -64,6 +88,7 @@ export interface ApiResponse {
   bodyBase64?: string;
   testResults?: TestResult[];
   consoleEntries?: ConsoleEntry[];
+  sslInfo?: SSLInfo;
 }
 
 interface RequestState {
@@ -74,6 +99,7 @@ interface RequestState {
   body: RequestBody;
   auth: AuthConfig;
   activeTab: 'params' | 'headers' | 'body' | 'auth';
+
   response: ApiResponse | null;
   responseError: string | null;
   loading: boolean;

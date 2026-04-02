@@ -1,10 +1,14 @@
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { StorageService } from './StorageService';
 import { HistoryEntry, ApiRequest, ApiResponse } from '../types';
 import { isBinaryContentType } from './contentTypeUtils';
 
 const HISTORY_DIR = 'history';
-const MAX_HISTORY_PER_DAY = 200;
+/** Content-addressed body store — one file per unique response body (keyed by MD5 hex). */
+const BODIES_DIR = `${HISTORY_DIR}/.bodies`;
+
+/** Stored JSON format augments HistoryEntry with a content-hash reference for the body. */
+type StoredEntry = HistoryEntry & { bodyMd5?: string };
 
 export class HistoryService {
   /** Per-instance counter ensures filenames are unique within the same millisecond */
@@ -12,7 +16,11 @@ export class HistoryService {
 
   constructor(private storage: StorageService) {}
 
-  add(request: ApiRequest, response: ApiResponse): HistoryEntry {
+  /**
+   * Record a new history entry.
+   * @param maxTotal  Maximum *total* entries to keep across all days. Default 1000.
+   */
+  add(request: ApiRequest, response: ApiResponse, maxTotal = 1000): HistoryEntry {
     const entry: HistoryEntry = {
       id: randomUUID(),
       request,
@@ -23,37 +31,41 @@ export class HistoryService {
     const dateKey = this.getDateKey(entry.timestamp);
     const dateDir = `${HISTORY_DIR}/${dateKey}`;
 
-    // Enforce per-day limit: delete oldest entry (and its body file) when at capacity
-    const existing = this.storage.listFiles(dateDir);
-    if (existing.length >= MAX_HISTORY_PER_DAY) {
-      const oldest = [...existing].sort()[0];
-      const oldBase = oldest.replace('.json', '');
-      this.storage.deleteFile(dateDir, oldest);
-      this.storage.deleteFile(dateDir, `${oldBase}.body`);
+    // Store response body content-addressed by MD5 (dedup across all entries)
+    let bodyMd5: string | undefined;
+    if (response.bodyBase64 || response.body) {
+      const bodyBuf = response.bodyBase64
+        ? Buffer.from(response.bodyBase64, 'base64')
+        : Buffer.from(response.body, 'utf-8');
+      bodyMd5 = createHash('md5').update(bodyBuf).digest('hex');
+      // Only write the body file once per unique content
+      if (!this.storage.fileExists(BODIES_DIR, bodyMd5)) {
+        this.storage.writeRaw(BODIES_DIR, bodyMd5, bodyBuf);
+      }
     }
 
     const seq = String(this.addCounter++).padStart(6, '0');
     const base = `${entry.timestamp}_${seq}_${entry.id}`;
 
-    // Store response body as raw bytes in a separate file (text: UTF-8; binary: raw bytes)
-    const entryWithoutBody: HistoryEntry = {
+    const stored: StoredEntry = {
       ...entry,
-      response: { ...response, body: '', bodyBase64: undefined },
+      bodyMd5,
+      response: { ...response, body: '', bodyBase64: undefined }, // body lives in .bodies/
     };
-    this.storage.writeJson(dateDir, `${base}.json`, entryWithoutBody);
+    this.storage.writeJson(dateDir, `${base}.json`, stored);
 
-    if (response.bodyBase64) {
-      // Decode base64 back to raw bytes before storing — no redundant encoding
-      this.storage.writeRaw(dateDir, `${base}.body`, Buffer.from(response.bodyBase64, 'base64'));
-    } else if (response.body) {
-      this.storage.writeRaw(dateDir, `${base}.body`, Buffer.from(response.body, 'utf-8'));
-    }
+    // Prune oldest entries so the total stays within the configured limit
+    this.enforceTotalLimit(maxTotal);
 
     return entry;
   }
 
+  // ---------------------------------------------------------------------------
+  // Read / query
+  // ---------------------------------------------------------------------------
+
   getRecent(limit = 50): HistoryEntry[] {
-    const dateDirs = this.storage.listDirs(HISTORY_DIR).sort().reverse();
+    const dateDirs = this.getDateDirs('desc');
     const results: HistoryEntry[] = [];
     for (const dir of dateDirs) {
       if (results.length >= limit) break;
@@ -68,31 +80,32 @@ export class HistoryService {
   }
 
   getDateGroups(): { date: string; count: number }[] {
-    const dirs = this.storage.listDirs(HISTORY_DIR);
-    dirs.sort((a, b) => b.localeCompare(a));
-    return dirs.map((dir) => ({
+    return this.getDateDirs('desc').map((dir) => ({
       date: dir,
       count: this.storage.listFiles(`${HISTORY_DIR}/${dir}`).length,
     }));
   }
 
+  // ---------------------------------------------------------------------------
+  // Delete / clear
+  // ---------------------------------------------------------------------------
+
   clear(): void {
-    const dirs = this.storage.listDirs(HISTORY_DIR);
-    for (const dir of dirs) {
+    // Delete all date dirs and the .bodies content store
+    for (const dir of this.storage.listDirs(HISTORY_DIR)) {
       this.storage.deleteDir(`${HISTORY_DIR}/${dir}`);
     }
   }
 
   deleteEntry(id: string): boolean {
-    const dirs = this.storage.listDirs(HISTORY_DIR);
-    for (const dir of dirs) {
+    for (const dir of this.getDateDirs('asc')) {
       const dateDir = `${HISTORY_DIR}/${dir}`;
-      const files = this.storage.listFiles(dateDir);
-      const file = files.find((f) => f.endsWith('.json') && f.includes(id));
+      const file = this.storage.listFiles(dateDir).find((f) => f.includes(id));
       if (file) {
-        const base = file.replace('.json', '');
-        this.storage.deleteFile(dateDir, file);
-        this.storage.deleteFile(dateDir, `${base}.body`);
+        this.deleteEntryFile(dir, file);
+        if (this.storage.listFiles(dateDir).length === 0) {
+          this.storage.deleteDir(dateDir);
+        }
         return true;
       }
     }
@@ -100,7 +113,85 @@ export class HistoryService {
   }
 
   deleteGroup(dateKey: string): boolean {
-    return this.storage.deleteDir(`${HISTORY_DIR}/${dateKey}`);
+    const dateDir = `${HISTORY_DIR}/${dateKey}`;
+    // Collect body refs before deleting the directory
+    const md5s = this.storage
+      .listFiles(dateDir)
+      .map((f) => this.storage.readJson<StoredEntry>(dateDir, f)?.bodyMd5)
+      .filter((m): m is string => !!m);
+    const success = this.storage.deleteDir(dateDir);
+    if (success) {
+      for (const md5 of md5s) {
+        this.maybeDeleteBodyFile(md5);
+      }
+    }
+    return success;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Internal helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Return date-directory names (YYYY-MM-DD), excluding the .bodies store.
+   * @param order  'asc' = oldest first (for pruning); 'desc' = newest first (for display).
+   */
+  private getDateDirs(order: 'asc' | 'desc'): string[] {
+    const dirs = this.storage
+      .listDirs(HISTORY_DIR)
+      .filter((d) => d !== '.bodies')
+      .sort(); // ascending by default
+    return order === 'desc' ? dirs.reverse() : dirs;
+  }
+
+  /** Remove oldest entries globally until total count ≤ maxTotal. */
+  private enforceTotalLimit(maxTotal: number): void {
+    const dirs = this.getDateDirs('asc'); // oldest date first
+    let total = dirs.reduce(
+      (sum, d) => sum + this.storage.listFiles(`${HISTORY_DIR}/${d}`).length,
+      0,
+    );
+    if (total <= maxTotal) return;
+
+    for (const dir of dirs) {
+      if (total <= maxTotal) break;
+      const dateDir = `${HISTORY_DIR}/${dir}`;
+      const files = this.storage.listFiles(dateDir).sort(); // asc = oldest entry first
+      for (const file of files) {
+        if (total <= maxTotal) break;
+        this.deleteEntryFile(dir, file);
+        total--;
+      }
+      if (this.storage.listFiles(dateDir).length === 0) {
+        this.storage.deleteDir(dateDir);
+      }
+    }
+  }
+
+  /** Delete a single entry JSON and release its body file if unreferenced. */
+  private deleteEntryFile(dateKey: string, file: string): void {
+    const dateDir = `${HISTORY_DIR}/${dateKey}`;
+    const stored = this.storage.readJson<StoredEntry>(dateDir, file);
+    const bodyMd5 = stored?.bodyMd5;
+    this.storage.deleteFile(dateDir, file);
+    if (bodyMd5) {
+      this.maybeDeleteBodyFile(bodyMd5);
+    }
+  }
+
+  /**
+   * Delete the body file for `bodyMd5` only if no remaining entry references it.
+   * Scans all entry JSON files — acceptable for the typical ceiling (≤ 10 000 entries).
+   */
+  private maybeDeleteBodyFile(bodyMd5: string): void {
+    for (const dir of this.getDateDirs('asc')) {
+      const dateDir = `${HISTORY_DIR}/${dir}`;
+      for (const file of this.storage.listFiles(dateDir)) {
+        const e = this.storage.readJson<StoredEntry>(dateDir, file);
+        if (e?.bodyMd5 === bodyMd5) return; // still referenced
+      }
+    }
+    this.storage.deleteFile(BODIES_DIR, bodyMd5);
   }
 
   private getEntriesForDate(dateKey: string): HistoryEntry[] {
@@ -109,17 +200,31 @@ export class HistoryService {
     return files
       .sort((a, b) => b.localeCompare(a)) // descending → newest first
       .map((f) => {
-        const entry = this.storage.readJson<HistoryEntry>(dateDir, f);
-        if (!entry) return null;
-        const base = f.replace('.json', '');
-        const bodyBuf = this.storage.readRaw(dateDir, `${base}.body`);
-        if (bodyBuf) {
-          const ct = entry.response.contentType ?? '';
-          if (ct && isBinaryContentType(ct)) {
-            // Re-encode to base64 for the webview (message protocol requires serializable data)
-            entry.response.bodyBase64 = bodyBuf.toString('base64');
-          } else {
-            entry.response.body = bodyBuf.toString('utf-8');
+        const stored = this.storage.readJson<StoredEntry>(dateDir, f);
+        if (!stored) return null;
+        const entry: HistoryEntry = { ...stored };
+        const ct = stored.response.contentType ?? '';
+
+        if (stored.bodyMd5) {
+          // New format: body in content-addressed store
+          const bodyBuf = this.storage.readRaw(BODIES_DIR, stored.bodyMd5);
+          if (bodyBuf) {
+            if (ct && isBinaryContentType(ct)) {
+              entry.response.bodyBase64 = bodyBuf.toString('base64');
+            } else {
+              entry.response.body = bodyBuf.toString('utf-8');
+            }
+          }
+        } else {
+          // Legacy format (pre-dedup): body in a per-entry .body sidecar file
+          const base = f.replace('.json', '');
+          const bodyBuf = this.storage.readRaw(dateDir, `${base}.body`);
+          if (bodyBuf) {
+            if (ct && isBinaryContentType(ct)) {
+              entry.response.bodyBase64 = bodyBuf.toString('base64');
+            } else {
+              entry.response.body = bodyBuf.toString('utf-8');
+            }
           }
         }
         return entry;

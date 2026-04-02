@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { RequestTab } from '../../stores/tabStore';
 import {
   generateCurl,
@@ -6,15 +6,31 @@ import {
   generateJsAxios,
   generatePython,
 } from '../../utils/codeGenerators';
+import { useEnvironments } from '../../hooks/useEnvironments';
+import { useI18n } from '../../i18n';
 
 type CodeLang = 'curl' | 'js-fetch' | 'js-axios' | 'python';
 
 const CODE_TABS: { id: CodeLang; label: string }[] = [
-  { id: 'curl',     label: 'cURL'      },
+  { id: 'curl',     label: 'cURL'       },
   { id: 'js-fetch', label: 'JS (Fetch)' },
   { id: 'js-axios', label: 'JS (Axios)' },
   { id: 'python',   label: 'Python'     },
 ];
+
+/** Replace {{varName}} tokens in a string using the provided variable map. */
+function resolveVarsInString(text: string, varMap: Map<string, string>): string {
+  if (!text || !text.includes('{{')) return text;
+  return text.replace(/\{\{([^}]+)\}\}/g, (match, name: string) => varMap.get(name.trim()) ?? match);
+}
+
+/** Deep-clone a RequestTab with all string fields resolved against the active env. */
+function resolveTabVars(tab: RequestTab, varMap: Map<string, string>): RequestTab {
+  if (varMap.size === 0) return tab;
+  const json = JSON.stringify(tab);
+  const resolved = resolveVarsInString(json, varMap);
+  try { return JSON.parse(resolved) as RequestTab; } catch { return tab; }
+}
 
 function buildCode(lang: CodeLang, tab: RequestTab): string {
   switch (lang) {
@@ -28,7 +44,17 @@ function buildCode(lang: CodeLang, tab: RequestTab): string {
 export function CodeModal({ tab, onClose }: { tab: RequestTab; onClose: () => void }) {
   const [activeLang, setActiveLang] = useState<CodeLang>('curl');
   const [copied, setCopied] = useState(false);
-  const code = buildCode(activeLang, tab);
+  const { environments, activeEnvId } = useEnvironments();
+  const t = useI18n();
+
+  const varMap = useMemo(() => {
+    const env = environments.find((e) => e.id === activeEnvId);
+    const vars = (env?.variables ?? []).filter((v) => v.enabled);
+    return new Map(vars.map((v) => [v.key, v.value]));
+  }, [environments, activeEnvId]);
+
+  const resolvedTab = useMemo(() => resolveTabVars(tab, varMap), [tab, varMap]);
+  const code = buildCode(activeLang, resolvedTab);
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(code).then(() => {
@@ -70,7 +96,7 @@ export function CodeModal({ tab, onClose }: { tab: RequestTab; onClose: () => vo
           padding: '10px 14px',
           borderBottom: '1px solid var(--border-color)',
         }}>
-          <span style={{ fontWeight: 600, fontSize: 13 }}>Code Snippet</span>
+          <span style={{ fontWeight: 600, fontSize: 13 }}>{t('codeSnippetTitle')}</span>
           <button
             onClick={onClose}
             style={{
@@ -78,7 +104,7 @@ export function CodeModal({ tab, onClose }: { tab: RequestTab; onClose: () => vo
               color: 'var(--panel-fg)', fontSize: 16, lineHeight: 1, padding: '0 2px',
               opacity: 0.7,
             }}
-            title="Close"
+            title={t('closeBtn')}
           >✕</button>
         </div>
 
@@ -138,7 +164,7 @@ export function CodeModal({ tab, onClose }: { tab: RequestTab; onClose: () => vo
               border: 'none', borderRadius: 3, cursor: 'pointer', fontSize: 12,
             }}
           >
-            {copied ? '✓ Copied' : 'Copy'}
+            {copied ? t('codeSnippetCopied') : t('codeSnippetCopy')}
           </button>
           <button
             onClick={onClose}
@@ -149,7 +175,7 @@ export function CodeModal({ tab, onClose }: { tab: RequestTab; onClose: () => vo
               cursor: 'pointer', fontSize: 12,
             }}
           >
-            Close
+            {t('closeBtn')}
           </button>
         </div>
       </div>

@@ -2,15 +2,18 @@ import { useMemo } from 'react';
 import { type KeyValuePair } from '../../stores/requestStore';
 import { AutoComplete } from '../shared/AutoComplete';
 import { searchHeaders, getHeaderValues } from '../../data/httpHeaders';
+import { useI18n } from '../../i18n';
 
 interface Props {
   items: KeyValuePair[];
   onChange: (items: KeyValuePair[]) => void;
   /** When provided, {{var}} tokens in value cells are highlighted. */
   knownVarNames?: Set<string>;
+  /** When provided, tooltip on {{var}} shows resolved value. */
+  varValues?: Map<string, string>;
 }
 
-export function HeadersEditor({ items, onChange, knownVarNames }: Props) {
+export function HeadersEditor({ items, onChange, knownVarNames, varValues }: Props) {
   const updateItem = (index: number, field: keyof KeyValuePair, value: string | boolean) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
@@ -40,6 +43,7 @@ export function HeadersEditor({ items, onChange, knownVarNames }: Props) {
           onRemove={() => removeItem(index)}
           canRemove={items.length > 1}
           knownVarNames={knownVarNames}
+          varValues={varValues}
         />
       ))}
     </div>
@@ -52,9 +56,11 @@ interface RowProps {
   onRemove: () => void;
   canRemove: boolean;
   knownVarNames?: Set<string>;
+  varValues?: Map<string, string>;
 }
 
-function HeaderRow({ item, onUpdate, onRemove, canRemove, knownVarNames }: RowProps) {
+function HeaderRow({ item, onUpdate, onRemove, canRemove, knownVarNames, varValues }: RowProps) {
+  const t = useI18n();
   const keySuggestions = useMemo(
     () =>
       searchHeaders(item.key).map((h) => ({
@@ -89,11 +95,19 @@ function HeaderRow({ item, onUpdate, onRemove, canRemove, knownVarNames }: RowPr
         suggestions={valueSuggestions}
         placeholder="Value"
         knownVarNames={knownVarNames}
+        varValues={varValues}
+      />
+      <input
+        className="kv-input kv-input-desc"
+        placeholder="Description"
+        value={item.description ?? ''}
+        onChange={(e) => onUpdate('description', e.target.value)}
+        spellCheck={false}
       />
       <button
         className="kv-delete-btn"
         onClick={onRemove}
-        title="Remove"
+        title={t('removeItem')}
         disabled={!canRemove}
       >
         ×

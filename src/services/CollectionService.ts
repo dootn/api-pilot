@@ -4,6 +4,7 @@ import { Collection, CollectionItem, ApiRequest } from '../types';
 
 const COLLECTIONS_DIR = 'collections';
 const META_FILE = '_meta.json';
+const ORDER_FILE = '_order.json';
 
 /** Tree item stored on disk — request data lives in a separate file, referenced by ID */
 interface StoredItemRef {
@@ -35,7 +36,21 @@ export class CollectionService {
       const col = this.getById(id);
       if (col) collections.push(col);
     }
-    collections.sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Apply custom order if exists
+    const orderData = this.storage.readJson<{ orderedIds: string[] }>(COLLECTIONS_DIR, ORDER_FILE);
+    if (orderData && orderData.orderedIds) {
+      const orderMap = new Map(orderData.orderedIds.map((id, idx) => [id, idx]));
+      collections.sort((a, b) => {
+        const aOrder = orderMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+        const bOrder = orderMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        return a.name.localeCompare(b.name);
+      });
+    } else {
+      collections.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    
     return collections;
   }
 
@@ -162,13 +177,9 @@ export class CollectionService {
   private updateRequestRecursive(items: CollectionItem[], request: ApiRequest): boolean {
     for (const item of items) {
       if (item.type === 'request' && item.request?.id === request.id) {
-        const oldMethod = item.request.method;
-        const oldUrl = item.request.url;
         item.request = { ...request, updatedAt: Date.now() };
-        // Keep auto-generated name in sync when method/url changes
-        if (item.name === `${oldMethod} ${oldUrl}`) {
-          item.name = request.name || `${request.method} ${request.url}`;
-        }
+        // Always keep the collection item name in sync with the saved request name
+        item.name = request.name || `${request.method} ${request.url}`;
         return true;
       }
       if (item.type === 'folder' && item.items) {
@@ -527,5 +538,10 @@ export class CollectionService {
       }
     }
     return null;
+  }
+
+  /** Save custom collection order */
+  setOrder(orderedIds: string[]): boolean {
+    return this.storage.writeJson(COLLECTIONS_DIR, ORDER_FILE, { orderedIds });
   }
 }
