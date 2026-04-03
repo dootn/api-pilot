@@ -8,6 +8,7 @@ import { useVscodeMessage } from './hooks/useVscodeMessage';
 import { useTabStore, type RequestTab } from './stores/tabStore';
 import type { ApiResponse } from './stores/requestStore';
 import { useLocaleStore } from './stores/localeStore';
+import { useSettingsStore } from './stores/settingsStore';
 import { useI18n } from './i18n';
 import { vscode } from './vscode';
 
@@ -19,6 +20,7 @@ function App() {
   const setActiveTabId = useTabStore((s) => s.setActiveTabId);
   const restoreSession = useTabStore((s) => s.restoreSession);
   const setLocale = useLocaleStore((s) => s.setLocale);
+  const setCustomHttpMethods = useSettingsStore((s) => s.setCustomHttpMethods);
   const t = useI18n();
 
   // Sidebar tab: 'collections' | 'history'
@@ -106,6 +108,10 @@ function App() {
         }
         case 'setLocale': {
           setLocale(message.payload as 'en' | 'zh-CN');
+          return;
+        }
+        case 'setCustomMethods': {
+          setCustomHttpMethods(message.payload as string[]);
           return;
         }
         case 'requestRenamed': {
@@ -226,7 +232,7 @@ function App() {
           pointerEvents: 'none',
           borderTop: '1px solid var(--border-color)',
         }}>
-          API PILOT
+          API PILOT v{typeof APP_VERSION !== 'undefined' ? APP_VERSION : '1.0.0'}
         </div>
       </div>
 

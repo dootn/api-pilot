@@ -7,11 +7,16 @@
 
 ---
 
+![API Pilot Screenshot](resources/screenshot.png)
+
+---
+
 ## Features
 
 ### HTTP Request
 
 - **Methods**: GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD
+- **Custom Methods**: Add additional HTTP methods (e.g. `PROPFIND`, `MKCOL`) via the `api-pilot.customHttpMethods` VS Code setting — they appear in the method dropdown alongside the standard methods
 - **Custom Headers**: Add any request header as key-value pairs; toggle individual headers on/off without deleting them
 - **Query Parameters**: Dedicated key-value editor for URL query params with per-row enable/disable toggles
 - **Request Body**: Supports multiple body types:
@@ -27,7 +32,12 @@
 
 ### Response Viewer
 
-- **Status & Timing**: HTTP status code, status text, response time (ms), and body size
+- **Status & Timing**: HTTP status code, status text, response time (ms), and body size — each labeled for clarity
+- **Timing Breakdown**: Dedicated **Timing** tab shows a horizontal bar chart with three phases:
+  - **DNS + Connect** — DNS resolution + TCP/TLS handshake time
+  - **Wait (TTFB)** — server processing time until first byte received
+  - **Download** — response body download time
+  - Each phase displays milliseconds and percentage of total time
 - **Body Rendering**:
   - JSON — pretty-printed with collapsible tree
   - XML, Markdown, HTML — rendered view
@@ -44,6 +54,7 @@
 - Organize requests into collections with **nested folders**
 - Full CRUD: create, rename, delete collections and folders
 - Save the current request directly into any collection
+- **Search / Filter**: Real-time search box filters requests by name or URL across all collections and folders; matching sections auto-expand
 
 ### Environment Variables
 
@@ -56,7 +67,7 @@
 ### Request History
 
 - Every sent request is automatically recorded, grouped by date (up to 1000 entries total), with one-click replay
-- One-click replay from the History sidebar
+- **Search / Filter**: Real-time search box filters history entries by URL, method, or request name; matching date groups auto-expand
 
 ### cURL / Fetch Import & Export
 
@@ -127,6 +138,19 @@ All data is stored locally in the workspace under `.api-pilot/`:
 ```
 
 > Add `.api-pilot/history/` to `.gitignore` to exclude history from version control.
+
+---
+
+## VS Code Settings
+
+Open **Settings** (`Ctrl+,`) and search for `API Pilot`, or add to your `settings.json`:
+
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| `api-pilot.locale` | `"auto"` \| `"en"` \| `"zh-CN"` | `"auto"` | UI language. `auto` follows VS Code's language. |
+| `api-pilot.requestTimeout` | number (ms) | `30000` | Global request timeout in milliseconds (1 000 – 300 000). |
+| `api-pilot.maxHistory` | number | `1000` | Maximum total history entries to keep (10 – 10 000). |
+| `api-pilot.customHttpMethods` | string[] | `[]` | Additional HTTP methods shown in the method selector (e.g. `["PROPFIND", "MKCOL"]`). |
 
 ---
 

@@ -44,17 +44,6 @@ describe('KeyValueEditor', () => {
     expect(newItems[0].value).toBe('Bearer token');
   });
 
-  it('should auto-add empty row when last item is filled', () => {
-    const items = [{ key: 'X-Custom', value: '', enabled: true }];
-    const onChange = vi.fn();
-    render(<KeyValueEditor items={items} onChange={onChange} />);
-    const keyInput = screen.getAllByPlaceholderText('Key')[0];
-    fireEvent.change(keyInput, { target: { value: 'Changed' } });
-    const newItems = onChange.mock.calls[0][0];
-    expect(newItems.length).toBeGreaterThan(1);
-    expect(newItems[newItems.length - 1].key).toBe('');
-  });
-
   it('should toggle checkbox', () => {
     const items = [
       { key: 'Accept', value: 'test', enabled: true },

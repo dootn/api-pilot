@@ -5,7 +5,7 @@ import { vscode } from '../../vscode';
 import { BodyViewer } from './BodyViewer';
 import { useI18n } from '../../i18n';
 
-type ResponseTab = 'body' | 'headers' | 'tests' | 'console' | 'ssl';
+type ResponseTab = 'body' | 'headers' | 'tests' | 'console' | 'ssl' | 'timing';
 
 function getStatusClass(status: number): string {
   if (status >= 200 && status < 300) return 'success';
@@ -141,11 +141,20 @@ export function ResponsePanel() {
   return (
     <div className="response-panel">
       <div className="response-meta">
-        <span className={`status ${getStatusClass(response.status)}`}>
-          {response.status} {response.statusText}
-        </span>
-        <span className="time">{response.time}ms</span>
-        <span className="size">{formatSize(response.bodySize)}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ fontSize: 10, opacity: 0.5 }}>{t('respStatus')}</span>
+          <span className={`status ${getStatusClass(response.status)}`}>
+            {response.status} {response.statusText}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ fontSize: 10, opacity: 0.5 }}>{t('respTime')}</span>
+          <span className="time">{response.time}ms</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ fontSize: 10, opacity: 0.5 }}>{t('respSize')}</span>
+          <span className="size">{formatSize(response.bodySize)}</span>
+        </div>
         <button
           onClick={() => downloadResponse(response, tab?.url)}
           title={t('respDownloadTitle')}
@@ -261,6 +270,14 @@ export function ResponsePanel() {
             )}
           </button>
         )}
+        {response.timingBreakdown && (
+          <button
+            className={`tab ${activeTab === 'timing' ? 'active' : ''}`}
+            onClick={() => setActiveTab('timing')}
+          >
+            {t('timingTab')}
+          </button>
+        )}
       </div>
 
       <div className="response-body">
@@ -374,6 +391,34 @@ export function ResponsePanel() {
             </div>
           )
         )}
+
+        {activeTab === 'timing' && response.timingBreakdown && (() => {
+          const { connect, ttfb, download } = response.timingBreakdown;
+          const total = connect + ttfb + download || 1;
+          const phases: { label: string; time: number; color: string }[] = [
+            { label: t('timingConnect'), time: connect, color: '#4fc3f7' },
+            { label: t('timingTtfb'),    time: ttfb,    color: '#81c995' },
+            { label: t('timingDownload'),time: download, color: '#ffb74d' },
+          ];
+          return (
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {phases.map(({ label, time, color }) => (
+                <div key={label}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 11, opacity: 0.8 }}>
+                    <span>{label}</span>
+                    <span>{time}ms ({((time / total) * 100).toFixed(1)}%)</span>
+                  </div>
+                  <div style={{ height: 8, background: 'var(--border-color)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.max((time / total) * 100, 0.5)}%`, height: '100%', background: color, borderRadius: 4 }} />
+                  </div>
+                </div>
+              ))}
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-color)', fontSize: 11, opacity: 0.6 }}>
+                {t('timingTotal')}: {response.time}ms
+              </div>
+            </div>
+          );
+        })()}
 
         {activeTab === 'ssl' && sslInfo && (
           <div style={{ padding: '12px 16px', fontSize: 12 }}>

@@ -264,7 +264,8 @@ export class MessageHandler {
         payload: { ...response, testResults, consoleEntries },
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const rawErrorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = MessageHandler.friendlyErrorMessage(rawErrorMessage, apiRequest?.url ?? '');
 
       // For HTTPS requests, collect SSL info separately so the user can inspect
       // the certificate even when the request fails (e.g. cert expired, untrusted CA).
@@ -289,6 +290,35 @@ export class MessageHandler {
 
   private handleCancelRequest(requestId: string): void {
     this.httpClient.cancel(requestId);
+  }
+
+  private static friendlyErrorMessage(message: string, url: string): string {
+    // HTTPS sent to a plain-HTTP port (SSL unwrap failure)
+    if (/packet length too long|tls_get_more_records|tls_early_post_process_client_hello|wrong version number|http_request/i.test(message)) {
+      const portHint = /:80\b/.test(url) ? ' (port 80 is typically plain HTTP)' : '';
+      return `SSL handshake failed${portHint}: the server returned a plain HTTP response instead of a TLS handshake. Try using http:// instead of https://.`;
+    }
+    // Plain HTTP sent to an HTTPS port
+    if (/unknown protocol|http_request|ssl alert number 70|ssl alert number 80/i.test(message)) {
+      return `Connection failed: the server expects HTTPS but received a plain HTTP request. Try using https:// instead of http://.`;
+    }
+    // Connection refused
+    if (/ECONNREFUSED/i.test(message)) {
+      return `Connection refused: no service is listening on that address/port. Check the URL and port number.`;
+    }
+    // DNS resolution failure
+    if (/ENOTFOUND|getaddrinfo/i.test(message)) {
+      return `DNS lookup failed: the hostname could not be resolved. Check the URL for typos.`;
+    }
+    // Connection timeout
+    if (/ETIMEDOUT|ESOCKETTIMEDOUT|socket hang up/i.test(message)) {
+      return `Request timed out: the server did not respond in time.`;
+    }
+    // Self-signed / untrusted certificate
+    if (/self.signed|DEPTH_ZERO_SELF_SIGNED_CERT|unable to verify the first certificate|ERR_TLS_CERT/i.test(message)) {
+      return `SSL certificate error: ${message}. You may need to trust the server's certificate or disable SSL verification.`;
+    }
+    return message;
   }
 
   private handleUpdateCollectionRequest(payload: { collectionId: string; request: ApiRequest }): void {
@@ -405,6 +435,9 @@ export class MessageHandler {
       locale = configLocale;
     }
     this.webview.postMessage({ type: 'setLocale', payload: locale });
+    // Send custom HTTP methods
+    const customMethods = vscode.workspace.getConfiguration('api-pilot').get<string[]>('customHttpMethods', []);
+    this.webview.postMessage({ type: 'setCustomMethods', payload: customMethods.map((m) => m.trim().toUpperCase()).filter(Boolean) });
   }
 
   private handleGetHistory(): void {

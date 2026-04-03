@@ -77,6 +77,12 @@ export interface SSLInfo {
   peerCertificate?: Record<string, any>;
 }
 
+export interface TimingBreakdown {
+  connect: number;
+  ttfb: number;
+  download: number;
+}
+
 export interface ApiResponse {
   status: number;
   statusText: string;
@@ -89,6 +95,7 @@ export interface ApiResponse {
   testResults?: TestResult[];
   consoleEntries?: ConsoleEntry[];
   sslInfo?: SSLInfo;
+  timingBreakdown?: TimingBreakdown;
 }
 
 interface RequestState {

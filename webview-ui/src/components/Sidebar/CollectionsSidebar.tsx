@@ -56,6 +56,7 @@ export function CollectionsSidebar() {
   const setActiveTabId = useTabStore((s) => s.setActiveTabId);
   const menuRef = useRef<HTMLDivElement>(null);
   const t = useI18n();
+  const [filterText, setFilterText] = useState('');
 
   // Load collections on mount
   useEffect(() => {
@@ -381,6 +382,39 @@ export function CollectionsSidebar() {
     setItemDragOverCollectionId(null);
   };
 
+  const lowerFilter = filterText.toLowerCase().trim();
+
+  function filterItems(items: CollectionItem[]): CollectionItem[] {
+    return items.flatMap((item) => {
+      if (item.type === 'request') {
+        const matches =
+          item.name.toLowerCase().includes(lowerFilter) ||
+          (item.request?.url ?? '').toLowerCase().includes(lowerFilter);
+        return matches ? [item] : [];
+      }
+      if (item.type === 'folder') {
+        const filteredChildren = filterItems(item.items ?? []);
+        const nameMatches = item.name.toLowerCase().includes(lowerFilter);
+        if (filteredChildren.length > 0 || nameMatches) {
+          return [{ ...item, items: filteredChildren }];
+        }
+        return [];
+      }
+      return [];
+    });
+  }
+
+  const visibleCollections = lowerFilter
+    ? collections.flatMap((col) => {
+        const filteredItems = filterItems(col.items);
+        const nameMatches = col.name.toLowerCase().includes(lowerFilter);
+        if (nameMatches || filteredItems.length > 0) {
+          return [{ ...col, items: filteredItems }];
+        }
+        return [];
+      })
+    : collections;
+
   const renderItems = (items: CollectionItem[], collectionId: string, depth: number, folderPath: string[] = []): React.ReactNode => {
     return items.map((item, idx) => {
       const key = `${collectionId}-${depth}-${idx}-${item.name}`;
@@ -408,7 +442,7 @@ export function CollectionsSidebar() {
         draggingFolderKey === folderPathKey &&
         draggingItem?.index === idx;
       if (item.type === 'folder') {
-        const expanded = expandedIds.has(key);
+        const expanded = lowerFilter ? true : expandedIds.has(key);
         const folderClass = [
           'sidebar-tree-item sidebar-folder',
           isDraggingThis ? 'dragging' : '',
@@ -498,13 +532,34 @@ export function CollectionsSidebar() {
         </button>
       </div>
 
+      {/* Filter input */}
+      <div style={{ padding: '4px 8px', borderBottom: '1px solid var(--border-color)' }}>
+        <input
+          type="text"
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+          placeholder={t('sidebarFilter')}
+          style={{
+            width: '100%',
+            padding: '4px 8px',
+            fontSize: 11,
+            background: 'var(--input-bg)',
+            color: 'var(--input-fg)',
+            border: '1px solid var(--input-border)',
+            borderRadius: 4,
+            outline: 'none',
+            boxSizing: 'border-box',
+          }}
+        />
+      </div>
+
       {/* Tree */}
       <div className="sidebar-tree">
-        {collections.length === 0 ? (
+        {visibleCollections.length === 0 ? (
           <div className="sidebar-empty">{t('colEmpty')}</div>
         ) : (
-          collections.map((col) => {
-            const expanded = expandedIds.has(col.id);
+          visibleCollections.map((col) => {
+            const expanded = lowerFilter ? true : expandedIds.has(col.id);
             const colClass = [
               'sidebar-tree-item sidebar-collection',
               draggingCollectionId === col.id ? 'dragging' : '',
@@ -516,7 +571,7 @@ export function CollectionsSidebar() {
               <div key={col.id}>
                 <div
                   className={colClass}
-                  draggable
+                  draggable={!lowerFilter}
                   onClick={() => toggleExpanded(col.id)}
                   onContextMenu={(e) =>
                     showContextMenu(e, { kind: 'collection', id: col.id, name: col.name })

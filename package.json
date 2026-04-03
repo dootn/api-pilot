@@ -2,7 +2,7 @@
   "name": "api-pilot",
   "displayName": "API Pilot",
   "description": "A powerful API debugging tool for VS Code, similar to Postman",
-  "version": "0.4.3",
+  "version": "1.0.1",
   "publisher": "api-pilot",
   "icon": "resources/icon.png",
   "repository": {
@@ -55,6 +55,12 @@
           "minimum": 1000,
           "maximum": 300000,
           "description": "Global request timeout in milliseconds. Applies to both receiving response headers and downloading the response body. Default: 30000 (30 s)."
+        },
+        "api-pilot.customHttpMethods": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Additional HTTP methods to show in the method selector dropdown (e.g. [\"PROPFIND\", \"MKCOL\"])."
         }
       }
     }

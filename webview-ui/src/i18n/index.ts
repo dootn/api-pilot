@@ -177,6 +177,14 @@ const en = {
   respErrorPrefix: 'Error: ',
   respDownloadTitle: 'Download response body',
   respCertNotTrusted: 'Certificate not trusted',
+  respStatus: 'Status',
+  respTime: 'Time',
+  respSize: 'Size',
+  timingConnect: 'DNS + Connect',
+  timingTtfb: 'Wait (TTFB)',
+  timingDownload: 'Download',
+  timingTab: '⏱ Timing',
+  timingTotal: 'Total',
   // EnvManager
   envManagerTitle: 'Environments',
   envListLabel: 'Environments',
@@ -202,6 +210,8 @@ const en = {
   colNewCollectionTitle: 'New Collection',
   // Variable preview
   varTooltipUnknown: 'undefined',
+  // Sidebar filter
+  sidebarFilter: 'Search...',
 } as const;
 
 const zhCN: Record<keyof typeof en, string> = {
@@ -381,6 +391,14 @@ const zhCN: Record<keyof typeof en, string> = {
   respErrorPrefix: '错误：',
   respDownloadTitle: '下载响应体',
   respCertNotTrusted: '证书不可信',
+  respStatus: '状态',
+  respTime: '耗时',
+  respSize: '大小',
+  timingConnect: 'DNS + 连接',
+  timingTtfb: '等待 (TTFB)',
+  timingDownload: '下载',
+  timingTab: '☑ 耗时',
+  timingTotal: '总耗时',
   // EnvManager
   envManagerTitle: '环境变量',
   envListLabel: '环境',
@@ -406,6 +424,8 @@ const zhCN: Record<keyof typeof en, string> = {
   colNewCollectionTitle: '新建收藏夹',
   // Variable preview
   varTooltipUnknown: '未定义',
+  // Sidebar filter
+  sidebarFilter: '搜索...',
 };
 
 const translations: Record<string, Record<TranslationKey, string>> = { en, 'zh-CN': zhCN };

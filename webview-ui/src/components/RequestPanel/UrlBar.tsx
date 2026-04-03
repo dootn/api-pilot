@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useTabStore } from '../../stores/tabStore';
 import type { HttpMethod } from '../../stores/requestStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { vscode } from '../../vscode';
 import { useEnvironments } from '../../hooks/useEnvironments';
 import { renderVarHighlight } from '../../utils/varHighlight';
@@ -97,6 +98,7 @@ const renderHighlightedUrl = renderVarHighlight;
 export function UrlBar() {
   const { activeTabId, tabs, updateTab } = useTabStore();
   const t = useI18n();
+  const customHttpMethods = useSettingsStore((s) => s.customHttpMethods);
   const [showSaveDropdown, setShowSaveDropdown] = useState(false);
   const [collections, setCollections] = useState<CollectionBrief[]>([]);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
@@ -315,17 +317,13 @@ export function UrlBar() {
 
   return (
     <div className="url-bar">
-      <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+      {/* Method selector + URL input: connected group, no gap between them */}
+      <div style={{ display: 'flex', flex: 1, minWidth: 0 }}>
         <select
           className={`method-select ${METHOD_CLASSES[tab.method] || 'method-get'}`}
           value={tab.method}
           onChange={(e) => {
-            const value = e.target.value;
-            if (value === '__custom__') {
-              updateTab(tab.id, { method: value as any });
-            } else {
-              updateTab(tab.id, { method: value as HttpMethod });
-            }
+            updateTab(tab.id, { method: e.target.value as HttpMethod });
           }}
         >
           {DEFAULT_METHODS.map((m) => (
@@ -333,177 +331,115 @@ export function UrlBar() {
               {m}
             </option>
           ))}
-          {/* Show current method if it's not in default list */}
-          {!DEFAULT_METHODS.includes(tab.method as any) && tab.method !== '__custom__' && (
+          {/* Custom methods from VS Code settings */}
+          {customHttpMethods.filter((m) => !DEFAULT_METHODS.includes(m as HttpMethod)).map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+          {/* Show current method if it's not in default or settings list (legacy tabs) */}
+          {!DEFAULT_METHODS.includes(tab.method as any) &&
+            !customHttpMethods.includes(tab.method) &&
+            (tab.method as string) !== '__custom__' && (
             <option key={tab.method} value={tab.method}>
               {tab.method}
             </option>
           )}
-          <option value="__custom__">{t('urlCustomMethod')}</option>
         </select>
-        {(tab.method as string) === '__custom__' && (
+
+        <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+          {/* Highlight backing layer: only active when URL contains {{vars}} */}
+          {tab.url.includes('{{') && (
+            <div
+              ref={urlHighlightRef}
+              aria-hidden
+              style={{
+                position: 'absolute',
+                inset: 0,
+                padding: '6px 10px',
+                fontSize: '13px',
+                lineHeight: '1.4',
+                whiteSpace: 'pre',
+                overflow: 'hidden',
+                pointerEvents: 'none',
+                background: 'var(--input-bg, #3c3c3c)',
+                border: '1px solid transparent',
+                borderRadius: 3,
+                display: 'flex',
+                alignItems: 'center',
+                zIndex: 0,
+                color: 'var(--input-fg, #cccccc)',
+              }}
+            >
+              {renderHighlightedUrl(tab.url, knownVarNames, varValues)}
+            </div>
+          )}
           <input
+            ref={urlInputRef}
+            className="url-input"
             type="text"
-            placeholder="Enter method"
+            placeholder="Enter request URL (e.g. https://api.example.com/users)"
+            value={tab.url}
+            onChange={handleUrlChange}
+            onKeyDown={handleUrlKeyDown}
+            onBlur={() => setTimeout(() => setShowVarDropdown(false), 150)}
+            spellCheck={false}
             style={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
               width: '100%',
-              height: '100%',
-              background: 'var(--input-bg)',
-              color: 'var(--input-fg)',
-              border: '1px solid var(--input-border)',
-              borderRadius: 3,
-              padding: '6px 8px',
-              fontSize: 12,
-              fontWeight: 600,
-              textTransform: 'uppercase',
-            }}
-            autoFocus
-            onBlur={(e) => {
-              const custom = e.target.value.trim().toUpperCase();
-              if (custom) {
-                updateTab(tab.id, { method: custom as HttpMethod });
-              } else {
-                updateTab(tab.id, { method: 'GET' });
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const custom = (e.target as HTMLInputElement).value.trim().toUpperCase();
-                if (custom) {
-                  updateTab(tab.id, { method: custom as HttpMethod });
-                } else {
-                  updateTab(tab.id, { method: 'GET' });
-                }
-                (e.target as HTMLInputElement).blur();
-              } else if (e.key === 'Escape') {
-                updateTab(tab.id, { method: 'GET' });
-                (e.target as HTMLInputElement).blur();
-              }
+              position: 'relative',
+              zIndex: 1,
+              ...(tab.url.includes('{{')
+                ? { color: 'transparent', caretColor: 'var(--input-fg, #cccccc)', background: 'transparent' }
+                : {}),
             }}
           />
-        )}
-        {/* Delete button for custom methods (not in the default list) */}
-        {!DEFAULT_METHODS.includes(tab.method as any) && (tab.method as string) !== '__custom__' && (
-          <button
-            title={t('urlRemoveCustomMethod')}
-            onClick={() => updateTab(tab.id, { method: 'GET' })}
-            style={{
-              position: 'absolute',
-              right: -18,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              background: 'none',
-              border: 'none',
-              color: 'var(--vscode-errorForeground, #f48771)',
-              cursor: 'pointer',
-              fontSize: 12,
-              lineHeight: 1,
-              padding: '1px 2px',
-              opacity: 0.7,
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-            onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
-          >
-            ✕
-          </button>
-        )}
-      </div>
-
-      <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-        {/* Highlight backing layer: only active when URL contains {{vars}} */}
-        {tab.url.includes('{{') && (
-          <div
-            ref={urlHighlightRef}
-            aria-hidden
-            style={{
-              position: 'absolute',
-              inset: 0,
-              padding: '6px 10px',
-              fontSize: '13px',
-              lineHeight: '1.4',
-              whiteSpace: 'pre',
-              overflow: 'hidden',
-              pointerEvents: 'none',
-              background: 'var(--input-bg, #3c3c3c)',
-              border: '1px solid transparent',
-              borderRadius: 3,
-              display: 'flex',
-              alignItems: 'center',
-              zIndex: 0,
-              color: 'var(--input-fg, #cccccc)',
-            }}
-          >
-            {renderHighlightedUrl(tab.url, knownVarNames, varValues)}
-          </div>
-        )}
-        <input
-          ref={urlInputRef}
-          className="url-input"
-          type="text"
-          placeholder="Enter request URL (e.g. https://api.example.com/users)"
-          value={tab.url}
-          onChange={handleUrlChange}
-          onKeyDown={handleUrlKeyDown}
-          onBlur={() => setTimeout(() => setShowVarDropdown(false), 150)}
-          spellCheck={false}
-          style={{
-            width: '100%',
-            position: 'relative',
-            zIndex: 1,
-            ...(tab.url.includes('{{')
-              ? { color: 'transparent', caretColor: 'var(--input-fg, #cccccc)', background: 'transparent' }
-              : {}),
-          }}
-        />
-        {showVarDropdown && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              zIndex: 200,
-              marginTop: 2,
-              maxHeight: 220,
-              overflowY: 'auto',
-              background: 'var(--vscode-editorSuggestWidget-background, var(--input-bg))',
-              border: '1px solid var(--vscode-editorSuggestWidget-border, var(--border-color))',
-              borderRadius: 3,
-              boxShadow: '0 3px 10px rgba(0,0,0,0.35)',
-            }}
-          >
-            {varSuggestions.map((v, idx) => (
-              <div
-                key={v.key}
-                onMouseDown={(e) => { e.preventDefault(); handleVarSelect(v.key); }}
-                onMouseEnter={() => setVarActiveIdx(idx)}
-                style={{
-                  padding: '5px 10px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  gap: 12,
-                  alignItems: 'center',
-                  background: idx === varActiveIdx
-                    ? 'var(--vscode-list-activeSelectionBackground, #094771)'
-                    : 'transparent',
-                  color: idx === varActiveIdx
-                    ? 'var(--vscode-list-activeSelectionForeground, #fff)'
-                    : 'var(--panel-fg)',
-                }}
-              >
-                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{'{{'}{v.key}{'}}'}</span>
-                {v.value && (
-                  <span style={{ opacity: 0.55, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {v.value}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+          {showVarDropdown && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                zIndex: 200,
+                marginTop: 2,
+                maxHeight: 220,
+                overflowY: 'auto',
+                background: 'var(--vscode-editorSuggestWidget-background, var(--input-bg))',
+                border: '1px solid var(--vscode-editorSuggestWidget-border, var(--border-color))',
+                borderRadius: 3,
+                boxShadow: '0 3px 10px rgba(0,0,0,0.35)',
+              }}
+            >
+              {varSuggestions.map((v, idx) => (
+                <div
+                  key={v.key}
+                  onMouseDown={(e) => { e.preventDefault(); handleVarSelect(v.key); }}
+                  onMouseEnter={() => setVarActiveIdx(idx)}
+                  style={{
+                    padding: '5px 10px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    gap: 12,
+                    alignItems: 'center',
+                    background: idx === varActiveIdx
+                      ? 'var(--vscode-list-activeSelectionBackground, #094771)'
+                      : 'transparent',
+                    color: idx === varActiveIdx
+                      ? 'var(--vscode-list-activeSelectionForeground, #fff)'
+                      : 'var(--panel-fg)',
+                  }}
+                >
+                  <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{'{{'}{v.key}{'}}'}</span>
+                  {v.value && (
+                    <span style={{ opacity: 0.55, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {v.value}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <button

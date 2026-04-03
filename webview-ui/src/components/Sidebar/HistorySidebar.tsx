@@ -48,6 +48,7 @@ function shortenUrl(url: string): string {
 export function HistorySidebar() {
   const [groups, setGroups] = useState<HistoryGroup[]>([]);
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+  const [filterText, setFilterText] = useState('');
   const addTabWithData = useTabStore((s) => s.addTabWithData);
   const t = useI18n();
 
@@ -104,12 +105,46 @@ export function HistorySidebar() {
         </button>
       </div>
 
+      {/* Filter input */}
+      <div style={{ padding: '4px 8px', borderBottom: '1px solid var(--border-color)' }}>
+        <input
+          type="text"
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+          placeholder={t('sidebarFilter')}
+          style={{
+            width: '100%',
+            padding: '4px 8px',
+            fontSize: 11,
+            background: 'var(--input-bg)',
+            color: 'var(--input-fg)',
+            border: '1px solid var(--input-border)',
+            borderRadius: 4,
+            outline: 'none',
+            boxSizing: 'border-box',
+          }}
+        />
+      </div>
+
       <div className="sidebar-tree">
-        {groups.length === 0 ? (
-          <div className="sidebar-empty">{t('hisEmpty')}</div>
-        ) : (
-          groups.map((group) => {
-            const expanded = expandedDates.has(group.date);
+        {(() => {
+          const lowerFilter = filterText.toLowerCase().trim();
+          const visibleGroups = lowerFilter
+            ? groups.flatMap((group) => {
+                const matchedEntries = group.entries.filter(
+                  (entry) =>
+                    (entry.request.url ?? '').toLowerCase().includes(lowerFilter) ||
+                    entry.request.method.toLowerCase().includes(lowerFilter) ||
+                    (entry.request.name ?? '').toLowerCase().includes(lowerFilter)
+                );
+                return matchedEntries.length > 0 ? [{ ...group, entries: matchedEntries }] : [];
+              })
+            : groups;
+          if (visibleGroups.length === 0) {
+            return <div className="sidebar-empty">{t('hisEmpty')}</div>;
+          }
+          return visibleGroups.map((group) => {
+            const expanded = lowerFilter ? true : expandedDates.has(group.date);
             return (
               <div key={group.date}>
                 <div
@@ -182,8 +217,8 @@ export function HistorySidebar() {
                   })}
               </div>
             );
-          })
-        )}
+          });
+        })()}
       </div>
     </div>
   );

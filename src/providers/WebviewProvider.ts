@@ -10,6 +10,7 @@ export interface WebviewServices {
   envService?: EnvService;
   historyService?: HistoryService;
   storageService?: StorageService;
+  version?: string;
   onCollectionChanged?: () => void;
   onHistoryChanged?: () => void;
 }
@@ -83,6 +84,7 @@ export class WebviewProvider {
     const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(distPath, 'index.css'));
     const nonce = getNonce();
 
+    const version = this.services.version ?? '1.0.0';
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -94,6 +96,7 @@ export class WebviewProvider {
 </head>
 <body>
   <div id="root"></div>
+  <script nonce="${nonce}">var APP_VERSION=${JSON.stringify(version)};</script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

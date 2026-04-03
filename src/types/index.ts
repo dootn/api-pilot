@@ -90,6 +90,12 @@ export interface SSLInfo {
   peerCertificate?: Record<string, any>;
 }
 
+export interface TimingBreakdown {
+  connect: number;   // DNS + TCP + TLS: from request start to first byte sent
+  ttfb: number;      // Time to first byte: from request sent to response headers received
+  download: number;  // Body download time
+}
+
 export interface ApiResponse {
   status: number;
   statusText: string;
@@ -102,6 +108,7 @@ export interface ApiResponse {
   testResults?: TestResult[];
   consoleEntries?: ConsoleEntry[];
   sslInfo?: SSLInfo;
+  timingBreakdown?: TimingBreakdown;
 }
 
 export interface HistoryEntry {

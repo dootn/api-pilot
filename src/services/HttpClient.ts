@@ -1,8 +1,45 @@
 import { request, Agent } from 'undici';
 import * as tls from 'tls';
-import { ApiRequest, ApiResponse, KeyValuePair, SSLInfo, SSLCertificate } from '../types';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import diagnosticsChannel from 'node:diagnostics_channel';
+import { ApiRequest, ApiResponse, KeyValuePair, SSLInfo, SSLCertificate, TimingBreakdown } from '../types';
 import { VariableResolver } from './VariableResolver';
 import { isBinaryContentType } from './contentTypeUtils';
+
+interface TimingStore {
+  sendHeadersTime?: number;
+  responseHeadersTime?: number;
+}
+
+const requestTimingMap = new WeakMap<object, TimingStore>();
+const timingStorage = new AsyncLocalStorage<TimingStore>();
+
+// Capture the undici Request object while still in the caller's sync context
+diagnosticsChannel.subscribe('undici:request:create', (msg: any) => {
+  const store = timingStorage.getStore();
+  if (store && msg?.request) {
+    requestTimingMap.set(msg.request, store);
+  }
+});
+
+// These fire in undici's I/O context — correlate via WeakMap
+diagnosticsChannel.subscribe('undici:client:sendHeaders', (msg: any) => {
+  if (msg?.request) {
+    const timing = requestTimingMap.get(msg.request);
+    if (timing && timing.sendHeadersTime === undefined) {
+      timing.sendHeadersTime = Date.now();
+    }
+  }
+});
+
+diagnosticsChannel.subscribe('undici:request:headers', (msg: any) => {
+  if (msg?.request) {
+    const timing = requestTimingMap.get(msg.request);
+    if (timing && timing.responseHeadersTime === undefined) {
+      timing.responseHeadersTime = Date.now();
+    }
+  }
+});
 
 export class HttpClient {
   private abortControllers = new Map<string, AbortController>();
@@ -28,7 +65,8 @@ export class HttpClient {
       const dispatcher = sslVerify ? undefined : new Agent({ connect: { rejectUnauthorized: false } });
 
       const effectiveTimeout = timeoutMs ?? 30000;
-      const response = await request(url, {
+      const timingStore: TimingStore = {};
+      const response = await timingStorage.run(timingStore, () => request(url, {
         method: resolvedRequest.method,
         headers,
         body,
@@ -36,7 +74,7 @@ export class HttpClient {
         headersTimeout: effectiveTimeout,
         bodyTimeout: effectiveTimeout,
         ...(dispatcher ? { dispatcher } : {}),
-      });
+      }));
 
       const flatHeaders = this.flattenHeaders(response.headers);
       const contentTypeHeader = flatHeaders['content-type'] || flatHeaders['Content-Type'] || '';
@@ -68,6 +106,15 @@ export class HttpClient {
         }
       }
 
+      const timingBreakdown: TimingBreakdown | undefined =
+        timingStore.sendHeadersTime !== undefined && timingStore.responseHeadersTime !== undefined
+          ? {
+              connect: timingStore.sendHeadersTime - startTime,
+              ttfb: timingStore.responseHeadersTime - timingStore.sendHeadersTime,
+              download: endTime - timingStore.responseHeadersTime,
+            }
+          : undefined;
+
       return {
         status: response.statusCode,
         statusText: this.getStatusText(response.statusCode),
@@ -78,6 +125,7 @@ export class HttpClient {
         contentType: contentType || undefined,
         bodyBase64,
         sslInfo,
+        timingBreakdown,
       };
     } finally {
       this.abortControllers.delete(requestId);

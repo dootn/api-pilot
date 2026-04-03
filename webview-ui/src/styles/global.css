@@ -364,13 +364,20 @@ body {
   background: var(--input-bg);
   color: var(--input-fg);
   border: 1px solid var(--input-border);
-  padding: 6px 8px;
-  border-radius: 3px;
+  border-right: none;
+  padding: 6px 24px 6px 8px;
+  border-radius: 3px 0 0 3px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   min-width: 80px;
   outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  background-size: 8px 5px;
 }
 
 .method-select:focus {
@@ -387,8 +394,9 @@ body {
   background: var(--input-bg);
   color: var(--input-fg);
   border: 1px solid var(--input-border);
+  border-left: 1px solid var(--border-color);
   padding: 6px 10px;
-  border-radius: 3px;
+  border-radius: 0 3px 3px 0;
   font-size: 13px;
   outline: none;
 }

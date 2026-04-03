@@ -23,13 +23,6 @@ export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valueP
   const updateItem = (index: number, field: keyof KeyValuePair, value: string | boolean) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
-
-    // Auto-add empty row at the end
-    const last = newItems[newItems.length - 1];
-    if (last && (last.key || last.value)) {
-      newItems.push({ key: '', value: '', enabled: true });
-    }
-
     onChange(newItems);
   };
 
