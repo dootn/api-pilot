@@ -170,6 +170,9 @@ const en = {
   removeItem: 'Remove',
   addItem: '+ Add',
   formDataToggleType: 'Toggle text / file',
+  bulkEditBtn: 'Bulk Edit',
+  tableViewBtn: 'Table View',
+  bulkEditPlaceholder: 'One per line: Key: Value  or  Key=Value  (lines starting with # are skipped)',
   // ResponsePanel
   respErrorPrefix: 'Error: ',
   respDownloadTitle: 'Download response body',
@@ -371,6 +374,9 @@ const zhCN: Record<keyof typeof en, string> = {
   removeItem: '删除',
   addItem: '+ 新增',
   formDataToggleType: '切换文本 / 文件',
+  bulkEditBtn: '批量编辑',
+  tableViewBtn: '表格视图',
+  bulkEditPlaceholder: '每行一条：Key: Value 或 Key=Value（# 开头为注释）',
   // ResponsePanel
   respErrorPrefix: '错误：',
   respDownloadTitle: '下载响应体',

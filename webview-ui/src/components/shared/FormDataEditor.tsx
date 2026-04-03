@@ -1,8 +1,9 @@
 import { type FormDataField } from '../../stores/requestStore';
 import { VarInput } from '../../utils/varHighlight';
 import { vscode } from '../../vscode';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useI18n } from '../../i18n';
+import { parseBulkText, itemsToBulkText, mergeDescriptions } from './bulkEditUtils';
 
 interface Props {
   items: FormDataField[];
@@ -26,6 +27,8 @@ export function FormDataEditor({
   varValues
 }: Props) {
   const t = useI18n();
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkText, setBulkText] = useState('');
   
   // Listen for file picked messages
   useEffect(() => {
@@ -92,6 +95,42 @@ export function FormDataEditor({
   const addItem = () => {
     onChange([...items, { key: '', value: '', enabled: true, type: 'text' as const }]);
   };
+
+  const enterBulk = () => {
+    // Only export text fields to bulk edit
+    setBulkText(itemsToBulkText(items.filter((i) => i.type === 'text')));
+    setBulkMode(true);
+  };
+
+  const exitBulk = () => {
+    const fileItems = items.filter((i) => i.type === 'file');
+    const textItems = items
+      .filter((i) => i.type === 'text')
+      .map(({ key, value, enabled, description }) => ({ key, value, enabled, description }));
+    const parsed = mergeDescriptions(parseBulkText(bulkText), textItems)
+      .map((kv) => ({ ...kv, type: 'text' as const }));
+    const merged = [...fileItems, ...parsed];
+    onChange(merged.length > 0
+      ? [...merged, { key: '', value: '', enabled: true, type: 'text' as const }]
+      : [{ key: '', value: '', enabled: true, type: 'text' as const }]);
+    setBulkMode(false);
+  };
+
+  if (bulkMode) {
+    return (
+      <div className="kv-editor">
+        <textarea
+          className="body-textarea"
+          value={bulkText}
+          onChange={(e) => setBulkText(e.target.value)}
+          placeholder={t('bulkEditPlaceholder')}
+          spellCheck={false}
+          style={{ minHeight: 120, fontFamily: 'var(--vscode-editor-font-family, monospace)', fontSize: 12 }}
+        />
+        <button className="kv-add-btn" onClick={exitBulk}>{t('tableViewBtn')}</button>
+      </div>
+    );
+  }
 
   return (
     <div className="kv-editor">
@@ -179,6 +218,14 @@ export function FormDataEditor({
               )}
             </div>
           )}
+
+          <VarInput
+            className="kv-input kv-input-desc"
+            placeholder="Description"
+            value={item.description ?? ''}
+            onChange={(v) => updateItem(index, 'description', v)}
+            spellCheck={false}
+          />
           
           <button
             className="kv-delete-btn"
@@ -189,7 +236,10 @@ export function FormDataEditor({
           </button>
         </div>
       ))}
-      <button className="kv-add-btn" onClick={addItem}>{t('addItem')}</button>
+      <div style={{ display: 'flex', gap: 4 }}>
+        <button className="kv-add-btn" onClick={addItem}>{t('addItem')}</button>
+        <button className="kv-add-btn" style={{ opacity: 0.65 }} onClick={enterBulk}>{t('bulkEditBtn')}</button>
+      </div>
     </div>
   );
 }

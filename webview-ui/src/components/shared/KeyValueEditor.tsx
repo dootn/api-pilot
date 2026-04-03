@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { type KeyValuePair } from '../../stores/requestStore';
 import { VarInput } from '../../utils/varHighlight';
 import { useI18n } from '../../i18n';
+import { parseBulkText, itemsToBulkText, mergeDescriptions } from './bulkEditUtils';
 
 interface Props {
   items: KeyValuePair[];
@@ -15,6 +17,9 @@ interface Props {
 
 export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valuePlaceholder = 'Value', knownVarNames, varValues }: Props) {
   const t = useI18n();
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+
   const updateItem = (index: number, field: keyof KeyValuePair, value: string | boolean) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
@@ -37,6 +42,35 @@ export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valueP
   const addItem = () => {
     onChange([...items, { key: '', value: '', enabled: true }]);
   };
+
+  const enterBulk = () => {
+    setBulkText(itemsToBulkText(items));
+    setBulkMode(true);
+  };
+
+  const exitBulk = () => {
+    const parsed = mergeDescriptions(parseBulkText(bulkText), items);
+    onChange(parsed.length > 0
+      ? [...parsed, { key: '', value: '', enabled: true }]
+      : [{ key: '', value: '', enabled: true }]);
+    setBulkMode(false);
+  };
+
+  if (bulkMode) {
+    return (
+      <div className="kv-editor">
+        <textarea
+          className="body-textarea"
+          value={bulkText}
+          onChange={(e) => setBulkText(e.target.value)}
+          placeholder={t('bulkEditPlaceholder')}
+          spellCheck={false}
+          style={{ minHeight: 120, fontFamily: 'var(--vscode-editor-font-family, monospace)', fontSize: 12 }}
+        />
+        <button className="kv-add-btn" onClick={exitBulk}>{t('tableViewBtn')}</button>
+      </div>
+    );
+  }
 
   return (
     <div className="kv-editor">
@@ -82,7 +116,10 @@ export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valueP
           </button>
         </div>
       ))}
-      <button className="kv-add-btn" onClick={addItem}>{t('addItem')}</button>
+      <div style={{ display: 'flex', gap: 4 }}>
+        <button className="kv-add-btn" onClick={addItem}>{t('addItem')}</button>
+        <button className="kv-add-btn" style={{ opacity: 0.65 }} onClick={enterBulk}>{t('bulkEditBtn')}</button>
+      </div>
     </div>
   );
 }
