@@ -96,13 +96,6 @@
 
 ---
 
-## Environment Variables
-
-1. Click the environment name in the status bar to switch or manage environments.
-2. Use `{{variable_name}}` anywhere in your request (URL, headers, params, body).
-3. Variables are resolved automatically at send time and during export.
-
----
 
 ## Scripts
 

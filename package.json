@@ -2,8 +2,8 @@
   "name": "api-pilot",
   "displayName": "API Pilot",
   "description": "A powerful API debugging tool for VS Code, similar to Postman",
-  "version": "1.0.1",
-  "publisher": "api-pilot",
+  "version": "1.0.2",
+  "publisher": "dootn",
   "icon": "resources/icon.png",
   "repository": {
     "type": "git",
