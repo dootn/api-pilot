@@ -213,6 +213,21 @@ function App() {
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
           {sidebarTab === 'collections' ? <CollectionsSidebar /> : <HistorySidebar />}
         </div>
+        {/* Branding watermark */}
+        <div style={{
+          padding: '6px 0',
+          textAlign: 'center',
+          fontSize: '10px',
+          opacity: 0.22,
+          color: 'var(--panel-fg)',
+          userSelect: 'none',
+          letterSpacing: '0.1em',
+          fontWeight: 600,
+          pointerEvents: 'none',
+          borderTop: '1px solid var(--border-color)',
+        }}>
+          API PILOT
+        </div>
       </div>
 
       {/* Sidebar resize handle */}

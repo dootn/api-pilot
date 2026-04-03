@@ -2,8 +2,9 @@
   "name": "api-pilot",
   "displayName": "API Pilot",
   "description": "A powerful API debugging tool for VS Code, similar to Postman",
-  "version": "0.3.4",
+  "version": "0.4.3",
   "publisher": "api-pilot",
+  "icon": "resources/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/dootn/api-pilot"
@@ -22,137 +23,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "apiPilot.newRequest",
-        "title": "New Request",
-        "category": "API Pilot",
-        "icon": "$(add)"
-      },
-      {
         "command": "apiPilot.openPanel",
         "title": "Open API Pilot",
-        "category": "API Pilot"
-      },
-      {
-        "command": "apiPilot.newCollection",
-        "title": "New Collection",
-        "category": "API Pilot",
-        "icon": "$(new-folder)"
-      },
-      {
-        "command": "apiPilot.renameCollection",
-        "title": "Rename",
-        "category": "API Pilot",
-        "icon": "$(edit)"
-      },
-      {
-        "command": "apiPilot.deleteCollection",
-        "title": "Delete",
-        "category": "API Pilot",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "apiPilot.addFolder",
-        "title": "Add Folder",
-        "category": "API Pilot",
-        "icon": "$(new-folder)"
-      },
-      {
-        "command": "apiPilot.refreshCollections",
-        "title": "Refresh",
-        "category": "API Pilot",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "apiPilot.openRequest",
-        "title": "Open Request",
-        "category": "API Pilot"
-      },
-      {
-        "command": "apiPilot.selectEnvironment",
-        "title": "Select Environment",
-        "category": "API Pilot"
-      },
-      {
-        "command": "apiPilot.manageEnvVars",
-        "title": "Manage Environment Variables",
-        "category": "API Pilot"
-      },
-      {
-        "command": "apiPilot.importCurl",
-        "title": "Import cURL",
-        "category": "API Pilot",
-        "icon": "$(cloud-download)"
-      },
-      {
-        "command": "apiPilot.clearHistory",
-        "title": "Clear History",
-        "category": "API Pilot",
-        "icon": "$(clear-all)"
-      },
-      {
-        "command": "apiPilot.refreshHistory",
-        "title": "Refresh",
-        "category": "API Pilot",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "apiPilot.renameFolder",
-        "title": "Rename Folder",
-        "category": "API Pilot"
-      },
-      {
-        "command": "apiPilot.deleteFolder",
-        "title": "Delete Folder",
-        "category": "API Pilot"
-      },
-      {
-        "command": "apiPilot.duplicateFolder",
-        "title": "Duplicate Folder",
-        "category": "API Pilot",
-        "icon": "$(copy)"
-      },
-      {
-        "command": "apiPilot.addSubfolder",
-        "title": "Add Subfolder",
-        "category": "API Pilot"
-      },
-      {
-        "command": "apiPilot.deleteRequest",
-        "title": "Delete Request",
-        "category": "API Pilot",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "apiPilot.renameRequest",
-        "title": "Rename Request",
-        "category": "API Pilot",
-        "icon": "$(edit)"
-      },
-      {
-        "command": "apiPilot.duplicateRequest",
-        "title": "Duplicate Request",
-        "category": "API Pilot",
-        "icon": "$(copy)"
-      },
-      {
-        "command": "apiPilot.moveRequest",
-        "title": "Move to...",
-        "category": "API Pilot",
-        "icon": "$(arrow-right)"
-      },
-      {
-        "command": "apiPilot.openHistoryEntry",
-        "title": "Open in New Tab",
-        "category": "API Pilot"
-      },
-      {
-        "command": "apiPilot.deleteHistoryEntry",
-        "title": "Delete Entry",
-        "category": "API Pilot"
-      },
-      {
-        "command": "apiPilot.deleteHistoryGroup",
-        "title": "Delete Day",
         "category": "API Pilot"
       }
     ],

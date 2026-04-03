@@ -28,4 +28,8 @@ docs/
 # Build artifacts not needed
 dist-webview/index.html
 
+*.mjs
+
 .api-pilot
+
+development*.md

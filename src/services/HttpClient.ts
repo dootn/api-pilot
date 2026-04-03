@@ -106,6 +106,12 @@ export class HttpClient {
       urlObj.searchParams.append(param.key, param.value);
     }
 
+    // Add API Key as query param if configured
+    const auth = apiRequest.auth as any;
+    if (auth.type === 'apikey' && auth.in === 'query' && auth.key && auth.value) {
+      urlObj.searchParams.append(auth.key, auth.value);
+    }
+
     return urlObj.toString();
   }
 
@@ -156,9 +162,8 @@ export class HttpClient {
   }
 
   private buildBody(apiRequest: ApiRequest): string | Uint8Array | FormData | undefined {
-    if (['GET', 'HEAD', 'OPTIONS'].includes(apiRequest.method)) {
-      return undefined;
-    }
+    // Note: RFC allows body with any method, even GET/HEAD/OPTIONS.
+    // Some APIs may accept body with GET requests, so we don't enforce restrictions.
 
     switch (apiRequest.body.type) {
       case 'none':

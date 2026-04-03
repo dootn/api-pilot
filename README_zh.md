@@ -1,223 +1,132 @@
 # API Pilot
 
-> 🚀 强大的 VS Code API 调试工具 —— 编辑器内的 Postman。
+**强大的 HTTP API 调试工具，直接内嵌在 VS Code 中 —— 无需浏览器，无需额外应用。**
 
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.85+-blue.svg)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
 ---
 
 ## 功能特性
 
-### 核心功能
+### HTTP 请求
 
-- **HTTP 请求编辑器** — 支持 GET、POST、PUT、DELETE、PATCH、OPTIONS、HEAD 方法，完整的请求配置。
+- **请求方法**: GET、POST、PUT、DELETE、PATCH、OPTIONS、HEAD
+- **自定义请求头**: 以键值对形式添加任意请求头；可单独启用/禁用每一行，无需删除
+- **查询参数**: 独立的键值对编辑器，每行支持启用/禁用开关
+- **请求体**: 支持多种 Body 类型：
+  - **JSON** — 带语法高亮的编辑器
+  - **Form Data**（multipart）— 键值字段，支持文件上传
+  - **URL Encoded**（x-www-form-urlencoded）
+  - **Raw** — 自由文本，可自定义 Content-Type
+  - **Binary** — 直接上传本地文件作为请求体
+  - **GraphQL** — query + variables 编辑器
+- **认证**: Bearer Token、Basic Auth、API Key（请求头或查询参数）
+- **SSL 验证**: 可按请求开关 SSL 证书校验
+- **脚本**: 使用兼容 Postman 的 `pm` API 编写 JavaScript 预请求脚本和后响应脚本 —— 修改请求、设置变量或断言响应结果
 
-- **响应查看器** — JSON 格式化显示、原始文本、响应头查看、状态码/耗时/大小元数据。
+### 响应查看器
 
-- **多标签页** — 支持同时编辑多个请求，标签页式界面。
-
-- **集合管理** — 将请求组织到集合中，支持嵌套文件夹，以 JSON 文件持久化存储。
-
-- **环境变量** — 支持 `{{variable}}` 占位符，在请求发送时自动解析。通过标签栏切换环境。悬停在任意 `{{var}}` 令牌上可预览当前值。激活环境重启后自动恢复，且始终保证至少有一个 `Default` 环境。
-
-- **请求历史** — 自动记录已发送的请求，按日期分组，支持快速重放。
-
-- **cURL 导入/导出** — 粘贴 cURL 命令导入请求，或将任何请求导出为 cURL。导出时自动解析变量。
-
-### 编辑器特性
-
-- **请求头自动补全** — 智能提示 58+ 个常见 HTTP 请求头名称及其常用值。
-
-- **认证配置** — 支持 Bearer Token、Basic Auth 和 API Key 认证方式。
-
-- **请求体编辑器** — 支持 JSON、form-urlencoded、原始文本等请求体类型。
-
-- **查询参数** — 独立的键值对编辑器，支持启用/禁用开关。
-
----
-
-## 安装
-
-### 从源码安装
-
-```bash
-# 克隆仓库
-git clone https://github.com/dootn/api-pilot
-cd api-pilot
-
-# 安装依赖
-npm install
-cd webview-ui && npm install && cd ..
-
-# 构建
-npm run build
-
-# 在 VS Code 中按 F5 启动扩展开发主机
-```
-
-### 从 VSIX 安装
-
-```bash
-# 打包扩展
-npx vsce package
-
-# 安装 .vsix 文件
-code --install-extension api-pilot-0.1.0.vsix
-```
-
----
-
-## 使用方法
-
-### 快速开始
-
-1. 点击左侧活动栏中的 **API Pilot** 图标。
-
-2. 点击 `+` 按钮或从命令面板运行 `API Pilot: New Request`。
-
-3. 输入 URL，选择 HTTP 方法，点击 **Send**。
-
-4. 在下方面板查看响应，包括状态码、耗时和格式化的响应体。
+- **状态与耗时**: HTTP 状态码、状态文本、响应时间（ms）、响应体大小
+- **响应体渲染**:
+  - JSON — 格式化展示，支持折叠树
+  - XML、Markdown、HTML — 渲染视图
+  - 图片 — 内联预览
+  - 原始文本 — 纯文本输出
+- **响应头**: 独立标签页显示完整响应头列表
+- **响应体搜索**: 在响应内容中搜索关键词
+- **SSL 信息**: HTTPS 请求显示 TLS 协议版本、加密套件、证书主体/颁发者、有效期、指纹及完整证书链
+- **测试结果**: 后响应脚本中 `pm.test()` 断言的通过/失败结果 —— 显示测试名称、状态（通过/失败）及失败时的错误信息
+- **脚本控制台**: 捕获预/后脚本中的 `console.log / warn / error` 输出，标注来源（pre/post）和日志级别
 
 ### 集合管理
 
-- **创建**: 点击集合树顶部的文件夹图标。
-- **添加文件夹**: 右键集合 → "Add Folder"。
-- **重命名/删除**: 右键集合进行管理。
+- 将请求组织到集合中，支持**嵌套文件夹**
+- 完整增删改查：创建、重命名、删除集合和文件夹
+- 将当前请求直接保存到任意集合
 
 ### 环境变量
 
-1. 点击标签栏右下角的环境名称（或从命令面板运行 `API Pilot: Select Environment`）。
+- 创建多个环境（如开发、测试、生产），每个环境独立维护键值变量
+- 在任意位置使用 `{{variable_name}}`：URL、请求头、参数、请求体、认证字段
+- 变量支持递归解析（最多 5 层），发送请求及导出 cURL / 代码片段时自动解析
+- 通过状态栏切换激活环境，激活环境重启后自动恢复
+- 始终保证至少存在一个 `Default` 环境
 
-2. 选择环境，或打开 **Manage Environments** 创建/编辑变量。
+### 请求历史
 
-3. 在 URL、请求头、查询参数、请求体中使用 `{{variable_name}}`，发送时及导出 cURL / 代码片段时均自动解析。
+- 每个已发送的请求自动记录，按日期分组（最多保留 1000 条），一键回放
+- 在历史侧边栏一键回放
 
-4. 在任意输入框中悬停在 `{{variable_name}}` 上，可通过 tooltip 预览该变量的当前解析值。
+### cURL / Fetch 导入 & 导出
 
-### cURL 导入
+- 粘贴 **cURL** 命令（bash）或 **fetch()** 代码片段（Chrome DevTools / Node.js）即可导入为请求
+- 将请求导出为 cURL，导出时自动解析环境变量
 
-1. 点击历史视图中的导入图标，或运行 `API Pilot: Import cURL`。
+### 代码片段
 
-2. 粘贴 cURL 命令 —— 请求将被解析并在新标签页中打开。
+- 一键生成当前请求的代码片段（变量已解析）
 
-### 键盘快捷键
+### 编辑器便利功能
 
-| 操作 | 快捷键 |
-|------|--------|
-| 打开命令面板 | `Ctrl+Shift+P` |
-| 新建请求 | 命令面板 → `API Pilot: New Request` |
+- **请求头自动补全**: 智能提示 58+ 个常见 HTTP 请求头名称及常用值
+- **多标签页**: 同时编辑多个请求，未保存的更改显示脏状态标记
+- **国际化**: 完整的中英文 UI 支持
+- **主题适配**: 自动集成 VS Code 颜色主题
 
 ---
 
-## 配置
+## 快速开始
 
-数据存储在工作区的 `.api-pilot/` 目录中：
+1. 打开 VS Code，点击活动栏中的 **API Pilot** 图标。
+2. 点击 `+` 新建请求。
+3. 输入 URL，选择 HTTP 方法，点击 **Send**。
+4. 在下方查看格式化的响应结果。
+
+---
+
+## 环境变量
+
+1. 点击状态栏中的环境名称，切换或管理环境。
+2. 在请求的任意位置（URL、请求头、参数、请求体）使用 `{{variable_name}}`。
+3. 发送时及导出时自动解析变量。
+
+---
+
+## 脚本
+
+预请求脚本和后响应脚本在沙箱化的 Node.js VM 中运行，提供兼容 Postman 的 `pm` 对象：
+
+```js
+// 预请求脚本：修改请求头或设置变量
+pm.request.headers.add({ key: 'X-Timestamp', value: Date.now().toString() });
+pm.environment.set('token', 'my-value');
+
+// 后响应脚本：运行断言
+pm.test('状态码为 200', () => pm.response.to.have.status(200));
+pm.test('响应包含 id', () => pm.expect(pm.response.json().id).to.exist);
+
+// 控制台输出会被捕获并显示在脚本控制台标签页中
+console.log('响应时间:', pm.response.responseTime);
+console.warn('响应体过大');
+```
+
+测试结果按条目显示 通过 ✓ / 失败 ✗ 及错误详情。所有 `console.log/warn/error` 调用均被捕获，在脚本控制台标签页中展示，并标注来源（pre/post）和日志级别。
+
+---
+
+## 数据存储
+
+所有数据存储在工作区的 `.api-pilot/` 目录中：
 
 ```
 .api-pilot/
-├── collections/     # 集合 JSON 文件
-├── environments/    # 环境 JSON 文件
-└── history/         # 按日期的历史记录
+├── collections/     # 已保存的请求和文件夹
+├── environments/    # 环境变量配置
+└── history/         # 按日期分组的请求历史
 ```
 
-> **提示**: 如果不想追踪请求历史，可将 `.api-pilot/history/` 添加到 `.gitignore`。
-
----
-
-## 命令
-
-| 命令 | 说明 |
-|------|------|
-| `API Pilot: New Request` | 打开新请求标签 |
-| `API Pilot: Open API Pilot` | 打开主面板 |
-| `API Pilot: New Collection` | 创建新集合 |
-| `API Pilot: Select Environment` | 选择活跃环境 |
-| `API Pilot: Manage Environment Variables` | 编辑环境变量 |
-| `API Pilot: Import cURL` | 导入 cURL 命令 |
-| `API Pilot: Clear History` | 清空请求历史 |
-
----
-
-## 技术栈
-
-| 层级 | 技术 |
-|------|------|
-| 扩展主机 | TypeScript + VS Code Extension API |
-| HTTP 客户端 | [undici](https://github.com/nodejs/undici) |
-| Webview UI | React 18 + TypeScript + Vite |
-| 状态管理 | [Zustand](https://github.com/pmndrs/zustand) |
-| 构建（扩展） | esbuild |
-| 构建（Webview） | Vite 5 |
-| 测试 | Vitest + React Testing Library |
-
----
-
-## 项目结构
-
-```
-api-pilot/
-├── src/                          # 扩展源代码 (Node.js)
-│   ├── extension.ts              # 入口
-│   ├── handlers/
-│   │   └── MessageHandler.ts     # 消息路由
-│   ├── providers/
-│   │   ├── WebviewProvider.ts    # Webview 面板管理
-│   │   ├── CollectionTreeProvider.ts  # 侧边栏集合树
-│   │   ├── HistoryTreeProvider.ts     # 侧边栏历史树
-│   │   └── EnvStatusBarItem.ts   # 状态栏环境显示
-│   ├── services/
-│   │   ├── HttpClient.ts         # HTTP 请求引擎
-│   │   ├── StorageService.ts     # JSON 文件持久化
-│   │   ├── CollectionService.ts  # 集合增删改查
-│   │   ├── EnvService.ts         # 环境管理
-│   │   ├── HistoryService.ts     # 请求历史
-│   │   ├── VariableResolver.ts   # 变量插值引擎
-│   │   ├── CurlParser.ts         # cURL 解析
-│   │   └── CurlExporter.ts       # cURL 导出
-│   └── types/
-│       ├── index.ts              # 数据模型
-│       └── messages.ts           # 消息协议
-├── webview-ui/                   # React webview 源代码
-│   └── src/
-│       ├── App.tsx               # 根组件
-│       ├── components/
-│       │   ├── Layout/TabBar.tsx           # 多标签栏
-│       │   ├── RequestPanel/              # 请求编辑
-│       │   ├── ResponsePanel/             # 响应展示
-│       │   └── shared/                    # 通用组件
-│       ├── stores/
-│       │   ├── tabStore.ts       # 多标签状态
-│       │   └── requestStore.ts   # 请求状态类型
-│       └── data/
-│           └── httpHeaders.ts    # 请求头自动补全数据
-├── dist/                         # 构建产物
-├── dist-webview/                 # Webview 构建产物
-└── .api-pilot/                   # 工作区数据 (运行时)
-```
-
----
-
-## 测试
-
-```bash
-# 运行所有扩展测试
-npm test
-
-# 运行 Webview 测试
-cd webview-ui && npm test
-
-# 监视模式
-npm run test:watch
-cd webview-ui && npm run test:watch
-```
-
-**测试覆盖**:
-- 扩展: 9 个测试套件，139 个测试（服务、处理器、解析器）
-- Webview: 5 个测试套件，50 个测试（存储、组件、数据）
-- 合计: **189 个测试**
+> 可将 `.api-pilot/history/` 添加到 `.gitignore`，避免历史记录提交到版本控制。
 
 ---
 

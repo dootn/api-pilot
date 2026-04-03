@@ -82,7 +82,7 @@ export function FormDataEditor({
     vscode.postMessage({ 
       type: 'selectFormDataFile', 
       requestId,
-      fieldKey: item.key 
+      payload: { fieldKey: item.key },
     });
   };
 
@@ -207,8 +207,28 @@ export function FormDataEditor({
                 {t('chooseFile')}
               </button>
               {item.fileName && (
-                <span style={{ fontSize: 11, color: 'var(--success-fg)' }}>
+                <span style={{ fontSize: 11, color: 'var(--success-fg)', display: 'flex', alignItems: 'center', gap: 4 }}>
                   ✓ {item.fileName}
+                  <button
+                    onClick={() => {
+                      const newItems = [...items];
+                      newItems[index] = { ...newItems[index], filePath: undefined, fileName: undefined, fileData: undefined };
+                      onChange(newItems);
+                    }}
+                    style={{
+                      padding: '0 4px',
+                      fontSize: 11,
+                      border: 'none',
+                      borderRadius: 3,
+                      cursor: 'pointer',
+                      background: 'transparent',
+                      color: 'var(--error-fg)',
+                      lineHeight: 1,
+                    }}
+                    title={t('removeItem')}
+                  >
+                    ×
+                  </button>
                 </span>
               )}
               {!item.fileName && item.key && (

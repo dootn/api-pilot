@@ -1,216 +1,132 @@
 # API Pilot
 
-> 🚀 A powerful API debugging tool for VS Code — like Postman, built right into your editor.
+**A powerful API debugging tool built right into VS Code — no browser, no separate app.**
 
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.85+-blue.svg)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
 ---
 
 ## Features
 
-### Core
+### HTTP Request
 
-- **HTTP Request Editor** — Support for GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD methods with full request configuration.
+- **Methods**: GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD
+- **Custom Headers**: Add any request header as key-value pairs; toggle individual headers on/off without deleting them
+- **Query Parameters**: Dedicated key-value editor for URL query params with per-row enable/disable toggles
+- **Request Body**: Supports multiple body types:
+  - **JSON** — syntax-highlighted editor
+  - **Form Data** (multipart) — key-value fields with file upload support
+  - **URL Encoded** (x-www-form-urlencoded)
+  - **Raw** — free text with custom Content-Type
+  - **Binary** — upload a local file as body
+  - **GraphQL** — query + variables editor
+- **Authentication**: Bearer Token, Basic Auth, API Key (header or query param)
+- **SSL Verification**: Toggle SSL certificate verification per request
+- **Scripts**: Write JavaScript pre-request and post-response scripts using a Postman-compatible `pm` API — modify the request, set variables, or assert response values
 
-- **Response Viewer** — Pretty-printed JSON, raw text, headers view, status/time/size metadata.
+### Response Viewer
 
-- **Multi-Tab Interface** — Work on multiple requests simultaneously with a tabbed interface.
-
-- **Collection Management** — Organize requests into collections with nested folders, persisted as JSON files.
-
-- **Environment Variables** — Define `{{variable}}` placeholders resolved at request time. Switch between environments via status bar. Hover over any `{{var}}` token to preview its current value. Active environment is persisted across restarts; a `Default` environment is always guaranteed.
-
-- **Request History** — Automatically records sent requests grouped by date, with quick replay.
-
-- **cURL Import/Export** — Paste a cURL command to import, or export any request as cURL. Variables are automatically resolved in the exported output.
-
-### Editor Features
-
-- **Header Auto-Complete** — Intelligent autocomplete for 58+ common HTTP header names and their common values.
-
-- **Auth Configuration** — Support for Bearer Token, Basic Auth, and API Key authentication.
-
-- **Body Editor** — JSON, form-urlencoded, raw text body types with syntax indication.
-
-- **Query Parameters** — Dedicated key-value editor for URL query parameters with enable/disable toggles.
-
----
-
-## Installation
-
-### From Source
-
-```bash
-# Clone the repository
-git clone https://github.com/dootn/api-pilot
-cd api-pilot
-
-# Install dependencies
-npm install
-cd webview-ui && npm install && cd ..
-
-# Build
-npm run build
-
-# Press F5 in VS Code to launch Extension Development Host
-```
-
-### From VSIX
-
-```bash
-# Package the extension
-npx vsce package
-
-# Install the .vsix file
-code --install-extension api-pilot-0.1.0.vsix
-```
-
----
-
-## Usage
-
-### Quick Start
-
-1. Click the **API Pilot** icon in the Activity Bar (left sidebar).
-2. Click the `+` button or run `API Pilot: New Request` from the command palette.
-3. Enter the URL, select the HTTP method, and click **Send**.
-4. View the response in the bottom panel with status, time, and formatted body.
+- **Status & Timing**: HTTP status code, status text, response time (ms), and body size
+- **Body Rendering**:
+  - JSON — pretty-printed with collapsible tree
+  - XML, Markdown, HTML — rendered view
+  - Images — inline preview
+  - Raw text — plain output
+- **Response Headers**: Full header list in a dedicated tab
+- **Body Search**: Search within the response body
+- **SSL Info**: For HTTPS requests — shows protocol (TLS version), cipher suite, certificate subject/issuer, validity dates, fingerprint, and full certificate chain
+- **Test Results**: Pass/fail results from `pm.test()` assertions in the post-response script — shows test name, status (pass/fail), and error message on failure
+- **Script Console**: Captured `console.log / warn / error` output from pre/post scripts, with source (pre/post) and log level indicated
 
 ### Collections
 
-- **Create**: Click the folder icon in the Collections tree header.
-- **Add Folder**: Right-click a collection → "Add Folder".
-- **Rename/Delete**: Right-click a collection to manage.
+- Organize requests into collections with **nested folders**
+- Full CRUD: create, rename, delete collections and folders
+- Save the current request directly into any collection
 
 ### Environment Variables
 
-1. Click the environment name in the bottom-right corner of the tab bar (or run `API Pilot: Select Environment`).
-2. Select an environment, or open **Manage Environments** to create/edit variables.
-3. Use `{{variable_name}}` in URLs, headers, params, and body. They are resolved at send time and when exporting cURL/code snippets.
-4. Hover over any `{{variable_name}}` token in any input to see a tooltip showing the current resolved value.
+- Create multiple environments (e.g. dev, staging, prod) with key-value variable sets
+- Use `{{variable_name}}` anywhere: URL, headers, params, body, auth fields
+- Variables are resolved recursively (up to 5 levels) at send time and during cURL/code export
+- Switch the active environment from the status bar; active environment persists across restarts
+- A `Default` environment is always guaranteed to exist
 
-### cURL Import
+### Request History
 
-1. Click the import icon in the History view, or run `API Pilot: Import cURL`.
-2. Paste a cURL command — the request will be parsed and opened in a new tab.
+- Every sent request is automatically recorded, grouped by date (up to 1000 entries total), with one-click replay
+- One-click replay from the History sidebar
 
-### Keyboard Shortcuts
+### cURL / Fetch Import & Export
 
-| Action | Shortcut |
-|--------|----------|
-| Open Command Palette | `Ctrl+Shift+P` |
-| New Request | Command Palette → `API Pilot: New Request` |
+- Paste a **cURL** command (bash) or a **fetch()** snippet (Chrome DevTools / Node.js) to instantly import it as a request
+- Export any request to cURL — environment variables are resolved in the output
+
+### Code Snippets
+
+- Generate ready-to-use code snippets for the current request (variables resolved)
+
+### Editor Convenience
+
+- **Header Autocomplete**: Intelligent suggestions for 58+ common HTTP header names and values
+- **Multi-Tab Interface**: Work on multiple requests simultaneously; unsaved changes show a dirty-state marker
+- **i18n**: Full English and Chinese (Simplified) UI
+- **Theme Adaptation**: Integrates with your VS Code color theme
 
 ---
 
-## Configuration
+## Quick Start
 
-Data is stored in the workspace `.api-pilot/` directory:
+1. Open VS Code and click the **API Pilot** icon in the Activity Bar.
+2. Click `+` to create a new request.
+3. Enter a URL, choose an HTTP method, and click **Send**.
+4. View the formatted response below.
+
+---
+
+## Environment Variables
+
+1. Click the environment name in the status bar to switch or manage environments.
+2. Use `{{variable_name}}` anywhere in your request (URL, headers, params, body).
+3. Variables are resolved automatically at send time and during export.
+
+---
+
+## Scripts
+
+Pre-request and post-response scripts run in a sandboxed Node.js VM with a Postman-compatible `pm` object:
+
+```js
+// Pre-request: modify headers or set variables
+pm.request.headers.add({ key: 'X-Timestamp', value: Date.now().toString() });
+pm.environment.set('token', 'my-value');
+
+// Post-response: run assertions
+pm.test('Status is 200', () => pm.response.to.have.status(200));
+pm.test('Body has id', () => pm.expect(pm.response.json().id).to.exist);
+
+// Console output is captured and shown in the Script Console tab
+console.log('response time:', pm.response.responseTime);
+console.warn('large body detected');
+```
+
+Test results are shown per-test with pass ✓ / fail ✗ and error details. All `console.log/warn/error` calls are captured and displayed in the Script Console tab, labeled by source (pre/post) and log level.
+
+---
+
+## Data Storage
+
+All data is stored locally in the workspace under `.api-pilot/`:
 
 ```
 .api-pilot/
-├── collections/     # Collection JSON files
-├── environments/    # Environment JSON files
-└── history/         # History entries by date
+├── collections/     # Saved requests and folders
+├── environments/    # Environment variable sets
+└── history/         # Request history by date
 ```
 
-> **Tip**: Add `.api-pilot/history/` to `.gitignore` if you don't want to track request history.
-
----
-
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `API Pilot: New Request` | Open a new request tab |
-| `API Pilot: Open API Pilot` | Open the main panel |
-| `API Pilot: New Collection` | Create a new collection |
-| `API Pilot: Select Environment` | Select active environment |
-| `API Pilot: Manage Environment Variables` | Edit environment variables |
-| `API Pilot: Import cURL` | Import a cURL command |
-| `API Pilot: Clear History` | Clear all request history |
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Extension Host | TypeScript + VS Code Extension API |
-| HTTP Client | [undici](https://github.com/nodejs/undici) |
-| Webview UI | React 18 + TypeScript + Vite |
-| State Management | [Zustand](https://github.com/pmndrs/zustand) |
-| Build (Extension) | esbuild |
-| Build (Webview) | Vite 5 |
-| Testing | Vitest + React Testing Library |
-
----
-
-## Project Structure
-
-```
-api-pilot/
-├── src/                          # Extension source (Node.js)
-│   ├── extension.ts              # Entry point
-│   ├── handlers/
-│   │   └── MessageHandler.ts     # Webview ↔ Extension message router
-│   ├── providers/
-│   │   ├── WebviewProvider.ts    # Webview panel management
-│   │   ├── CollectionTreeProvider.ts  # Sidebar collection tree
-│   │   ├── HistoryTreeProvider.ts     # Sidebar history tree
-│   │   └── EnvStatusBarItem.ts   # Status bar environment display
-│   ├── services/
-│   │   ├── HttpClient.ts         # HTTP request engine
-│   │   ├── StorageService.ts     # JSON file persistence
-│   │   ├── CollectionService.ts  # Collection CRUD
-│   │   ├── EnvService.ts         # Environment management
-│   │   ├── HistoryService.ts     # Request history
-│   │   ├── VariableResolver.ts   # {{var}} interpolation
-│   │   ├── CurlParser.ts         # cURL → ApiRequest
-│   │   └── CurlExporter.ts       # ApiRequest → cURL
-│   └── types/
-│       ├── index.ts              # Data models
-│       └── messages.ts           # Message protocol
-├── webview-ui/                   # React webview source
-│   └── src/
-│       ├── App.tsx               # Root component
-│       ├── components/
-│       │   ├── Layout/TabBar.tsx           # Multi-tab bar
-│       │   ├── RequestPanel/              # Request editing
-│       │   ├── ResponsePanel/             # Response display
-│       │   └── shared/                    # Reusable components
-│       ├── stores/
-│       │   ├── tabStore.ts       # Multi-tab state
-│       │   └── requestStore.ts   # Request state types
-│       └── data/
-│           └── httpHeaders.ts    # Header autocomplete data
-├── dist/                         # Built extension
-├── dist-webview/                 # Built webview
-└── .api-pilot/                   # Workspace data (runtime)
-```
-
----
-
-## Testing
-
-```bash
-# Run all extension tests
-npm test
-
-# Run webview tests
-cd webview-ui && npm test
-
-# Watch mode
-npm run test:watch
-cd webview-ui && npm run test:watch
-```
-
-**Test Coverage**:
-- Extension: 9 test suites, 139 tests (services, handlers, parsers)
-- Webview: 5 test suites, 50 tests (stores, components, data)
-- Total: **189 tests**
+> Add `.api-pilot/history/` to `.gitignore` to exclude history from version control.
 
 ---
 

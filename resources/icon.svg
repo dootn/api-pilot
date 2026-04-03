@@ -1,4 +1,39 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M22 2L11 13"/>
-  <path d="M22 2L15 22L11 13L2 9L22 2Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+
+  <!-- Trajectory arc (dashed, behind rocket) -->
+  <path d="M 26 104 Q 50 74 80 38"
+        stroke="#555577" stroke-width="2" fill="none"
+        stroke-dasharray="5,5" stroke-linecap="round" opacity="0.45"/>
+
+  <!-- Rocket (pointing upper-right, rotated -42°) centered at 65, 60 -->
+  <g transform="translate(64, 62) rotate(-42) scale(1.8)">
+
+    <!-- Nose cone (pointed tip above body) -->
+    <path d="M -10 -18 Q 0 -42 10 -18 Z" fill="#3B82F6"/>
+
+    <!-- Main body (capsule) -->
+    <rect x="-10" y="-18" width="20" height="34" rx="10" fill="#3B82F6"/>
+
+    <!-- Porthole / window -->
+    <circle cx="0" cy="-4" r="5.5" fill="#fffffe"/>
+    <circle cx="0" cy="-4" r="3.5" fill="#FCD34D"/>
+    <!-- Window shine -->
+    <circle cx="-1.5" cy="-5.5" r="1.2" fill="#fffffe" opacity="0.7"/>
+
+    <!-- Left fin (swept back) -->
+    <path d="M -10 12 L -21 25 L -10 19 Z" fill="#F87171"/>
+
+    <!-- Right fin (swept back) -->
+    <path d="M 10 12 L 21 25 L 10 19 Z" fill="#F87171"/>
+
+    <!-- Engine nozzle/ bell -->
+    <rect x="-7.5" y="15" width="15" height="5" rx="2.5" fill="#a7a9be"/>
+
+    <!-- Flame (outer) -->
+    <path d="M -6 19 Q -2 32 0 36 Q 2 32 6 19 Z" fill="#ff8906"/>
+    <!-- Flame (inner / brighter) -->
+    <path d="M -4 21 Q 0 31 4 21 Z" fill="#f9c74f"/>
+
+  </g>
+
 </svg>

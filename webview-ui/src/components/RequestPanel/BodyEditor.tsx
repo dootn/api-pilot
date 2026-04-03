@@ -209,8 +209,24 @@ export function BodyEditor() {
             {t('chooseFile')}
           </button>
           {body.binaryName ? (
-            <div style={{ fontSize: 12, color: 'var(--success-fg)' }}>
+            <div style={{ fontSize: 12, color: 'var(--success-fg)', display: 'flex', alignItems: 'center', gap: 6 }}>
               ✓ {body.binaryName}
+              <button
+                onClick={() => setBody({ ...body, binaryPath: undefined, binaryName: undefined })}
+                style={{
+                  padding: '0 4px',
+                  fontSize: 12,
+                  border: 'none',
+                  borderRadius: 3,
+                  cursor: 'pointer',
+                  background: 'transparent',
+                  color: 'var(--error-fg)',
+                  lineHeight: 1,
+                }}
+                title={t('removeItem')}
+              >
+                ×
+              </button>
             </div>
           ) : (
             <div style={{ fontSize: 12, opacity: 0.5 }}>{t('noFileSelected')}</div>
