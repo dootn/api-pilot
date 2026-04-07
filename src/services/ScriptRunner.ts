@@ -1,5 +1,5 @@
 import * as vm from 'vm';
-import { ApiRequest, ApiResponse, ConsoleEntry, KeyValuePair } from '../types';
+import { ApiRequest, ApiResponse, ConsoleEntry, KeyValuePair, WsMessage } from '../types';
 
 export interface TestResult {
   name: string;
@@ -46,6 +46,43 @@ export class ScriptRunner {
     }
 
     return { request: mutableReq, envUpdates };
+  }
+
+  /** Run post-script when a WebSocket/Socket.IO message is received. */
+  runWsMessageScript(
+    script: string,
+    request: ApiRequest,
+    wsMessage: WsMessage,
+    envVariables: KeyValuePair[],
+    consoleEntries?: ConsoleEntry[],
+  ): { envUpdates: EnvVariableUpdate[] } {
+    if (!script.trim()) return { envUpdates: [] };
+
+    const envUpdates: EnvVariableUpdate[] = [];
+    const pm = this.buildPmContext(request, null, envVariables, [], envUpdates);
+
+    const wsMessageCtx = {
+      data: wsMessage.data,
+      direction: wsMessage.direction,
+      type: wsMessage.type,
+      event: wsMessage.event ?? null,
+      size: wsMessage.size,
+      timestamp: wsMessage.timestamp,
+    };
+
+    try {
+      vm.runInNewContext(
+        script,
+        { pm: { ...pm, wsMessage: wsMessageCtx }, console: this.safeConsole('post', consoleEntries) },
+        { timeout: this.timeout, filename: 'ws-post.js' },
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      consoleEntries?.push({ level: 'error', args: `[ScriptError] ${msg}`, source: 'post' });
+      console.error('[ScriptRunner] ws post-message error:', msg);
+    }
+
+    return { envUpdates };
   }
 
   /** Run the post-response script. Returns collected test results and updated env vars. */

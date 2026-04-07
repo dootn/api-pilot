@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { TabBar } from './components/Layout/TabBar';
 import { RequestPanel } from './components/RequestPanel/RequestPanel';
 import { ResponsePanel } from './components/ResponsePanel/ResponsePanel';
+import { WsConversation } from './components/RequestPanel/WsConversation';
 import { CollectionsSidebar } from './components/Sidebar/CollectionsSidebar';
 import { HistorySidebar } from './components/Sidebar/HistorySidebar';
 import { useVscodeMessage } from './hooks/useVscodeMessage';
 import { useTabStore, type RequestTab } from './stores/tabStore';
-import type { ApiResponse } from './stores/requestStore';
+import type { ApiResponse, WsMessage, WsStatus } from './stores/requestStore';
 import { useLocaleStore } from './stores/localeStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { useI18n } from './i18n';
@@ -143,6 +144,28 @@ function App() {
           }
           return;
         }
+        case 'wsStatusChanged': {
+          const wsMsg = message as unknown as { tabId: string; payload: { status: WsStatus; connectionId?: string; error?: string } };
+          const { status, connectionId, error } = wsMsg.payload;
+          updateTab(wsMsg.tabId, {
+            wsStatus: status,
+            wsConnectionId: connectionId,
+            loading: status === 'connecting',
+            ...(status === 'disconnected' || status === 'error' ? { wsConnectedAt: undefined } : {}),
+            ...(status === 'connected' ? { wsConnectedAt: Date.now() } : {}),
+            ...(status === 'error' ? { responseError: error ?? 'WebSocket error' } : {}),
+          });
+          return;
+        }
+        case 'wsMessageReceived': {
+          const wsMsg = message as unknown as { tabId: string; payload: WsMessage };
+          const tab = tabs.find((t) => t.id === wsMsg.tabId);
+          if (tab) {
+            const existing = tab.wsMessages ?? [];
+            updateTab(wsMsg.tabId, { wsMessages: [...existing, wsMsg.payload] });
+          }
+          return;
+        }
       }
 
       const tabId = message.requestId;
@@ -173,8 +196,11 @@ function App() {
           break;
       }
     },
-    [updateTab, addTabWithData, restoreSession, tabs, activeTabId, setActiveTabId, setLocale]
+    [updateTab, addTabWithData, restoreSession, tabs, activeTabId, setActiveTabId, setLocale, setCustomHttpMethods]
   );
+
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  const isWsMode = activeTab?.protocol === 'websocket';
 
   useVscodeMessage(handleMessage);
 
@@ -273,7 +299,7 @@ function App() {
             onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--border-color)')}
           />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <ResponsePanel />
+            {isWsMode ? <WsConversation /> : <ResponsePanel />}
           </div>
         </div>
       </div>

@@ -55,7 +55,7 @@ describe('HistoryService', () => {
       const entry = service.add(makeRequest(), makeResponse());
       expect(entry.id).toBeDefined();
       expect(entry.request.method).toBe('GET');
-      expect(entry.response.status).toBe(200);
+      expect(entry.response!.status).toBe(200);
       expect(entry.timestamp).toBeGreaterThan(0);
     });
 

@@ -7,6 +7,7 @@ import { HistoryService } from '../services/HistoryService';
 import { StorageService } from '../services/StorageService';
 import { exportCurl } from '../services/CurlExporter';
 import { VariableResolver } from '../services/VariableResolver';
+import { WsClient } from '../services/WsClient';
 import { WebviewMessage } from '../types/messages';
 import { ApiRequest, ConsoleEntry, CollectionItem, Environment, SSLInfo } from '../types';
 import { parseCurl } from '../services/CurlParser';
@@ -37,6 +38,7 @@ interface TabSession {
 export class MessageHandler {
   private httpClient: HttpClient;
   private scriptRunner: ScriptRunner;
+  private wsClient: WsClient;
 
   constructor(
     private webview: vscode.Webview,
@@ -49,6 +51,16 @@ export class MessageHandler {
   ) {
     this.httpClient = new HttpClient();
     this.scriptRunner = new ScriptRunner();
+    this.wsClient = new WsClient(
+      webview,
+      historyService,
+      vscode.workspace.getConfiguration('api-pilot').get<number>('maxHistory', 1000),
+    );
+  }
+
+  /** Clean up all WebSocket connections when the panel is disposed. */
+  dispose(): void {
+    this.wsClient.disposeAll();
   }
 
   async handle(message: WebviewMessage): Promise<void> {
@@ -168,9 +180,39 @@ export class MessageHandler {
       case 'importRequest':
         await this.handleImportRequest(message.payload as { input: string });
         break;
+      // --- WebSocket / Socket.IO ---
+      case 'wsConnect':
+        this.handleWsConnect(
+          (message as any).tabId as string,
+          message.payload as ApiRequest,
+        );
+        break;
+      case 'wsDisconnect':
+        this.handleWsDisconnect((message.payload as { connectionId: string }).connectionId);
+        break;
+      case 'wsSend':
+        this.handleWsSend(message.payload as {
+          connectionId: string;
+          msgType: 'text' | 'binary';
+          data: string;
+        });
+        break;
       default:
         console.warn(`Unknown message type: ${message.type}`);
     }
+  }
+
+  private handleWsConnect(tabId: string, request: ApiRequest): void {
+    const envVariables = this.envService?.getActiveVariables() || [];
+    this.wsClient.connect(tabId, request, envVariables);
+  }
+
+  private handleWsDisconnect(connectionId: string): void {
+    this.wsClient.disconnect(connectionId);
+  }
+
+  private handleWsSend(payload: { connectionId: string; msgType: 'text' | 'binary'; data: string }): void {
+    this.wsClient.send(payload.connectionId, payload.msgType, payload.data);
   }
 
   private async handleSendRequest(requestId: string, apiRequest: ApiRequest): Promise<void> {
@@ -787,9 +829,5 @@ export class MessageHandler {
     const curl = exportCurl(resolved);
     await vscode.env.clipboard.writeText(curl);
     vscode.window.showInformationMessage('cURL copied to clipboard.');
-  }
-
-  dispose(): void {
-    // Cleanup if needed
   }
 }

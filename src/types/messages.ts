@@ -59,3 +59,41 @@ export interface RequestProgressMessage {
   requestId: string;
   payload: { status: string };
 }
+
+// WebSocket messages (Webview -> Extension)
+export interface WsConnectMessage {
+  type: 'wsConnect';
+  tabId: string;
+  payload: import('./index').ApiRequest;
+}
+
+export interface WsDisconnectMessage {
+  type: 'wsDisconnect';
+  payload: { connectionId: string };
+}
+
+export interface WsSendMessage {
+  type: 'wsSend';
+  payload: {
+    connectionId: string;
+    msgType: 'text' | 'binary';
+    data: string;
+  };
+}
+
+// WebSocket messages (Extension -> Webview)
+export interface WsStatusChangedMessage {
+  type: 'wsStatusChanged';
+  tabId: string;
+  payload: {
+    status: import('./index').WsStatus;
+    connectionId?: string;
+    error?: string;
+  };
+}
+
+export interface WsMessageReceivedMessage {
+  type: 'wsMessageReceived';
+  tabId: string;
+  payload: import('./index').WsMessage;
+}

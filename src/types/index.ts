@@ -1,5 +1,19 @@
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
 
+export type Protocol = 'http' | 'websocket';
+
+export type WsStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export interface WsMessage {
+  id: string;
+  direction: 'sent' | 'received';
+  timestamp: number;
+  type: 'text' | 'binary';
+  data: string;           // text content or base64 for binary
+  event?: string;         // (reserved for future use)
+  size: number;
+}
+
 export interface KeyValuePair {
   key: string;
   value: string;
@@ -41,6 +55,7 @@ export interface ApiRequest {
   id: string;
   name: string;
   description?: string;
+  protocol?: Protocol;         // defaults to 'http'
   method: HttpMethod;
   url: string;
   params: KeyValuePair[];
@@ -111,10 +126,18 @@ export interface ApiResponse {
   timingBreakdown?: TimingBreakdown;
 }
 
+export interface WsSessionSummary {
+  messageCount: number;
+  sentCount: number;
+  receivedCount: number;
+  duration: number;  // ms
+}
+
 export interface HistoryEntry {
   id: string;
   request: ApiRequest;
-  response: ApiResponse;
+  response?: ApiResponse;
+  wsSession?: WsSessionSummary;
   timestamp: number;
 }
 

@@ -62,10 +62,16 @@ export function RequestTabs() {
 
   if (!tab) return null;
 
+  const isWsMode = tab.protocol === 'websocket';
+
+  // In WS mode, filter out the body tab
+  const visibleTabs = TAB_DEFS
+    .filter((def) => !(isWsMode && def.id === 'body'));
+
   return (
     <div className="request-section">
       <div className="tabs">
-        {TAB_DEFS.map((def) => {
+        {visibleTabs.map((def) => {
           const badge = getTabBadge(def.id, tab);
           return (
             <button
@@ -136,7 +142,7 @@ export function RequestTabs() {
           />
         )}
 
-        {tab.activeTab === 'body' && <BodyEditor />}
+        {tab.activeTab === 'body' && !isWsMode && <BodyEditor />}
 
         {tab.activeTab === 'auth' && <AuthEditor />}
 

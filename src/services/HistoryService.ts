@@ -1,6 +1,6 @@
 import { randomUUID, createHash } from 'crypto';
 import { StorageService } from './StorageService';
-import { HistoryEntry, ApiRequest, ApiResponse } from '../types';
+import { HistoryEntry, ApiRequest, ApiResponse, WsSessionSummary } from '../types';
 import { isBinaryContentType } from './contentTypeUtils';
 
 const HISTORY_DIR = 'history';
@@ -55,6 +55,27 @@ export class HistoryService {
     this.storage.writeJson(dateDir, `${base}.json`, stored);
 
     // Prune oldest entries so the total stays within the configured limit
+    this.enforceTotalLimit(maxTotal);
+
+    return entry;
+  }
+
+  /** Record a WebSocket/Socket.IO session summary in history. */
+  addWsSession(request: ApiRequest, wsSession: WsSessionSummary, maxTotal = 1000): HistoryEntry {
+    const entry: HistoryEntry = {
+      id: randomUUID(),
+      request,
+      wsSession,
+      timestamp: Date.now(),
+    };
+
+    const dateKey = this.getDateKey(entry.timestamp);
+    const dateDir = `${HISTORY_DIR}/${dateKey}`;
+
+    const seq = String(this.addCounter++).padStart(6, '0');
+    const base = `${entry.timestamp}_${seq}_${entry.id}`;
+    this.storage.writeJson(dateDir, `${base}.json`, entry);
+
     this.enforceTotalLimit(maxTotal);
 
     return entry;
@@ -203,6 +224,10 @@ export class HistoryService {
         const stored = this.storage.readJson<StoredEntry>(dateDir, f);
         if (!stored) return null;
         const entry: HistoryEntry = { ...stored };
+
+        // WS session entries have no response body to load
+        if (!stored.response) return entry;
+
         const ct = stored.response.contentType ?? '';
 
         if (stored.bodyMd5) {
@@ -210,9 +235,9 @@ export class HistoryService {
           const bodyBuf = this.storage.readRaw(BODIES_DIR, stored.bodyMd5);
           if (bodyBuf) {
             if (ct && isBinaryContentType(ct)) {
-              entry.response.bodyBase64 = bodyBuf.toString('base64');
+              entry.response!.bodyBase64 = bodyBuf.toString('base64');
             } else {
-              entry.response.body = bodyBuf.toString('utf-8');
+              entry.response!.body = bodyBuf.toString('utf-8');
             }
           }
         } else {
@@ -221,9 +246,9 @@ export class HistoryService {
           const bodyBuf = this.storage.readRaw(dateDir, `${base}.body`);
           if (bodyBuf) {
             if (ct && isBinaryContentType(ct)) {
-              entry.response.bodyBase64 = bodyBuf.toString('base64');
+              entry.response!.bodyBase64 = bodyBuf.toString('base64');
             } else {
-              entry.response.body = bodyBuf.toString('utf-8');
+              entry.response!.body = bodyBuf.toString('utf-8');
             }
           }
         }

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useTabStore } from '../../stores/tabStore';
-import type { HttpMethod } from '../../stores/requestStore';
+import type { HttpMethod, Protocol } from '../../stores/requestStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { vscode } from '../../vscode';
 import { useEnvironments } from '../../hooks/useEnvironments';
@@ -165,8 +165,51 @@ export function UrlBar() {
 
   if (!tab) return null;
 
+  const isWsMode = tab.protocol === 'websocket';
+
+  const handleWsToggle = () => {
+    if (!tab.url.trim()) return;
+
+    if (tab.wsStatus === 'connected' || tab.wsStatus === 'connecting') {
+      // Disconnect
+      if (tab.wsConnectionId) {
+        vscode.postMessage({ type: 'wsDisconnect', payload: { connectionId: tab.wsConnectionId } });
+      }
+      updateTab(tab.id, { wsStatus: 'disconnected', wsConnectionId: undefined, loading: false });
+      return;
+    }
+
+    // Connect
+    updateTab(tab.id, { loading: true, wsMessages: [], responseError: null });
+    vscode.postMessage({
+      type: 'wsConnect',
+      tabId: tab.id,
+      payload: {
+        id: tab.id,
+        name: tab.name,
+        protocol: tab.protocol,
+        method: tab.method,
+        url: tab.url.trim(),
+        params: tab.params.filter((p) => p.key),
+        headers: tab.headers.filter((h) => h.key),
+        body: tab.body,
+        auth: tab.auth,
+        preScript: tab.preScript,
+        postScript: tab.postScript,
+        sslVerify: tab.sslVerify ?? true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+  };
+
   const handleSend = () => {
     if (!tab.url.trim()) return;
+
+    if (isWsMode) {
+      handleWsToggle();
+      return;
+    }
 
     if (tab.loading) {
       vscode.postMessage({ type: 'cancelRequest', requestId: tab.id });
@@ -199,7 +242,21 @@ export function UrlBar() {
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newUrl = e.target.value;
-    updateTab(tab.id, { url: newUrl });
+    const updates: Parameters<typeof updateTab>[1] = { url: newUrl };
+
+    // Auto-detect WebSocket URLs
+    const lower = newUrl.toLowerCase();
+    if (lower.startsWith('ws://') || lower.startsWith('wss://')) {
+      if (!tab.protocol || tab.protocol === 'http') {
+        updates.protocol = 'websocket';
+      }
+    } else if (lower.startsWith('http://') || lower.startsWith('https://')) {
+      if (tab.protocol === 'websocket') {
+        updates.protocol = 'http';
+      }
+    }
+
+    updateTab(tab.id, updates);
     const cursorPos = e.target.selectionStart ?? newUrl.length;
     const beforeCursor = newUrl.substring(0, cursorPos);
     const match = beforeCursor.match(/\{\{([^}]*)$/);
@@ -275,7 +332,14 @@ export function UrlBar() {
     } catch { /* invalid URL, keep as-is */ }
     return {
       id: tab!.id,
-      name: tab!.isCustomNamed ? tab!.name : (tab!.url ? `${tab!.method} ${tab!.url}` : tab!.name),
+      name: tab!.isCustomNamed
+        ? tab!.name
+        : (tab!.url
+            ? (tab!.protocol === 'websocket'
+                ? `WS ${tab!.url}`
+                : `${tab!.method} ${tab!.url}`)
+            : tab!.name),
+      protocol: tab!.protocol,
       method: tab!.method,
       url: saveUrl,
       params: mergedParams,
@@ -317,8 +381,35 @@ export function UrlBar() {
 
   return (
     <div className="url-bar">
+      {/* Protocol selector */}
+      <select
+        value={tab.protocol ?? 'http'}
+        onChange={(e) => {
+          const p = e.target.value as Protocol;
+          updateTab(tab.id, { protocol: p });
+        }}
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          padding: '4px 6px',
+          borderRadius: '4px 0 0 4px',
+          border: '1px solid var(--border-color, #555)',
+          background: 'var(--input-bg, #3c3c3c)',
+          color: tab.protocol === 'websocket'
+            ? 'var(--vscode-terminal-ansiCyan, #4ec9b0)'
+            : 'var(--panel-fg)',
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        <option value="http">HTTP</option>
+        <option value="websocket">WS</option>
+      </select>
+
       {/* Method selector + URL input: connected group, no gap between them */}
       <div style={{ display: 'flex', flex: 1, minWidth: 0 }}>
+        {/* Method selector — hidden in WS mode */}
+        {!isWsMode && (
         <select
           className={`method-select ${METHOD_CLASSES[tab.method] || 'method-get'}`}
           value={tab.method}
@@ -346,6 +437,7 @@ export function UrlBar() {
             </option>
           )}
         </select>
+        )}
 
         <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
           {/* Highlight backing layer: only active when URL contains {{vars}} */}
@@ -378,7 +470,7 @@ export function UrlBar() {
             ref={urlInputRef}
             className="url-input"
             type="text"
-            placeholder="Enter request URL (e.g. https://api.example.com/users)"
+            placeholder={isWsMode ? 'Enter WebSocket URL (e.g. ws://localhost:3456/ws)' : 'Enter request URL (e.g. https://api.example.com/users)'}
             value={tab.url}
             onChange={handleUrlChange}
             onKeyDown={handleUrlKeyDown}
@@ -443,15 +535,23 @@ export function UrlBar() {
       </div>
 
       <button
-        className={`send-btn ${tab.loading ? 'cancel' : ''}`}
+        className={`send-btn ${(tab.loading || tab.wsStatus === 'connected') ? 'cancel' : ''}`}
         onClick={handleSend}
-        disabled={!tab.url.trim() && !tab.loading}
+        disabled={!tab.url.trim() && !tab.loading && tab.wsStatus !== 'connected'}
       >
-        {tab.loading ? t('urlCancel') : t('urlSend')}
+        {isWsMode
+          ? tab.wsStatus === 'connected'
+            ? 'Disconnect'
+            : tab.wsStatus === 'connecting' || tab.loading
+              ? 'Connecting…'
+              : 'Connect'
+          : tab.loading
+            ? t('urlCancel')
+            : t('urlSend')}
       </button>
 
-      {/* SSL verify toggle — only meaningful for HTTPS */}
-      {tab.url.trim().toLowerCase().startsWith('https') && (
+      {/* SSL verify toggle — only meaningful for HTTPS (not WS mode) */}
+      {!isWsMode && tab.url.trim().toLowerCase().startsWith('https') && (
         <button
           className="ssl-toggle-btn"
           title={(tab.sslVerify ?? true) ? t('urlSslVerifyOn') : t('urlSslVerifyOff')}
@@ -472,13 +572,13 @@ export function UrlBar() {
         </button>
       )}
 
-      {/* Save: update existing collection item (only when opened from a bookmark) */}
-      {tab.collectionId && (
+      {/* Save: update existing collection item — only when bound to a collection AND there are unsaved changes */}
+      {tab.collectionId && tab.isDirty && (
         <button
           className={`save-btn ${saveStatus === 'saved' ? 'saved' : ''}`}
           onClick={handleDirectSave}
           title={t('urlSaveTitleUpdate')}
-          disabled={!tab.url.trim() || !tab.isDirty}
+          disabled={!tab.url.trim()}
         >
           {saveStatus === 'saved' ? t('urlSavedBtn') : t('urlSaveBtn')}
         </button>

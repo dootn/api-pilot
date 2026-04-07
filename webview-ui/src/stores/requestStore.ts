@@ -2,6 +2,19 @@ import { create } from 'zustand';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD' | string;
 
+export type Protocol = 'http' | 'websocket';
+
+export type WsStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export interface WsMessage {
+  id: string;
+  direction: 'sent' | 'received';
+  timestamp: number;
+  type: 'text' | 'binary';
+  data: string;
+  size: number;
+}
+
 export interface KeyValuePair {
   key: string;
   value: string;

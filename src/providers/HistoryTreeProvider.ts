@@ -51,9 +51,17 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<HistoryTreeI
       return Promise.resolve(
         entries.map((entry) => {
           const url = this.shortenUrl(entry.request.url);
-          const status = entry.response.status;
-          // Include method name in the label
-          const label = `${entry.request.method} ${url}`;
+          const protocol = entry.request.protocol;
+          const isWs = protocol === 'websocket';
+
+          const methodOrProtocol = isWs
+            ? 'WS'
+            : entry.request.method;
+
+          const label = `${methodOrProtocol} ${url}`;
+          const description = isWs
+            ? `↑${entry.wsSession?.sentCount ?? 0} ↓${entry.wsSession?.receivedCount ?? 0}`
+            : `[${entry.response?.status ?? '?'}]`;
 
           return new HistoryTreeItem(
             label,
@@ -61,8 +69,8 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<HistoryTreeI
             'entry',
             entry,
             undefined,
-            `[${status}]`,
-            entry.request.method
+            description,
+            methodOrProtocol
           );
         })
       );

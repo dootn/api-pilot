@@ -30,6 +30,12 @@
 - **SSL Verification**: Toggle SSL certificate verification per request
 - **Scripts**: Write JavaScript pre-request and post-response scripts using a Postman-compatible `pm` API — modify the request, set variables, or assert response values
 
+### WebSocket (WS) Request
+
+- The extension detects `ws://` and `wss://` URLs and switches the request UI into WebSocket mode.
+- Connect / Disconnect: enter a WebSocket URL in the request bar and click **Connect** to open a live session; click **Disconnect** to close it.
+- Conversation panel: send and receive messages (text shown as UTF‑8, binary shown as base64), with per-message copy and truncate/expand controls.
+
 ### Response Viewer
 
 - **Status & Timing**: HTTP status code, status text, response time (ms), and body size — each labeled for clarity
@@ -91,8 +97,8 @@
 
 1. Open VS Code and click the **API Pilot** icon in the Activity Bar.
 2. Click `+` to create a new request.
-3. Enter a URL, choose an HTTP method, and click **Send**.
-4. View the formatted response below.
+3. Enter a URL (http(s) or ws(s)). For HTTP requests choose a method and click **Send**; for WebSocket enter a `ws://...` or `wss://...` URL and click **Connect**.
+4. View the formatted response or live WebSocket conversation below.
 
 ---
 

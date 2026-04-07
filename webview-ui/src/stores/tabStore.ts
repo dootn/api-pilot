@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { HttpMethod, KeyValuePair, RequestBody, AuthConfig, ApiResponse, SSLInfo } from './requestStore';
+import type { HttpMethod, KeyValuePair, RequestBody, AuthConfig, ApiResponse, SSLInfo, Protocol, WsStatus, WsMessage } from './requestStore';
 import { vscode } from '../vscode';
 
 export interface RequestTab {
@@ -7,6 +7,7 @@ export interface RequestTab {
   name: string;
   isCustomNamed: boolean;
   collectionId?: string;
+  protocol?: Protocol;          // 'http' by default
   method: HttpMethod;
   url: string;
   params: KeyValuePair[];
@@ -24,9 +25,14 @@ export interface RequestTab {
   description?: string;
   sslVerify?: boolean;
   sslInfo?: SSLInfo;
+  // WebSocket runtime state
+  wsStatus?: WsStatus;
+  wsConnectionId?: string;
+  wsMessages?: WsMessage[];
+  wsConnectedAt?: number;
 }
 
-type PersistedTab = Omit<RequestTab, 'response' | 'responseError' | 'loading' | 'isDirty'>;
+type PersistedTab = Omit<RequestTab, 'response' | 'responseError' | 'loading' | 'isDirty' | 'wsStatus' | 'wsConnectionId' | 'wsMessages' | 'wsConnectedAt'>;
 
 interface TabState {
   tabs: RequestTab[];
@@ -72,7 +78,7 @@ function ensureTrailingEmpty(arr: KeyValuePair[]): KeyValuePair[] {
 }
 
 function stripTransient(tab: RequestTab): PersistedTab {
-  const { response: _r, responseError: _re, loading: _l, isDirty: _d, ...rest } = tab;
+  const { response: _r, responseError: _re, loading: _l, isDirty: _d, wsStatus: _ws, wsConnectionId: _wci, wsMessages: _wm, wsConnectedAt: _wca, ...rest } = tab;
   return rest;
 }
 
@@ -92,7 +98,21 @@ export const useTabStore = create<TabState>((set, get) => ({
 
   addTabWithData: (data) => {
     const newTab = { ...createDefaultTab(), ...data };
-    newTab.name = data.url ? `${data.method || 'GET'} ${new URL(data.url).pathname}` : (data.name || 'Imported Request');
+    if (data.name) {
+      // Use the provided name (e.g. saved collection request name)
+      newTab.name = data.name;
+    } else if (data.url) {
+      try {
+        const scheme = data.protocol === 'websocket' ? 'WS' : (data.method || 'GET');
+        const isWs = data.protocol === 'websocket';
+        const normalizedUrl = isWs ? data.url.replace(/^wss?:\/\//, 'http://') : data.url;
+        newTab.name = `${scheme} ${new URL(normalizedUrl).pathname}`;
+      } catch {
+        newTab.name = data.url;
+      }
+    } else {
+      newTab.name = 'Imported Request';
+    }
     // Ensure editable rows in params/headers (always keep a trailing empty row)
     if (data.params !== undefined) newTab.params = ensureTrailingEmpty(data.params);
     if (data.headers !== undefined) newTab.headers = ensureTrailingEmpty(data.headers);
@@ -153,14 +173,14 @@ export const useTabStore = create<TabState>((set, get) => ({
         if (t.id !== id) return t;
         // If isDirty is explicitly provided in updates, use it; otherwise set to true
         const shouldMarkDirty = updates.isDirty !== undefined ? updates.isDirty : true;
-        // Don't mark as dirty if only updating response, loading, or error fields
-        const isResponseUpdate = 
-          Object.keys(updates).length === 1 && 
-          ('response' in updates || 'loading' in updates || 'responseError' in updates);
+        // Don't mark as dirty if ALL updated fields are transient runtime state
+        const TRANSIENT_FIELDS = new Set(['response', 'loading', 'responseError', 'sslInfo',
+          'wsStatus', 'wsConnectionId', 'wsMessages', 'wsConnectedAt']);
+        const isTransientUpdate = Object.keys(updates).every((k) => TRANSIENT_FIELDS.has(k));
         return { 
           ...t, 
           ...updates, 
-          isDirty: isResponseUpdate ? t.isDirty : shouldMarkDirty 
+          isDirty: isTransientUpdate ? t.isDirty : shouldMarkDirty 
         };
       }),
     }));

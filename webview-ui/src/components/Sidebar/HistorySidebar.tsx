@@ -5,6 +5,13 @@ import { useTabStore } from '../../stores/tabStore';
 import type { ApiResponse } from '../../stores/requestStore';
 import { useI18n } from '../../i18n';
 
+interface WsSessionSummary {
+  messageCount: number;
+  sentCount: number;
+  receivedCount: number;
+  duration: number;
+}
+
 interface HistoryEntry {
   id: string;
   timestamp: number;
@@ -13,9 +20,11 @@ interface HistoryEntry {
     name: string;
     method: string;
     url: string;
+    protocol?: string;
     [key: string]: unknown;
   };
-  response: ApiResponse;
+  response?: ApiResponse;
+  wsSession?: WsSessionSummary;
 }
 
 interface HistoryGroup {
@@ -83,13 +92,11 @@ export function HistorySidebar() {
     });
   };
 
-  const openEntry = (entry: HistoryEntry, forceNewTab = false) => {
-    // Strip the historical request id so a fresh UUID is generated for the new tab.
-    // This prevents id conflicts with open collection tabs or duplicate history opens.
+  const openEntry = (entry: HistoryEntry, _forceNewTab = false) => {
     const { id: _unused, ...requestData } = entry.request;
     addTabWithData({
       ...(requestData as Parameters<typeof addTabWithData>[0]),
-      response: entry.response,  // restore the historical response in the new tab
+      ...(entry.response ? { response: entry.response } : {}),
     });
   };
 
@@ -173,6 +180,11 @@ export function HistorySidebar() {
                 {expanded &&
                   group.entries.map((entry) => {
                     const method = entry.request.method || 'GET';
+                    const protocol = entry.request.protocol as string | undefined;
+                    const isWs = protocol === 'websocket';
+                    const displayMethod = isWs
+                      ? 'WS'
+                      : method;
                     const url = shortenUrl(entry.request.url || '');
                     return (
                       <div
@@ -186,19 +198,25 @@ export function HistorySidebar() {
                       >
                         <span
                           className="sidebar-method"
-                          style={{ color: METHOD_COLORS[method] || '#888' }}
+                          style={{ color: isWs ? 'var(--vscode-terminal-ansiCyan, #4ec9b0)' : (METHOD_COLORS[method] || '#888') }}
                         >
-                          {method}
+                          {displayMethod}
                         </span>
                         <span className="sidebar-item-label" title={entry.request.url}>
                           {url}
                         </span>
-                        <span
-                          className="sidebar-status"
-                          style={{ color: statusColor(entry.response.status) }}
-                        >
-                          {entry.response.status}
-                        </span>
+                        {isWs ? (
+                          <span className="sidebar-status" style={{ color: 'var(--vscode-terminal-ansiCyan, #4ec9b0)', fontSize: 10 }}>
+                            ↑{entry.wsSession?.sentCount ?? 0} ↓{entry.wsSession?.receivedCount ?? 0}
+                          </span>
+                        ) : (
+                          <span
+                            className="sidebar-status"
+                            style={{ color: statusColor(entry.response?.status ?? 0) }}
+                          >
+                            {entry.response?.status ?? '?'}
+                          </span>
+                        )}
                         <button
                           className="sidebar-inline-action"
                           title={t('hisDeleteEntry')}
