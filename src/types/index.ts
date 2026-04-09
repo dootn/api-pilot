@@ -1,8 +1,19 @@
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
 
-export type Protocol = 'http' | 'websocket';
+export type Protocol = 'http' | 'websocket' | 'sse';
 
 export type WsStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export type SseStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export interface SseEvent {
+  id: string;          // internal uuid
+  eventId?: string;    // SSE 'id:' field
+  event: string;       // SSE 'event:' field (default 'message')
+  data: string;        // SSE 'data:' field content
+  timestamp: number;
+  size: number;
+}
 
 export interface WsMessage {
   id: string;
@@ -133,11 +144,17 @@ export interface WsSessionSummary {
   duration: number;  // ms
 }
 
+export interface SseSessionSummary {
+  eventCount: number;
+  duration: number;  // ms
+}
+
 export interface HistoryEntry {
   id: string;
   request: ApiRequest;
   response?: ApiResponse;
   wsSession?: WsSessionSummary;
+  sseSession?: SseSessionSummary;
   timestamp: number;
 }
 

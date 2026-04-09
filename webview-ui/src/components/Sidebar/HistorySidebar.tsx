@@ -12,6 +12,11 @@ interface WsSessionSummary {
   duration: number;
 }
 
+interface SseSessionSummary {
+  eventCount: number;
+  duration: number;
+}
+
 interface HistoryEntry {
   id: string;
   timestamp: number;
@@ -25,6 +30,7 @@ interface HistoryEntry {
   };
   response?: ApiResponse;
   wsSession?: WsSessionSummary;
+  sseSession?: SseSessionSummary;
 }
 
 interface HistoryGroup {
@@ -182,9 +188,12 @@ export function HistorySidebar() {
                     const method = entry.request.method || 'GET';
                     const protocol = entry.request.protocol as string | undefined;
                     const isWs = protocol === 'websocket';
+                    const isSse = protocol === 'sse';
                     const displayMethod = isWs
                       ? 'WS'
-                      : method;
+                      : isSse
+                        ? 'SSE'
+                        : method;
                     const url = shortenUrl(entry.request.url || '');
                     return (
                       <div
@@ -198,7 +207,7 @@ export function HistorySidebar() {
                       >
                         <span
                           className="sidebar-method"
-                          style={{ color: isWs ? 'var(--vscode-terminal-ansiCyan, #4ec9b0)' : (METHOD_COLORS[method] || '#888') }}
+                          style={{ color: isWs ? 'var(--vscode-terminal-ansiCyan, #4ec9b0)' : isSse ? 'var(--vscode-terminal-ansiYellow, #dcdcaa)' : (METHOD_COLORS[method] || '#888') }}
                         >
                           {displayMethod}
                         </span>
@@ -208,6 +217,12 @@ export function HistorySidebar() {
                         {isWs ? (
                           <span className="sidebar-status" style={{ color: 'var(--vscode-terminal-ansiCyan, #4ec9b0)', fontSize: 10 }}>
                             ↑{entry.wsSession?.sentCount ?? 0} ↓{entry.wsSession?.receivedCount ?? 0}
+                          </span>                        ) : isSse ? (
+                          <span className="sidebar-status" style={{ color: 'var(--vscode-terminal-ansiYellow, #dcdcaa)', fontSize: 10 }}>
+                            ↓{entry.sseSession?.eventCount ?? 0}
+                          </span>                        ) : isSse ? (
+                          <span className="sidebar-status" style={{ color: 'var(--vscode-terminal-ansiYellow, #dcdcaa)', fontSize: 10 }}>
+                            ↓{entry.sseSession?.eventCount ?? 0}
                           </span>
                         ) : (
                           <span

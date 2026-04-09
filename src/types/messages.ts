@@ -97,3 +97,32 @@ export interface WsMessageReceivedMessage {
   tabId: string;
   payload: import('./index').WsMessage;
 }
+
+// SSE messages (Webview -> Extension)
+export interface SseConnectMessage {
+  type: 'sseConnect';
+  tabId: string;
+  payload: import('./index').ApiRequest;
+}
+
+export interface SseDisconnectMessage {
+  type: 'sseDisconnect';
+  payload: { connectionId: string };
+}
+
+// SSE messages (Extension -> Webview)
+export interface SseStatusChangedMessage {
+  type: 'sseStatusChanged';
+  tabId: string;
+  payload: {
+    status: import('./index').SseStatus;
+    connectionId?: string;
+    error?: string;
+  };
+}
+
+export interface SseEventReceivedMessage {
+  type: 'sseEventReceived';
+  tabId: string;
+  payload: import('./index').SseEvent;
+}

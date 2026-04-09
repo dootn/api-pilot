@@ -8,6 +8,7 @@ import { StorageService } from '../services/StorageService';
 import { exportCurl } from '../services/CurlExporter';
 import { VariableResolver } from '../services/VariableResolver';
 import { WsClient } from '../services/WsClient';
+import { SseClient } from '../services/SseClient';
 import { WebviewMessage } from '../types/messages';
 import { ApiRequest, ConsoleEntry, CollectionItem, Environment, SSLInfo } from '../types';
 import { parseCurl } from '../services/CurlParser';
@@ -39,6 +40,7 @@ export class MessageHandler {
   private httpClient: HttpClient;
   private scriptRunner: ScriptRunner;
   private wsClient: WsClient;
+  private sseClient: SseClient;
 
   constructor(
     private webview: vscode.Webview,
@@ -56,11 +58,17 @@ export class MessageHandler {
       historyService,
       vscode.workspace.getConfiguration('api-pilot').get<number>('maxHistory', 1000),
     );
+    this.sseClient = new SseClient(
+      webview,
+      historyService,
+      vscode.workspace.getConfiguration('api-pilot').get<number>('maxHistory', 1000),
+    );
   }
 
-  /** Clean up all WebSocket connections when the panel is disposed. */
+  /** Clean up all WebSocket/SSE connections when the panel is disposed. */
   dispose(): void {
     this.wsClient.disposeAll();
+    this.sseClient.disposeAll();
   }
 
   async handle(message: WebviewMessage): Promise<void> {
@@ -197,6 +205,16 @@ export class MessageHandler {
           data: string;
         });
         break;
+      // --- SSE ---
+      case 'sseConnect':
+        this.handleSseConnect(
+          (message as any).tabId as string,
+          message.payload as ApiRequest,
+        );
+        break;
+      case 'sseDisconnect':
+        this.handleSseDisconnect((message.payload as { connectionId: string }).connectionId);
+        break;
       default:
         console.warn(`Unknown message type: ${message.type}`);
     }
@@ -213,6 +231,15 @@ export class MessageHandler {
 
   private handleWsSend(payload: { connectionId: string; msgType: 'text' | 'binary'; data: string }): void {
     this.wsClient.send(payload.connectionId, payload.msgType, payload.data);
+  }
+
+  private handleSseConnect(tabId: string, request: ApiRequest): void {
+    const envVariables = this.envService?.getActiveVariables() || [];
+    this.sseClient.connect(tabId, request, envVariables);
+  }
+
+  private handleSseDisconnect(connectionId: string): void {
+    this.sseClient.disconnect(connectionId);
   }
 
   private async handleSendRequest(requestId: string, apiRequest: ApiRequest): Promise<void> {

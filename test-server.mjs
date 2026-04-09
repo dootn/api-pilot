@@ -1,5 +1,5 @@
 /**
- * Simple echo HTTP + WebSocket + Socket.IO server for testing.
+ * Simple echo HTTP + WebSocket + SSE server for testing.
  * 
  * Usage:
  *   node test-server.mjs [port]
@@ -11,6 +11,14 @@
  *     ?delay=2000        → delay 2 seconds before responding
  *     ?type=text         → response as text/plain (default: application/json)
  *
+ * SSE (http://localhost:<port>/sse):
+ *   Query Parameters (optional):
+ *     ?count=10          → send N events then close (default: unlimited)
+ *     ?interval=1000     → ms between events (default: 1000)
+ *     ?event=ping        → custom event name (default: message)
+ *   /sse/counter         → numeric counter events
+ *   /sse/multi           → multiple named event types (open, update, close)
+ *
  * WebSocket (ws://localhost:<port>/ws):
  *   - Echoes every text/binary message back
  *   - Sends "ping" → responds "pong" (as JSON: {"type":"pong","ts":...})
@@ -18,17 +26,11 @@
  *   - Sends "delay:<ms>:<msg>" → echoes after <ms> delay
  *   - Connects auto-sends a welcome message
  *
- * Socket.IO (ws://localhost:<port>/socket.io):
- *   - Event "message": echoes back on event "echo"
- *   - Event "ping": emits "pong" with timestamp
- *   - Event "broadcast": emits "broadcast" to all clients
- *   - Event "room": join/leave rooms
  */
 
 import http from 'http';
 import { Buffer } from 'buffer';
-import { WebSocketServer } from 'ws';
-import { Server as SocketIOServer } from 'socket.io';
+import { WebSocketServer } from 'ws'; 
 
 const PORT = parseInt(process.argv[2] ?? '3458', 10);
 
@@ -57,8 +59,7 @@ function send(res, status, contentType, body) {
 }
 let count=0;
 const server = http.createServer(async (req, res) => {
-  // Let socket.io / engine.io handle its own protocol path
-  if (req.url.startsWith('/socket.io')) return;
+ 
 
   // CORS preflight
   if (req.method === 'OPTIONS') {
@@ -71,6 +72,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   const url = new URL(req.url, `http://localhost:${PORT}`);
+
+  // ─── SSE routes ──────────────────────────────────────────────────────────────
+  if (url.pathname === '/sse' || url.pathname === '/sse/counter' || url.pathname === '/sse/multi') {
+    return handleSse(req, res, url);
+  }
+
   const query = parseQuery(url.search);
   const rawBody = await readBody(req);
 
@@ -114,15 +121,98 @@ const server = http.createServer(async (req, res) => {
 });
 
 
+// ─── SSE handler ─────────────────────────────────────────────────────────────
+/**
+ * Handles Server-Sent Events connections.
+ *
+ * Routes:
+ *   GET /sse           — generic message stream
+ *   GET /sse/counter   — incremental counter events
+ *   GET /sse/multi     — mixed named-event stream (open, update, close)
+ *
+ * Query params for /sse and /sse/counter:
+ *   ?count=N       — send N events then close (0 = unlimited, default 0)
+ *   ?interval=ms   — delay between events in ms (default 1000)
+ *   ?event=name    — SSE event name (default "message")
+ */
+function handleSse(req, res, url) {
+  const query = parseQuery(url.search);
+  const maxCount = parseInt(query.count ?? '0', 10);
+  const interval = Math.max(100, parseInt(query.interval ?? '1000', 10));
+  const eventName = query.event ?? 'message';
+  const pathname = url.pathname;
+
+  console.log(`[SSE] Client connected → ${pathname}${url.search}`);
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': '*',
+  });
+
+  // Helper: write one SSE event
+  function writeEvent(id, event, data) {
+    res.write(`id: ${id}\n`);
+    if (event !== 'message') res.write(`event: ${event}\n`);
+    res.write(`data: ${typeof data === 'string' ? data : JSON.stringify(data)}\n`);
+    res.write('\n');
+  }
+
+  // Send a comment as a heartbeat immediately so clients know the connection is alive
+  res.write(': connected\n\n');
+
+  let seq = 0;
+  let timer = null;
+
+  function sendNext() {
+    seq++;
+    const ts = Date.now();
+
+    if (pathname === '/sse/counter') {
+      writeEvent(seq, eventName === 'message' ? 'counter' : eventName, JSON.stringify({ seq, ts }));
+    } else if (pathname === '/sse/multi') {
+      // Cycle through different named events
+      const cycle = seq % 4;
+      if (cycle === 1) writeEvent(seq, 'open',   JSON.stringify({ seq, message: 'Stream opened', ts }));
+      else if (cycle === 2) writeEvent(seq, 'update', JSON.stringify({ seq, value: Math.random().toFixed(4), ts }));
+      else if (cycle === 3) writeEvent(seq, 'ping',   JSON.stringify({ seq, ts }));
+      else                  writeEvent(seq, 'update', JSON.stringify({ seq, value: Math.random().toFixed(4), ts }));
+    } else {
+      // Generic /sse — echo back query params + counter
+      writeEvent(seq, eventName, JSON.stringify({ seq, ts, path: pathname, query }));
+    }
+
+    if (maxCount > 0 && seq >= maxCount) {
+      // Send a final "done" event and close
+      writeEvent(seq + 1, 'done', JSON.stringify({ message: `Sent ${seq} events`, ts: Date.now() }));
+      console.log(`[SSE] Closed after ${seq} events`);
+      clearInterval(timer);
+      res.end();
+    }
+  }
+
+  timer = setInterval(sendNext, interval);
+
+  // Clean up when client disconnects
+  req.on('close', () => {
+    clearInterval(timer);
+    console.log(`[SSE] Client disconnected from ${pathname} (sent ${seq} events)`);
+  });
+}
+
 server.listen(PORT, () => {
   console.log(`\n=== API Pilot Test Server ===`);
   console.log(`HTTP:       http://localhost:${PORT}`);
+  console.log(`SSE:        http://localhost:${PORT}/sse`);
+  console.log(`            http://localhost:${PORT}/sse/counter`);
+  console.log(`            http://localhost:${PORT}/sse/multi`);
   console.log(`WebSocket:  ws://localhost:${PORT}/ws`);
-  console.log(`Socket.IO:  URL=ws://localhost:${PORT}  path=/socket.io`);
   console.log('');
   console.log('HTTP — query params: ?status=404  ?delay=2000  ?type=text|html|xml');
+  console.log('SSE  — query params: ?count=10  ?interval=500  ?event=update');
   console.log('WS   — send "ping" | "broadcast:<msg>" | "delay:<ms>:<msg>" | any text/binary');
-  console.log('SIO  — events: "message" (echo) | "ping" (pong) | "broadcast" | "room"');
   console.log('');
   console.log('Press Ctrl+C to stop.');
 });
@@ -212,62 +302,4 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-// ─── Socket.IO server ─────────────────────────────────────────────────────────
-const io = new SocketIOServer(server, {
-  path: '/socket.io',
-  cors: { origin: '*', methods: ['GET', 'POST'] },
-  transports: ['websocket', 'polling'],
-});
-
-io.on('connection', (socket) => {
-  console.log(`[SIO] Client connected: ${socket.id} (total: ${io.engine.clientsCount})`);
-
-  // Welcome
-  socket.emit('welcome', {
-    id: socket.id,
-    message: 'Connected to API Pilot Socket.IO test server',
-    clientCount: io.engine.clientsCount,
-    ts: Date.now(),
-  });
-
-  // message → echo
-  socket.on('message', (data) => {
-    const payload = typeof data === 'string' ? data : JSON.stringify(data);
-    console.log(`[SIO] message from ${socket.id}: ${payload}`);
-    let parsed;
-    try { parsed = JSON.parse(payload); } catch { parsed = null; }
-    socket.emit('echo', { received: parsed ?? payload, ts: Date.now() });
-  });
-
-  // ping → pong
-  socket.on('ping', () => {
-    console.log(`[SIO] ping from ${socket.id}`);
-    socket.emit('pong', { ts: Date.now() });
-  });
-
-  // broadcast → emit to all
-  socket.on('broadcast', (data) => {
-    const payload = typeof data === 'string' ? data : JSON.stringify(data);
-    console.log(`[SIO] broadcast from ${socket.id}: ${payload}`);
-    io.emit('broadcast', { from: socket.id, message: payload, ts: Date.now() });
-  });
-
-  // room management
-  socket.on('room', ({ action, name } = {}) => {
-    if (action === 'join') {
-      socket.join(name);
-      socket.emit('room-joined', { name, ts: Date.now() });
-      console.log(`[SIO] ${socket.id} joined room "${name}"`);
-    } else if (action === 'leave') {
-      socket.leave(name);
-      socket.emit('room-left', { name, ts: Date.now() });
-      console.log(`[SIO] ${socket.id} left room "${name}"`);
-    } else if (action === 'send') {
-      socket.to(name).emit('room-message', { from: socket.id, room: name, message: data?.message, ts: Date.now() });
-    }
-  });
-
-  socket.on('disconnect', (reason) => {
-    console.log(`[SIO] Client disconnected: ${socket.id} (${reason})`);
-  });
-});
+ 

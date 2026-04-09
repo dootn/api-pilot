@@ -35,7 +35,14 @@
 - The extension detects `ws://` and `wss://` URLs and switches the request UI into WebSocket mode.
 - Connect / Disconnect: enter a WebSocket URL in the request bar and click **Connect** to open a live session; click **Disconnect** to close it.
 - Conversation panel: send and receive messages (text shown as UTF‑8, binary shown as base64), with per-message copy and truncate/expand controls.
+### Server-Sent Events (SSE)
 
+- Select **SSE** from the protocol dropdown in the URL bar to switch into SSE mode.
+- **Connect / Disconnect**: enter an SSE endpoint URL and click **Connect**; click **Disconnect** to close the stream.
+- **Event stream panel**: real-time list of received SSE events showing timestamp, event type (if non-default), event ID, and data content with copy and expand controls.
+- Supports the full SSE spec: `id:`, `event:`, `data:`, and `retry:` fields; multi-line data blocks are joined with `\n`.
+- Custom **Headers**, **Params**, and **Auth** are all supported (Body and Scripts tabs are hidden in SSE mode).
+- Sessions are automatically saved to **Request History** with the event count and duration on disconnect.
 ### Response Viewer
 
 - **Status & Timing**: HTTP status code, status text, response time (ms), and body size — each labeled for clarity
@@ -97,8 +104,8 @@
 
 1. Open VS Code and click the **API Pilot** icon in the Activity Bar.
 2. Click `+` to create a new request.
-3. Enter a URL (http(s) or ws(s)). For HTTP requests choose a method and click **Send**; for WebSocket enter a `ws://...` or `wss://...` URL and click **Connect**.
-4. View the formatted response or live WebSocket conversation below.
+3. Enter a URL (http(s) or ws(s)) or select the **SSE** protocol to connect to a Server-Sent Events endpoint. For HTTP requests choose a method and click **Send**; for WebSocket/SSE click **Connect**.
+4. View the formatted response, live WebSocket conversation, or real-time SSE event stream below.
 
 ---
 

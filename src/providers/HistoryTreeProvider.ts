@@ -53,15 +53,20 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<HistoryTreeI
           const url = this.shortenUrl(entry.request.url);
           const protocol = entry.request.protocol;
           const isWs = protocol === 'websocket';
+          const isSse = protocol === 'sse';
 
           const methodOrProtocol = isWs
             ? 'WS'
-            : entry.request.method;
+            : isSse
+              ? 'SSE'
+              : entry.request.method;
 
           const label = `${methodOrProtocol} ${url}`;
           const description = isWs
             ? `↑${entry.wsSession?.sentCount ?? 0} ↓${entry.wsSession?.receivedCount ?? 0}`
-            : `[${entry.response?.status ?? '?'}]`;
+            : isSse
+              ? `↓${entry.sseSession?.eventCount ?? 0}`
+              : `[${entry.response?.status ?? '?'}]`;
 
           return new HistoryTreeItem(
             label,

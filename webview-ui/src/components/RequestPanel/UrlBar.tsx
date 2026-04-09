@@ -166,6 +166,7 @@ export function UrlBar() {
   if (!tab) return null;
 
   const isWsMode = tab.protocol === 'websocket';
+  const isSseMode = tab.protocol === 'sse';
 
   const handleWsToggle = () => {
     if (!tab.url.trim()) return;
@@ -203,11 +204,52 @@ export function UrlBar() {
     });
   };
 
+  const handleSseToggle = () => {
+    if (!tab.url.trim()) return;
+
+    if (tab.sseStatus === 'connected' || tab.sseStatus === 'connecting') {
+      // Disconnect
+      if (tab.sseConnectionId) {
+        vscode.postMessage({ type: 'sseDisconnect', payload: { connectionId: tab.sseConnectionId } });
+      }
+      updateTab(tab.id, { sseStatus: 'disconnected', sseConnectionId: undefined, loading: false });
+      return;
+    }
+
+    // Connect
+    updateTab(tab.id, { loading: true, sseEvents: [], responseError: null });
+    vscode.postMessage({
+      type: 'sseConnect',
+      tabId: tab.id,
+      payload: {
+        id: tab.id,
+        name: tab.name,
+        protocol: tab.protocol,
+        method: 'GET',
+        url: tab.url.trim(),
+        params: tab.params.filter((p) => p.key),
+        headers: tab.headers.filter((h) => h.key),
+        body: { type: 'none' },
+        auth: tab.auth,
+        preScript: undefined,
+        postScript: undefined,
+        sslVerify: tab.sslVerify ?? true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+  };
+
   const handleSend = () => {
     if (!tab.url.trim()) return;
 
     if (isWsMode) {
       handleWsToggle();
+      return;
+    }
+
+    if (isSseMode) {
+      handleSseToggle();
       return;
     }
 
@@ -337,7 +379,9 @@ export function UrlBar() {
         : (tab!.url
             ? (tab!.protocol === 'websocket'
                 ? `WS ${tab!.url}`
-                : `${tab!.method} ${tab!.url}`)
+                : tab!.protocol === 'sse'
+                  ? `SSE ${tab!.url}`
+                  : `${tab!.method} ${tab!.url}`)
             : tab!.name),
       protocol: tab!.protocol,
       method: tab!.method,
@@ -397,19 +441,22 @@ export function UrlBar() {
           background: 'var(--input-bg, #3c3c3c)',
           color: tab.protocol === 'websocket'
             ? 'var(--vscode-terminal-ansiCyan, #4ec9b0)'
-            : 'var(--panel-fg)',
+            : tab.protocol === 'sse'
+              ? 'var(--vscode-terminal-ansiYellow, #dcdcaa)'
+              : 'var(--panel-fg)',
           cursor: 'pointer',
           flexShrink: 0,
         }}
       >
         <option value="http">HTTP</option>
         <option value="websocket">WS</option>
+        <option value="sse">SSE</option>
       </select>
 
       {/* Method selector + URL input: connected group, no gap between them */}
       <div style={{ display: 'flex', flex: 1, minWidth: 0 }}>
-        {/* Method selector — hidden in WS mode */}
-        {!isWsMode && (
+        {/* Method selector — hidden in WS or SSE mode */}
+        {!isWsMode && !isSseMode && (
         <select
           className={`method-select ${METHOD_CLASSES[tab.method] || 'method-get'}`}
           value={tab.method}
@@ -470,7 +517,7 @@ export function UrlBar() {
             ref={urlInputRef}
             className="url-input"
             type="text"
-            placeholder={isWsMode ? 'Enter WebSocket URL (e.g. ws://localhost:3456/ws)' : 'Enter request URL (e.g. https://api.example.com/users)'}
+            placeholder={isWsMode ? 'Enter WebSocket URL (e.g. ws://localhost:3456/ws)' : isSseMode ? 'Enter SSE URL (e.g. http://localhost:3458/sse)' : 'Enter request URL (e.g. https://api.example.com/users)'}
             value={tab.url}
             onChange={handleUrlChange}
             onKeyDown={handleUrlKeyDown}
@@ -535,9 +582,9 @@ export function UrlBar() {
       </div>
 
       <button
-        className={`send-btn ${(tab.loading || tab.wsStatus === 'connected') ? 'cancel' : ''}`}
+        className={`send-btn ${(tab.loading || tab.wsStatus === 'connected' || tab.sseStatus === 'connected') ? 'cancel' : ''}`}
         onClick={handleSend}
-        disabled={!tab.url.trim() && !tab.loading && tab.wsStatus !== 'connected'}
+        disabled={!tab.url.trim() && !tab.loading && tab.wsStatus !== 'connected' && tab.sseStatus !== 'connected'}
       >
         {isWsMode
           ? tab.wsStatus === 'connected'
@@ -545,13 +592,19 @@ export function UrlBar() {
             : tab.wsStatus === 'connecting' || tab.loading
               ? 'Connecting…'
               : 'Connect'
-          : tab.loading
-            ? t('urlCancel')
-            : t('urlSend')}
+          : isSseMode
+            ? tab.sseStatus === 'connected'
+              ? 'Disconnect'
+              : tab.sseStatus === 'connecting' || tab.loading
+                ? 'Connecting…'
+                : 'Connect'
+            : tab.loading
+              ? t('urlCancel')
+              : t('urlSend')}
       </button>
 
-      {/* SSL verify toggle — only meaningful for HTTPS (not WS mode) */}
-      {!isWsMode && tab.url.trim().toLowerCase().startsWith('https') && (
+      {/* SSL verify toggle — only meaningful for HTTPS (not WS or SSE mode) */}
+      {!isWsMode && !isSseMode && tab.url.trim().toLowerCase().startsWith('https') && (
         <button
           className="ssl-toggle-btn"
           title={(tab.sslVerify ?? true) ? t('urlSslVerifyOn') : t('urlSslVerifyOff')}

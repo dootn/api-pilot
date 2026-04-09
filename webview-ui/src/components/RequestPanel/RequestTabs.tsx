@@ -63,10 +63,12 @@ export function RequestTabs() {
   if (!tab) return null;
 
   const isWsMode = tab.protocol === 'websocket';
+  const isSseMode = tab.protocol === 'sse';
 
-  // In WS mode, filter out the body tab
+  // In WS mode, filter out the body tab; in SSE mode, filter out body and scripts
   const visibleTabs = TAB_DEFS
-    .filter((def) => !(isWsMode && def.id === 'body'));
+    .filter((def) => !(isWsMode && def.id === 'body'))
+    .filter((def) => !(isSseMode && (def.id === 'body' || def.id === 'scripts')));
 
   return (
     <div className="request-section">

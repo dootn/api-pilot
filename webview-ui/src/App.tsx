@@ -3,11 +3,12 @@ import { TabBar } from './components/Layout/TabBar';
 import { RequestPanel } from './components/RequestPanel/RequestPanel';
 import { ResponsePanel } from './components/ResponsePanel/ResponsePanel';
 import { WsConversation } from './components/RequestPanel/WsConversation';
+import { SseConversation } from './components/RequestPanel/SseConversation';
 import { CollectionsSidebar } from './components/Sidebar/CollectionsSidebar';
 import { HistorySidebar } from './components/Sidebar/HistorySidebar';
 import { useVscodeMessage } from './hooks/useVscodeMessage';
 import { useTabStore, type RequestTab } from './stores/tabStore';
-import type { ApiResponse, WsMessage, WsStatus } from './stores/requestStore';
+import type { ApiResponse, WsMessage, WsStatus, SseEvent, SseStatus } from './stores/requestStore';
 import { useLocaleStore } from './stores/localeStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { useI18n } from './i18n';
@@ -166,6 +167,28 @@ function App() {
           }
           return;
         }
+        case 'sseStatusChanged': {
+          const sseMsg = message as unknown as { tabId: string; payload: { status: SseStatus; connectionId?: string; error?: string } };
+          const { status, connectionId, error } = sseMsg.payload;
+          updateTab(sseMsg.tabId, {
+            sseStatus: status,
+            sseConnectionId: connectionId,
+            loading: status === 'connecting',
+            ...(status === 'disconnected' || status === 'error' ? { sseConnectedAt: undefined } : {}),
+            ...(status === 'connected' ? { sseConnectedAt: Date.now() } : {}),
+            ...(status === 'error' ? { responseError: error ?? 'SSE error' } : {}),
+          });
+          return;
+        }
+        case 'sseEventReceived': {
+          const sseMsg = message as unknown as { tabId: string; payload: SseEvent };
+          const tab = tabs.find((t) => t.id === sseMsg.tabId);
+          if (tab) {
+            const existing = tab.sseEvents ?? [];
+            updateTab(sseMsg.tabId, { sseEvents: [...existing, sseMsg.payload] });
+          }
+          return;
+        }
       }
 
       const tabId = message.requestId;
@@ -201,6 +224,7 @@ function App() {
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const isWsMode = activeTab?.protocol === 'websocket';
+  const isSseMode = activeTab?.protocol === 'sse';
 
   useVscodeMessage(handleMessage);
 
@@ -299,7 +323,7 @@ function App() {
             onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--border-color)')}
           />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            {isWsMode ? <WsConversation /> : <ResponsePanel />}
+            {isWsMode ? <WsConversation /> : isSseMode ? <SseConversation /> : <ResponsePanel />}
           </div>
         </div>
       </div>

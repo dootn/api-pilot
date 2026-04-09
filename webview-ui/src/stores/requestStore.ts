@@ -2,9 +2,20 @@ import { create } from 'zustand';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD' | string;
 
-export type Protocol = 'http' | 'websocket';
+export type Protocol = 'http' | 'websocket' | 'sse';
 
 export type WsStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export type SseStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export interface SseEvent {
+  id: string;
+  eventId?: string;
+  event: string;
+  data: string;
+  timestamp: number;
+  size: number;
+}
 
 export interface WsMessage {
   id: string;
