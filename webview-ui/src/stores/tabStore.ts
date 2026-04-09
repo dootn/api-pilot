@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { HttpMethod, KeyValuePair, RequestBody, AuthConfig, ApiResponse, SSLInfo, Protocol, WsStatus, WsMessage, SseStatus, SseEvent } from './requestStore';
+import type { HttpMethod, KeyValuePair, RequestBody, AuthConfig, ApiResponse, SSLInfo, Protocol, WsStatus, WsMessage, SseStatus, SseEvent, MqttStatus, MqttMessage, MqttOptions } from './requestStore';
 import { vscode } from '../vscode';
 
 export interface RequestTab {
@@ -14,7 +14,7 @@ export interface RequestTab {
   headers: KeyValuePair[];
   body: RequestBody;
   auth: AuthConfig;
-  activeTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts';
+  activeTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'mqtt-options';
   response: ApiResponse | null;
   responseError: string | null;
   loading: boolean;
@@ -35,9 +35,16 @@ export interface RequestTab {
   sseConnectionId?: string;
   sseEvents?: SseEvent[];
   sseConnectedAt?: number;
+  // MQTT options (persisted) and runtime state
+  mqttOptions?: MqttOptions;
+  mqttStatus?: MqttStatus;
+  mqttConnectionId?: string;
+  mqttMessages?: MqttMessage[];
+  mqttConnectedAt?: number;
+  mqttSubscriptions?: string[];
 }
 
-type PersistedTab = Omit<RequestTab, 'response' | 'responseError' | 'loading' | 'isDirty' | 'wsStatus' | 'wsConnectionId' | 'wsMessages' | 'wsConnectedAt' | 'sseStatus' | 'sseConnectionId' | 'sseEvents' | 'sseConnectedAt'>;
+type PersistedTab = Omit<RequestTab, 'response' | 'responseError' | 'loading' | 'isDirty' | 'wsStatus' | 'wsConnectionId' | 'wsMessages' | 'wsConnectedAt' | 'sseStatus' | 'sseConnectionId' | 'sseEvents' | 'sseConnectedAt' | 'mqttStatus' | 'mqttConnectionId' | 'mqttMessages' | 'mqttConnectedAt' | 'mqttSubscriptions'>;
 
 interface TabState {
   tabs: RequestTab[];
@@ -67,7 +74,7 @@ function createDefaultTab(): RequestTab {
     headers: [{ key: '', value: '', enabled: true }],
     body: { type: 'none' },
     auth: { type: 'none' },
-    activeTab: 'params',
+    activeTab: 'params' as 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'mqtt-options',
     response: null,
     responseError: null,
     loading: false,
@@ -83,7 +90,7 @@ function ensureTrailingEmpty(arr: KeyValuePair[]): KeyValuePair[] {
 }
 
 function stripTransient(tab: RequestTab): PersistedTab {
-    const { response: _r, responseError: _re, loading: _l, isDirty: _d, wsStatus: _ws, wsConnectionId: _wci, wsMessages: _wm, wsConnectedAt: _wca, sseStatus: _ss, sseConnectionId: _sci, sseEvents: _se, sseConnectedAt: _sca, ...rest } = tab;
+  const { response: _r, responseError: _re, loading: _l, isDirty: _d, wsStatus: _ws, wsConnectionId: _wci, wsMessages: _wm, wsConnectedAt: _wca, sseStatus: _ss, sseConnectionId: _sci, sseEvents: _se, sseConnectedAt: _sca, mqttStatus: _mqs, mqttConnectionId: _mqci, mqttMessages: _mqm, mqttConnectedAt: _mqca, mqttSubscriptions: _mqsubs, ...rest } = tab;
   return rest;
 }
 
@@ -181,7 +188,8 @@ export const useTabStore = create<TabState>((set, get) => ({
         // Don't mark as dirty if ALL updated fields are transient runtime state
         const TRANSIENT_FIELDS = new Set(['response', 'loading', 'responseError', 'sslInfo',
           'wsStatus', 'wsConnectionId', 'wsMessages', 'wsConnectedAt',
-          'sseStatus', 'sseConnectionId', 'sseEvents', 'sseConnectedAt']);
+          'sseStatus', 'sseConnectionId', 'sseEvents', 'sseConnectedAt',
+          'mqttStatus', 'mqttConnectionId', 'mqttMessages', 'mqttConnectedAt', 'mqttSubscriptions']);
         const isTransientUpdate = Object.keys(updates).every((k) => TRANSIENT_FIELDS.has(k));
         return { 
           ...t, 

@@ -126,3 +126,47 @@ export interface SseEventReceivedMessage {
   tabId: string;
   payload: import('./index').SseEvent;
 }
+
+// MQTT messages (Webview -> Extension)
+export interface MqttConnectMessage {
+  type: 'mqttConnect';
+  tabId: string;
+  payload: import('./index').ApiRequest;
+}
+
+export interface MqttDisconnectMessage {
+  type: 'mqttDisconnect';
+  payload: { connectionId: string };
+}
+
+export interface MqttSubscribeMessage {
+  type: 'mqttSubscribe';
+  payload: { connectionId: string; topic: string; qos: 0 | 1 | 2 };
+}
+
+export interface MqttUnsubscribeMessage {
+  type: 'mqttUnsubscribe';
+  payload: { connectionId: string; topic: string };
+}
+
+export interface MqttPublishMessage {
+  type: 'mqttPublish';
+  payload: { connectionId: string; topic: string; payload: string; qos: 0 | 1 | 2; retain: boolean };
+}
+
+// MQTT messages (Extension -> Webview)
+export interface MqttStatusChangedMessage {
+  type: 'mqttStatusChanged';
+  tabId: string;
+  payload: {
+    status: import('./index').MqttStatus;
+    connectionId?: string;
+    error?: string;
+  };
+}
+
+export interface MqttMessageReceivedMessage {
+  type: 'mqttMessageReceived';
+  tabId: string;
+  payload: import('./index').MqttMessage;
+}

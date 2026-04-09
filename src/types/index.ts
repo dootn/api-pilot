@@ -1,6 +1,6 @@
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
 
-export type Protocol = 'http' | 'websocket' | 'sse';
+export type Protocol = 'http' | 'websocket' | 'sse' | 'mqtt';
 
 export type WsStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -13,6 +13,36 @@ export interface SseEvent {
   data: string;        // SSE 'data:' field content
   timestamp: number;
   size: number;
+}
+
+export type MqttStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export interface MqttMessage {
+  id: string;
+  direction: 'sent' | 'received';
+  topic: string;
+  payload: string;        // UTF-8 text or base64 for binary
+  qos: 0 | 1 | 2;
+  retained: boolean;
+  timestamp: number;
+  size: number;
+}
+
+export interface MqttSubscription {
+  topic: string;
+  qos: 0 | 1 | 2;
+}
+
+export interface MqttOptions {
+  clientId?: string;        // auto-generated if empty
+  cleanSession?: boolean;   // default true
+  keepAlive?: number;       // default 60 (seconds)
+  username?: string;
+  password?: string;
+  lastWillTopic?: string;
+  lastWillPayload?: string;
+  lastWillQos?: 0 | 1 | 2;
+  lastWillRetain?: boolean;
 }
 
 export interface WsMessage {
@@ -76,6 +106,7 @@ export interface ApiRequest {
   preScript?: string;
   postScript?: string;
   sslVerify?: boolean;
+  mqttOptions?: MqttOptions;   // MQTT-specific connection options
   createdAt: number;
   updatedAt: number;
 }
@@ -149,12 +180,20 @@ export interface SseSessionSummary {
   duration: number;  // ms
 }
 
+export interface MqttSessionSummary {
+  publishedCount: number;
+  receivedCount: number;
+  subscribedTopics: string[];
+  duration: number;  // ms
+}
+
 export interface HistoryEntry {
   id: string;
   request: ApiRequest;
   response?: ApiResponse;
   wsSession?: WsSessionSummary;
   sseSession?: SseSessionSummary;
+  mqttSession?: MqttSessionSummary;
   timestamp: number;
 }
 

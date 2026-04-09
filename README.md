@@ -43,6 +43,17 @@
 - Supports the full SSE spec: `id:`, `event:`, `data:`, and `retry:` fields; multi-line data blocks are joined with `\n`.
 - Custom **Headers**, **Params**, and **Auth** are all supported (Body and Scripts tabs are hidden in SSE mode).
 - Sessions are automatically saved to **Request History** with the event count and duration on disconnect.
+
+### MQTT
+
+- Select **MQTT** from the protocol dropdown in the URL bar to switch into MQTT mode.
+- **Connect / Disconnect**: enter a broker URL (e.g. `mqtt://localhost:1883` or `mqtts://`) and click **Connect**; click **Disconnect** to close the session.
+- **Connection Options** tab: configure Client ID, Keep Alive, Clean Session, Username/Password, and Last Will (topic, payload, QoS, Retain).
+- **Subscriptions**: add topic filters (wildcards `+` and `#` supported) with per-subscription QoS; active subscriptions shown as removable badges.
+- **Message log**: real-time scrolling list of published (↑) and received (↓) messages, each showing topic, QoS, retain flag, timestamp, payload size, and a copy button. Long payloads can be expanded.
+- **Publish panel**: compose and send messages with topic, payload, QoS (0/1/2), and Retain controls; `Ctrl+Enter` sends.
+- Sessions are automatically saved to **Request History** with publish/receive counts, subscribed topics, and duration on disconnect.
+
 ### Response Viewer
 
 - **Status & Timing**: HTTP status code, status text, response time (ms), and body size — each labeled for clarity
@@ -104,7 +115,7 @@
 
 1. Open VS Code and click the **API Pilot** icon in the Activity Bar.
 2. Click `+` to create a new request.
-3. Enter a URL (http(s) or ws(s)) or select the **SSE** protocol to connect to a Server-Sent Events endpoint. For HTTP requests choose a method and click **Send**; for WebSocket/SSE click **Connect**.
+3. Enter a URL (http(s) or ws(s)) or select the **SSE** or **MQTT** protocol to connect to a Server-Sent Events endpoint or MQTT broker. For HTTP requests choose a method and click **Send**; for WebSocket/SSE/MQTT click **Connect**.
 4. View the formatted response, live WebSocket conversation, or real-time SSE event stream below.
 
 ---

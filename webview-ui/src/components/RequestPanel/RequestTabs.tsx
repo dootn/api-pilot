@@ -6,11 +6,12 @@ import { BodyEditor } from './BodyEditor';
 import { AuthEditor } from './AuthEditor';
 import { ScriptEditor } from './ScriptEditor';
 import { CodeModal } from './CodeModal';
+import { MqttOptions } from './MqttOptions';
 import { useEnvironments } from '../../hooks/useEnvironments';
 import { useI18n, type TranslationKey } from '../../i18n';
 import type { RequestTab } from '../../stores/tabStore';
 
-type Tab = 'params' | 'headers' | 'body' | 'auth' | 'scripts';
+type Tab = 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'mqtt-options';
 
 function getTabBadge(id: Tab, tab: RequestTab): string | number | null {
   switch (id) {
@@ -28,17 +29,24 @@ function getTabBadge(id: Tab, tab: RequestTab): string | number | null {
       return tab.auth.type !== 'none' ? tab.auth.type : null;
     case 'scripts':
       return (tab.preScript?.trim() || tab.postScript?.trim()) ? '●' : null;
+    case 'mqtt-options': {
+      const opts = tab.mqttOptions;
+      if (!opts) return null;
+      const keys = ['clientId', 'username', 'lastWillTopic'] as const;
+      return keys.some((k) => opts[k]) ? '●' : null;
+    }
     default:
       return null;
   }
 }
 
-const TAB_DEFS: { id: Tab; key: TranslationKey }[] = [
+const TAB_DEFS: { id: Tab; key: TranslationKey; label?: string }[] = [
   { id: 'params',  key: 'tabParams'  },
   { id: 'headers', key: 'tabHeaders' },
   { id: 'body',    key: 'tabBody'    },
   { id: 'auth',    key: 'tabAuth'    },
   { id: 'scripts', key: 'tabScripts' },
+  { id: 'mqtt-options', key: 'tabParams', label: 'Options' },
 ];
 
 export function RequestTabs() {
@@ -64,11 +72,14 @@ export function RequestTabs() {
 
   const isWsMode = tab.protocol === 'websocket';
   const isSseMode = tab.protocol === 'sse';
+  const isMqttMode = tab.protocol === 'mqtt';
 
-  // In WS mode, filter out the body tab; in SSE mode, filter out body and scripts
+  // In WS mode, filter out the body tab; in SSE/MQTT mode, filter out body and scripts
+  // In MQTT mode also show the mqtt-options tab; in non-MQTT modes hide it
   const visibleTabs = TAB_DEFS
     .filter((def) => !(isWsMode && def.id === 'body'))
-    .filter((def) => !(isSseMode && (def.id === 'body' || def.id === 'scripts')));
+    .filter((def) => !((isSseMode || isMqttMode) && (def.id === 'body' || def.id === 'scripts')))
+    .filter((def) => !(def.id === 'mqtt-options' && !isMqttMode));
 
   return (
     <div className="request-section">
@@ -81,7 +92,7 @@ export function RequestTabs() {
               className={`tab ${tab.activeTab === def.id ? 'active' : ''}`}
               onClick={() => updateTab(tab.id, { activeTab: def.id })}
             >
-              {t(def.key)}
+              {def.label ?? t(def.key)}
               {badge !== null && (
                 <span
                   style={{
@@ -149,6 +160,8 @@ export function RequestTabs() {
         {tab.activeTab === 'auth' && <AuthEditor />}
 
         {tab.activeTab === 'scripts' && <ScriptEditor />}
+
+        {tab.activeTab === 'mqtt-options' && isMqttMode && <MqttOptions />}
       </div>
 
       {showCodeModal && tab && (

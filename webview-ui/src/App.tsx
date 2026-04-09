@@ -4,11 +4,12 @@ import { RequestPanel } from './components/RequestPanel/RequestPanel';
 import { ResponsePanel } from './components/ResponsePanel/ResponsePanel';
 import { WsConversation } from './components/RequestPanel/WsConversation';
 import { SseConversation } from './components/RequestPanel/SseConversation';
+import { MqttPanel } from './components/RequestPanel/MqttPanel';
 import { CollectionsSidebar } from './components/Sidebar/CollectionsSidebar';
 import { HistorySidebar } from './components/Sidebar/HistorySidebar';
 import { useVscodeMessage } from './hooks/useVscodeMessage';
 import { useTabStore, type RequestTab } from './stores/tabStore';
-import type { ApiResponse, WsMessage, WsStatus, SseEvent, SseStatus } from './stores/requestStore';
+import type { ApiResponse, WsMessage, WsStatus, SseEvent, SseStatus, MqttStatus, MqttMessage } from './stores/requestStore';
 import { useLocaleStore } from './stores/localeStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { useI18n } from './i18n';
@@ -189,6 +190,48 @@ function App() {
           }
           return;
         }
+        case 'mqttStatusChanged': {
+          const mqttMsg = message as unknown as { tabId: string; payload: { status: MqttStatus; connectionId?: string; error?: string } };
+          const { status, connectionId, error } = mqttMsg.payload;
+          updateTab(mqttMsg.tabId, {
+            mqttStatus: status,
+            mqttConnectionId: connectionId,
+            loading: status === 'connecting',
+            ...(status === 'disconnected' || status === 'error' ? { mqttConnectedAt: undefined } : {}),
+            ...(status === 'connected' ? { mqttConnectedAt: Date.now() } : {}),
+            ...(status === 'error' ? { responseError: error ?? 'MQTT error' } : {}),
+          });
+          return;
+        }
+        case 'mqttMessageReceived': {
+          const mqttMsg = message as unknown as { tabId: string; payload: MqttMessage };
+          const tab = tabs.find((t) => t.id === mqttMsg.tabId);
+          if (tab) {
+            const existing = tab.mqttMessages ?? [];
+            updateTab(mqttMsg.tabId, { mqttMessages: [...existing, mqttMsg.payload] });
+          }
+          return;
+        }
+        case 'mqttSubscribed': {
+          const mqttMsg = message as unknown as { tabId: string; payload: { topic: string } };
+          const tab = tabs.find((t) => t.id === mqttMsg.tabId);
+          if (tab) {
+            const existing = tab.mqttSubscriptions ?? [];
+            if (!existing.includes(mqttMsg.payload.topic)) {
+              updateTab(mqttMsg.tabId, { mqttSubscriptions: [...existing, mqttMsg.payload.topic] });
+            }
+          }
+          return;
+        }
+        case 'mqttUnsubscribed': {
+          const mqttMsg = message as unknown as { tabId: string; payload: { topic: string } };
+          const tab = tabs.find((t) => t.id === mqttMsg.tabId);
+          if (tab) {
+            const existing = tab.mqttSubscriptions ?? [];
+            updateTab(mqttMsg.tabId, { mqttSubscriptions: existing.filter((s) => s !== mqttMsg.payload.topic) });
+          }
+          return;
+        }
       }
 
       const tabId = message.requestId;
@@ -225,6 +268,7 @@ function App() {
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const isWsMode = activeTab?.protocol === 'websocket';
   const isSseMode = activeTab?.protocol === 'sse';
+  const isMqttMode = activeTab?.protocol === 'mqtt';
 
   useVscodeMessage(handleMessage);
 
@@ -323,7 +367,7 @@ function App() {
             onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--border-color)')}
           />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            {isWsMode ? <WsConversation /> : isSseMode ? <SseConversation /> : <ResponsePanel />}
+            {isWsMode ? <WsConversation /> : isSseMode ? <SseConversation /> : isMqttMode ? <MqttPanel /> : <ResponsePanel />}
           </div>
         </div>
       </div>

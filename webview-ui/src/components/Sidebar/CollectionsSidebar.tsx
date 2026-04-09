@@ -33,10 +33,13 @@ const METHOD_COLORS: Record<string, string> = {
   GET: '#4ec9b0',
   POST: '#cca700',
   PUT: '#3794ff',
-  DELETE: '#f14c4c',
+  DELETE: '#f44747',
   PATCH: '#c586c0',
   OPTIONS: '#888',
   HEAD: '#888',
+  WS:   'var(--vscode-terminal-ansiCyan, #4ec9b0)',
+  SSE:  'var(--vscode-terminal-ansiYellow, #dcdcaa)',
+  MQTT: 'var(--vscode-terminal-ansiMagenta, #c586c0)',
 };
 
 export function CollectionsSidebar() {
@@ -475,7 +478,12 @@ export function CollectionsSidebar() {
           </div>
         );
       } else if (item.type === 'request' && item.request) {
-        const method = item.request.method || 'GET';
+        const protocol = item.request.protocol as string | undefined;
+        const rawMethod = item.request.method || 'GET';
+        const method = protocol === 'websocket' ? 'WS'
+          : protocol === 'sse' ? 'SSE'
+          : protocol === 'mqtt' ? 'MQTT'
+          : rawMethod;
         const requestClass = [
           'sidebar-tree-item sidebar-request',
           isDraggingThis ? 'dragging' : '',

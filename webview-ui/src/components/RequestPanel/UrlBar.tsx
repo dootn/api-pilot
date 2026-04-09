@@ -167,6 +167,7 @@ export function UrlBar() {
 
   const isWsMode = tab.protocol === 'websocket';
   const isSseMode = tab.protocol === 'sse';
+  const isMqttMode = tab.protocol === 'mqtt';
 
   const handleWsToggle = () => {
     if (!tab.url.trim()) return;
@@ -198,6 +199,41 @@ export function UrlBar() {
         preScript: tab.preScript,
         postScript: tab.postScript,
         sslVerify: tab.sslVerify ?? true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+  };
+
+  const handleMqttToggle = () => {
+    if (!tab.url.trim()) return;
+
+    if (tab.mqttStatus === 'connected' || tab.mqttStatus === 'connecting') {
+      if (tab.mqttConnectionId) {
+        vscode.postMessage({ type: 'mqttDisconnect', payload: { connectionId: tab.mqttConnectionId } });
+      }
+      updateTab(tab.id, { mqttStatus: 'disconnected', mqttConnectionId: undefined, loading: false });
+      return;
+    }
+
+    updateTab(tab.id, { loading: true, mqttMessages: [], mqttSubscriptions: [], responseError: null });
+    vscode.postMessage({
+      type: 'mqttConnect',
+      tabId: tab.id,
+      payload: {
+        id: tab.id,
+        name: tab.name,
+        protocol: tab.protocol,
+        method: tab.method,
+        url: tab.url.trim(),
+        params: tab.params.filter((p) => p.key),
+        headers: tab.headers.filter((h) => h.key),
+        body: { type: 'none' },
+        auth: tab.auth,
+        preScript: undefined,
+        postScript: undefined,
+        sslVerify: tab.sslVerify ?? true,
+        mqttOptions: tab.mqttOptions,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       },
@@ -248,6 +284,11 @@ export function UrlBar() {
       return;
     }
 
+    if (isMqttMode) {
+      handleMqttToggle();
+      return;
+    }
+
     if (isSseMode) {
       handleSseToggle();
       return;
@@ -291,6 +332,10 @@ export function UrlBar() {
     if (lower.startsWith('ws://') || lower.startsWith('wss://')) {
       if (!tab.protocol || tab.protocol === 'http') {
         updates.protocol = 'websocket';
+      }
+    } else if (lower.startsWith('mqtt://') || lower.startsWith('mqtts://')) {
+      if (!tab.protocol || tab.protocol === 'http') {
+        updates.protocol = 'mqtt';
       }
     } else if (lower.startsWith('http://') || lower.startsWith('https://')) {
       if (tab.protocol === 'websocket') {
@@ -377,11 +422,9 @@ export function UrlBar() {
       name: tab!.isCustomNamed
         ? tab!.name
         : (tab!.url
-            ? (tab!.protocol === 'websocket'
-                ? `WS ${tab!.url}`
-                : tab!.protocol === 'sse'
-                  ? `SSE ${tab!.url}`
-                  : `${tab!.method} ${tab!.url}`)
+            ? (tab!.protocol === 'websocket' || tab!.protocol === 'sse' || tab!.protocol === 'mqtt'
+                ? tab!.url
+                : `${tab!.method} ${tab!.url}`)
             : tab!.name),
       protocol: tab!.protocol,
       method: tab!.method,
@@ -443,7 +486,9 @@ export function UrlBar() {
             ? 'var(--vscode-terminal-ansiCyan, #4ec9b0)'
             : tab.protocol === 'sse'
               ? 'var(--vscode-terminal-ansiYellow, #dcdcaa)'
-              : 'var(--panel-fg)',
+              : tab.protocol === 'mqtt'
+                ? 'var(--vscode-terminal-ansiMagenta, #c586c0)'
+                : 'var(--panel-fg)',
           cursor: 'pointer',
           flexShrink: 0,
         }}
@@ -451,12 +496,13 @@ export function UrlBar() {
         <option value="http">HTTP</option>
         <option value="websocket">WS</option>
         <option value="sse">SSE</option>
+        <option value="mqtt">MQTT</option>
       </select>
 
       {/* Method selector + URL input: connected group, no gap between them */}
       <div style={{ display: 'flex', flex: 1, minWidth: 0 }}>
-        {/* Method selector — hidden in WS or SSE mode */}
-        {!isWsMode && !isSseMode && (
+        {/* Method selector — hidden in WS, SSE, or MQTT mode */}
+        {!isWsMode && !isSseMode && !isMqttMode && (
         <select
           className={`method-select ${METHOD_CLASSES[tab.method] || 'method-get'}`}
           value={tab.method}
@@ -517,7 +563,7 @@ export function UrlBar() {
             ref={urlInputRef}
             className="url-input"
             type="text"
-            placeholder={isWsMode ? 'Enter WebSocket URL (e.g. ws://localhost:3456/ws)' : isSseMode ? 'Enter SSE URL (e.g. http://localhost:3458/sse)' : 'Enter request URL (e.g. https://api.example.com/users)'}
+            placeholder={isWsMode ? 'Enter WebSocket URL (e.g. ws://localhost:3456/ws)' : isSseMode ? 'Enter SSE URL (e.g. http://localhost:3458/sse)' : isMqttMode ? 'Enter MQTT broker URL (e.g. mqtt://localhost:1883)' : 'Enter request URL (e.g. https://api.example.com/users)'}
             value={tab.url}
             onChange={handleUrlChange}
             onKeyDown={handleUrlKeyDown}
@@ -582,9 +628,9 @@ export function UrlBar() {
       </div>
 
       <button
-        className={`send-btn ${(tab.loading || tab.wsStatus === 'connected' || tab.sseStatus === 'connected') ? 'cancel' : ''}`}
+        className={`send-btn ${(tab.loading || tab.wsStatus === 'connected' || tab.sseStatus === 'connected' || tab.mqttStatus === 'connected') ? 'cancel' : ''}`}
         onClick={handleSend}
-        disabled={!tab.url.trim() && !tab.loading && tab.wsStatus !== 'connected' && tab.sseStatus !== 'connected'}
+        disabled={!tab.url.trim() && !tab.loading && tab.wsStatus !== 'connected' && tab.sseStatus !== 'connected' && tab.mqttStatus !== 'connected'}
       >
         {isWsMode
           ? tab.wsStatus === 'connected'
@@ -598,13 +644,19 @@ export function UrlBar() {
               : tab.sseStatus === 'connecting' || tab.loading
                 ? 'Connecting…'
                 : 'Connect'
-            : tab.loading
-              ? t('urlCancel')
-              : t('urlSend')}
+            : isMqttMode
+              ? tab.mqttStatus === 'connected'
+                ? 'Disconnect'
+                : tab.mqttStatus === 'connecting' || tab.loading
+                  ? 'Connecting…'
+                  : 'Connect'
+              : tab.loading
+                ? t('urlCancel')
+                : t('urlSend')}
       </button>
 
-      {/* SSL verify toggle — only meaningful for HTTPS (not WS or SSE mode) */}
-      {!isWsMode && !isSseMode && tab.url.trim().toLowerCase().startsWith('https') && (
+      {/* SSL verify toggle — only meaningful for HTTPS (not WS, SSE, or MQTT mode) */}
+      {!isWsMode && !isSseMode && !isMqttMode && tab.url.trim().toLowerCase().startsWith('https') && (
         <button
           className="ssl-toggle-btn"
           title={(tab.sslVerify ?? true) ? t('urlSslVerifyOn') : t('urlSslVerifyOff')}
@@ -625,8 +677,8 @@ export function UrlBar() {
         </button>
       )}
 
-      {/* Save: update existing collection item — only when bound to a collection AND there are unsaved changes */}
-      {tab.collectionId && tab.isDirty && (
+      {/* Save: update existing collection item — shown when tab is bound to a collection */}
+      {tab.collectionId && (
         <button
           className={`save-btn ${saveStatus === 'saved' ? 'saved' : ''}`}
           onClick={handleDirectSave}

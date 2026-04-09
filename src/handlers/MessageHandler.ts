@@ -9,6 +9,7 @@ import { exportCurl } from '../services/CurlExporter';
 import { VariableResolver } from '../services/VariableResolver';
 import { WsClient } from '../services/WsClient';
 import { SseClient } from '../services/SseClient';
+import { MqttClient } from '../services/MqttClient';
 import { WebviewMessage } from '../types/messages';
 import { ApiRequest, ConsoleEntry, CollectionItem, Environment, SSLInfo } from '../types';
 import { parseCurl } from '../services/CurlParser';
@@ -41,6 +42,7 @@ export class MessageHandler {
   private scriptRunner: ScriptRunner;
   private wsClient: WsClient;
   private sseClient: SseClient;
+  private mqttClient: MqttClient;
 
   constructor(
     private webview: vscode.Webview,
@@ -63,12 +65,18 @@ export class MessageHandler {
       historyService,
       vscode.workspace.getConfiguration('api-pilot').get<number>('maxHistory', 1000),
     );
+    this.mqttClient = new MqttClient(
+      webview,
+      historyService,
+      vscode.workspace.getConfiguration('api-pilot').get<number>('maxHistory', 1000),
+    );
   }
 
-  /** Clean up all WebSocket/SSE connections when the panel is disposed. */
+  /** Clean up all WebSocket/SSE/MQTT connections when the panel is disposed. */
   dispose(): void {
     this.wsClient.disposeAll();
     this.sseClient.disposeAll();
+    this.mqttClient.disposeAll();
   }
 
   async handle(message: WebviewMessage): Promise<void> {
@@ -215,6 +223,25 @@ export class MessageHandler {
       case 'sseDisconnect':
         this.handleSseDisconnect((message.payload as { connectionId: string }).connectionId);
         break;
+      // --- MQTT ---
+      case 'mqttConnect':
+        this.handleMqttConnect(
+          (message as any).tabId as string,
+          message.payload as ApiRequest,
+        );
+        break;
+      case 'mqttDisconnect':
+        this.handleMqttDisconnect((message.payload as { connectionId: string }).connectionId);
+        break;
+      case 'mqttSubscribe':
+        this.handleMqttSubscribe(message.payload as { connectionId: string; topic: string; qos: 0 | 1 | 2 });
+        break;
+      case 'mqttUnsubscribe':
+        this.handleMqttUnsubscribe(message.payload as { connectionId: string; topic: string });
+        break;
+      case 'mqttPublish':
+        this.handleMqttPublish(message.payload as { connectionId: string; topic: string; payload: string; qos: 0 | 1 | 2; retain: boolean });
+        break;
       default:
         console.warn(`Unknown message type: ${message.type}`);
     }
@@ -240,6 +267,27 @@ export class MessageHandler {
 
   private handleSseDisconnect(connectionId: string): void {
     this.sseClient.disconnect(connectionId);
+  }
+
+  private handleMqttConnect(tabId: string, request: ApiRequest): void {
+    const envVariables = this.envService?.getActiveVariables() || [];
+    this.mqttClient.connect(tabId, request, envVariables);
+  }
+
+  private handleMqttDisconnect(connectionId: string): void {
+    this.mqttClient.disconnect(connectionId);
+  }
+
+  private handleMqttSubscribe(payload: { connectionId: string; topic: string; qos: 0 | 1 | 2 }): void {
+    this.mqttClient.subscribe(payload.connectionId, payload.topic, payload.qos);
+  }
+
+  private handleMqttUnsubscribe(payload: { connectionId: string; topic: string }): void {
+    this.mqttClient.unsubscribe(payload.connectionId, payload.topic);
+  }
+
+  private handleMqttPublish(payload: { connectionId: string; topic: string; payload: string; qos: 0 | 1 | 2; retain: boolean }): void {
+    this.mqttClient.publish(payload.connectionId, payload.topic, payload.payload, payload.qos, payload.retain);
   }
 
   private async handleSendRequest(requestId: string, apiRequest: ApiRequest): Promise<void> {

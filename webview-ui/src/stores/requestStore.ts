@@ -2,11 +2,36 @@ import { create } from 'zustand';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD' | string;
 
-export type Protocol = 'http' | 'websocket' | 'sse';
+export type Protocol = 'http' | 'websocket' | 'sse' | 'mqtt';
 
 export type WsStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 export type SseStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export type MqttStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export interface MqttMessage {
+  id: string;
+  direction: 'sent' | 'received';
+  topic: string;
+  payload: string;
+  qos: 0 | 1 | 2;
+  retained: boolean;
+  timestamp: number;
+  size: number;
+}
+
+export interface MqttOptions {
+  clientId?: string;
+  cleanSession?: boolean;
+  keepAlive?: number;
+  username?: string;
+  password?: string;
+  lastWillTopic?: string;
+  lastWillPayload?: string;
+  lastWillQos?: 0 | 1 | 2;
+  lastWillRetain?: boolean;
+}
 
 export interface SseEvent {
   id: string;

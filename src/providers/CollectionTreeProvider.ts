@@ -78,7 +78,12 @@ export class CollectionTreeProvider
           );
         } else {
           const req = item.request;
-          const method = req?.method || 'GET';
+          const protocol = req?.protocol as string | undefined;
+          const rawMethod = req?.method || 'GET';
+          const method = protocol === 'websocket' ? 'WS'
+            : protocol === 'sse' ? 'SSE'
+            : protocol === 'mqtt' ? 'MQTT'
+            : rawMethod;
           // Strip HTTP method prefix from auto-generated names for clean display
           const rawName = item.name || req?.url || 'Unnamed Request';
           const methodPrefix = `${method} `;

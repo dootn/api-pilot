@@ -40,6 +40,16 @@
 - 支持自定义**请求头**、**查询参数**和**认证**（SSE 模式隐藏 Body 和脚本标签页）。
 - 断开连接时自动将会话（事件数量、持续时间）保存至**请求历史**。
 
+### MQTT
+
+- 在 URL 栏左侧的协议下拉框中选择 **MQTT**，切换为 MQTT 模式。
+- **连接/断开**：输入 Broker 地址（如 `mqtt://localhost:1883` 或 `mqtts://`），点击 **Connect** 建立连接；点击 **Disconnect** 断开。
+- **Options 标签页**：配置 Client ID、Keep Alive、Clean Session、用户名/密码及遗嘱消息（Topic、Payload、QoS、Retain）。
+- **订阅管理**：输入主题过滤器（支持 `+` 和 `#` 通配符）和 QoS，点击 Subscribe；已订阅主题以标签形式展示，可单独取消订阅。
+- **消息记录**：实时滚动展示发布（↑）和接收（↓）的消息，每条显示主题、QoS、retain 标志、时间戳、消息大小及复制按钮；超长 payload 支持展开。
+- **发布面板**（右侧）：填写主题、payload、QoS（0/1/2）和 Retain，点击 Publish 或按 `Ctrl+Enter` 发送。
+- 断开连接时自动将会话（发布数/接收数、已订阅主题、持续时间）保存至**请求历史**。
+
 ### 响应查看器
 
 - **状态与耗时**: HTTP 状态码、状态文本、响应时间（ms）、响应体大小
@@ -95,7 +105,7 @@
 
 1. 打开 VS Code，点击活动栏中的 **API Pilot** 图标。
 2. 点击 `+` 新建请求。
-3. 输入 URL（支持 `http(s)` 或 `ws(s)`）。HTTP 请求选择方法并点击 **Send**；WebSocket 输入 `ws://...` 或 `wss://...` 并点击 **Connect**。
+3. 输入 URL（支持 `http(s)` 或 `ws(s)`），或从协议下拉框选择 **SSE**/**MQTT**。HTTP 请求选择方法并点击 **Send**；WebSocket/SSE/MQTT 输入对应地址并点击 **Connect**。
 4. 在下方查看格式化的响应结果或实时 WebSocket 会话。
 
 ---

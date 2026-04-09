@@ -1,8 +1,8 @@
 {
   "name": "api-pilot",
   "displayName": "API Pilot",
-  "description": "A powerful API debugging tool for VS Code, similar to Postman",
-  "version": "1.2.1",
+  "description": "VS Code API client supporting HTTP, WebSocket, SSE and MQTT — send requests, stream events, manage collections and history",
+  "version": "1.3.1",
   "publisher": "dootn",
   "icon": "resources/icon.png",
   "repository": {
@@ -34,7 +34,11 @@
         "api-pilot.locale": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "en", "zh-CN"],
+          "enum": [
+            "auto",
+            "en",
+            "zh-CN"
+          ],
           "enumDescriptions": [
             "Follow VS Code UI language",
             "English",
@@ -58,7 +62,9 @@
         },
         "api-pilot.customHttpMethods": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Additional HTTP methods to show in the method selector dropdown (e.g. [\"PROPFIND\", \"MKCOL\"])."
         }
@@ -86,6 +92,8 @@
     "vitest": "^1.6.1"
   },
   "dependencies": {
+    "aedes": "^1.0.2",
+    "mqtt": "^5.15.1",
     "undici": "^6.6.0",
     "ws": "^8.18.0"
   }

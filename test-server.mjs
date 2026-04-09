@@ -11,6 +11,12 @@
  *     ?delay=2000        → delay 2 seconds before responding
  *     ?type=text         → response as text/plain (default: application/json)
  *
+ * MQTT (mqtt://localhost:<mqttPort>):
+ *   Default port: 3460
+ *   - Publishes status events on 'server/status' every 5 seconds
+ *   - Mirrors all published messages back on 'echo/<original-topic>'
+ *   - Supports QoS 0, 1, 2
+ *
  * SSE (http://localhost:<port>/sse):
  *   Query Parameters (optional):
  *     ?count=10          → send N events then close (default: unlimited)
@@ -29,8 +35,9 @@
  */
 
 import http from 'http';
+import net from 'net';
 import { Buffer } from 'buffer';
-import { WebSocketServer } from 'ws'; 
+import { WebSocketServer } from 'ws';
 
 const PORT = parseInt(process.argv[2] ?? '3458', 10);
 
@@ -209,10 +216,12 @@ server.listen(PORT, () => {
   console.log(`            http://localhost:${PORT}/sse/counter`);
   console.log(`            http://localhost:${PORT}/sse/multi`);
   console.log(`WebSocket:  ws://localhost:${PORT}/ws`);
+  console.log(`MQTT:       mqtt://localhost:${MQTT_PORT}`);
   console.log('');
   console.log('HTTP — query params: ?status=404  ?delay=2000  ?type=text|html|xml');
   console.log('SSE  — query params: ?count=10  ?interval=500  ?event=update');
   console.log('WS   — send "ping" | "broadcast:<msg>" | "delay:<ms>:<msg>" | any text/binary');
+  console.log('MQTT — subscribe to server/status for periodic updates; messages echoed on echo/<topic>');
   console.log('');
   console.log('Press Ctrl+C to stop.');
 });
@@ -302,4 +311,54 @@ wss.on('connection', (ws, req) => {
   });
 });
 
- 
+// ─── MQTT broker (aedes) ───────────────────────────────────────────────────────────────────────────────
+const MQTT_PORT = parseInt(process.argv[3] ?? '3460', 10);
+
+(async () => {
+  const { Aedes } = await import('aedes');
+  const broker = await Aedes.createBroker();
+  const mqttServer = net.createServer(broker.handle);
+
+  broker.on('client', (client) => {
+    console.log(`[MQTT] Client connected: ${client.id}`);
+  });
+  broker.on('clientDisconnect', (client) => {
+    console.log(`[MQTT] Client disconnected: ${client.id}`);
+  });
+  broker.on('publish', (packet, client) => {
+    if (!client) return; // internal publish
+    const topic = packet.topic;
+    const payload = packet.payload.toString();
+    console.log(`[MQTT] ← ${client.id} → ${topic}: ${payload.slice(0, 80)}`);
+    // Echo every published message on echo/<original-topic>
+    broker.publish({
+      topic: `echo/${topic}`,
+      payload: Buffer.from(JSON.stringify({ original: topic, payload, ts: Date.now() })),
+      qos: packet.qos,
+      retain: false,
+    }, () => {});
+  });
+  broker.on('subscribe', (subscriptions, client) => {
+    for (const sub of subscriptions) {
+      console.log(`[MQTT] ${client.id} subscribed to ${sub.topic} (QoS ${sub.qos})`);
+    }
+  });
+  broker.on('error', (err) => {
+    console.error(`[MQTT] Broker error: ${err.message}`);
+  });
+
+  mqttServer.listen(MQTT_PORT, () => {
+    console.log(`[MQTT] Broker listening on mqtt://localhost:${MQTT_PORT}`);
+  });
+
+  // Publish periodic status message
+  setInterval(() => {
+    broker.publish({
+      topic: 'server/status',
+      payload: Buffer.from(JSON.stringify({ status: 'ok', uptime: process.uptime().toFixed(1), ts: Date.now() })),
+      qos: 0,
+      retain: true,
+    }, () => {});
+  }, 5000);
+})();
+

@@ -1,6 +1,6 @@
 import { randomUUID, createHash } from 'crypto';
 import { StorageService } from './StorageService';
-import { HistoryEntry, ApiRequest, ApiResponse, WsSessionSummary, SseSessionSummary } from '../types';
+import { HistoryEntry, ApiRequest, ApiResponse, WsSessionSummary, SseSessionSummary, MqttSessionSummary } from '../types';
 import { isBinaryContentType } from './contentTypeUtils';
 
 const HISTORY_DIR = 'history';
@@ -87,6 +87,27 @@ export class HistoryService {
       id: randomUUID(),
       request,
       sseSession,
+      timestamp: Date.now(),
+    };
+
+    const dateKey = this.getDateKey(entry.timestamp);
+    const dateDir = `${HISTORY_DIR}/${dateKey}`;
+
+    const seq = String(this.addCounter++).padStart(6, '0');
+    const base = `${entry.timestamp}_${seq}_${entry.id}`;
+    this.storage.writeJson(dateDir, `${base}.json`, entry);
+
+    this.enforceTotalLimit(maxTotal);
+
+    return entry;
+  }
+
+  /** Record an MQTT session summary in history. */
+  addMqttSession(request: ApiRequest, mqttSession: MqttSessionSummary, maxTotal = 1000): HistoryEntry {
+    const entry: HistoryEntry = {
+      id: randomUUID(),
+      request,
+      mqttSession,
       timestamp: Date.now(),
     };
 
