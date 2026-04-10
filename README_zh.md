@@ -1,5 +1,7 @@
 # API Pilot
 
+[English Documentation](README.md)
+
 **强大的 HTTP API 调试工具，直接内嵌在 VS Code 中 —— 无需浏览器，无需额外应用。**
 
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.85+-blue.svg)

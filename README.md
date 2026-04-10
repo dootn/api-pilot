@@ -1,5 +1,7 @@
 # API Pilot
 
+[中文文档](README_zh.md)
+
 **A powerful API debugging tool built right into VS Code — no browser, no separate app.**
 
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.85+-blue.svg)

@@ -1,8 +1,8 @@
 {
   "name": "api-pilot",
   "displayName": "API Pilot",
-  "description": "VS Code API client supporting HTTP, WebSocket, SSE, MQTT and gRPC — send requests, stream events, manage collections and history",
-  "version": "1.5.0",
+  "description": "Multi-protocol API client — HTTP, WebSocket, SSE, MQTT & gRPC",
+  "version": "1.5.1",
   "publisher": "dootn",
   "icon": "resources/icon.png",
   "repository": {
