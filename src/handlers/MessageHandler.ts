@@ -10,6 +10,7 @@ import { VariableResolver } from '../services/VariableResolver';
 import { WsClient } from '../services/WsClient';
 import { SseClient } from '../services/SseClient';
 import { MqttClient } from '../services/MqttClient';
+import { GrpcClient } from '../services/GrpcClient';
 import { WebviewMessage } from '../types/messages';
 import { ApiRequest, ConsoleEntry, CollectionItem, Environment, SSLInfo } from '../types';
 import { parseCurl } from '../services/CurlParser';
@@ -43,6 +44,7 @@ export class MessageHandler {
   private wsClient: WsClient;
   private sseClient: SseClient;
   private mqttClient: MqttClient;
+  private grpcClient: GrpcClient;
 
   constructor(
     private webview: vscode.Webview,
@@ -70,13 +72,19 @@ export class MessageHandler {
       historyService,
       vscode.workspace.getConfiguration('api-pilot').get<number>('maxHistory', 1000),
     );
+    this.grpcClient = new GrpcClient(
+      webview,
+      historyService,
+      vscode.workspace.getConfiguration('api-pilot').get<number>('maxHistory', 1000),
+    );
   }
 
-  /** Clean up all WebSocket/SSE/MQTT connections when the panel is disposed. */
+  /** Clean up all WebSocket/SSE/MQTT/gRPC connections when the panel is disposed. */
   dispose(): void {
     this.wsClient.disposeAll();
     this.sseClient.disposeAll();
     this.mqttClient.disposeAll();
+    this.grpcClient.disposeAll();
   }
 
   async handle(message: WebviewMessage): Promise<void> {
@@ -242,6 +250,31 @@ export class MessageHandler {
       case 'mqttPublish':
         this.handleMqttPublish(message.payload as { connectionId: string; topic: string; payload: string; qos: 0 | 1 | 2; retain: boolean });
         break;
+      // --- gRPC ---
+      case 'grpcCall':
+        this.handleGrpcCall(
+          (message as any).tabId as string,
+          message.payload as ApiRequest,
+        );
+        break;
+      case 'grpcSend':
+        this.handleGrpcSend(message.payload as { callId: string; data: string });
+        break;
+      case 'grpcCancel':
+        this.handleGrpcCancel(message.payload as { callId: string });
+        break;
+      case 'grpcReflect':
+        this.handleGrpcReflect(
+          (message as any).tabId as string,
+          message.payload as ApiRequest,
+        );
+        break;
+      case 'grpcLoadProto':
+        this.handleGrpcLoadProto(
+          (message as any).tabId as string,
+          message.payload as { protoContent: string; protoFileName?: string },
+        );
+        break;
       default:
         console.warn(`Unknown message type: ${message.type}`);
     }
@@ -288,6 +321,28 @@ export class MessageHandler {
 
   private handleMqttPublish(payload: { connectionId: string; topic: string; payload: string; qos: 0 | 1 | 2; retain: boolean }): void {
     this.mqttClient.publish(payload.connectionId, payload.topic, payload.payload, payload.qos, payload.retain);
+  }
+
+  private handleGrpcCall(tabId: string, request: ApiRequest): void {
+    const envVars = this.envService?.getActiveVariables() ?? [];
+    this.grpcClient.call(tabId, request, envVars);
+  }
+
+  private handleGrpcSend(payload: { callId: string; data: string }): void {
+    this.grpcClient.send(payload.callId, payload.data);
+  }
+
+  private handleGrpcCancel(payload: { callId: string }): void {
+    this.grpcClient.cancel(payload.callId);
+  }
+
+  private handleGrpcReflect(tabId: string, request: ApiRequest): void {
+    const envVars = this.envService?.getActiveVariables() ?? [];
+    this.grpcClient.reflect(tabId, request, envVars);
+  }
+
+  private handleGrpcLoadProto(tabId: string, payload: { protoContent: string; protoFileName?: string }): void {
+    this.grpcClient.loadFromProto(tabId, payload.protoContent, payload.protoFileName);
   }
 
   private async handleSendRequest(requestId: string, apiRequest: ApiRequest): Promise<void> {

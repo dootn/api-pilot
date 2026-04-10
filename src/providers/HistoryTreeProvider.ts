@@ -55,6 +55,7 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<HistoryTreeI
           const isWs = protocol === 'websocket';
           const isSse = protocol === 'sse';
           const isMqtt = protocol === 'mqtt';
+          const isGrpc = protocol === 'grpc';
 
           const methodOrProtocol = isWs
             ? 'WS'
@@ -62,7 +63,9 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<HistoryTreeI
               ? 'SSE'
               : isMqtt
                 ? 'MQTT'
-                : entry.request.method;
+                : isGrpc
+                  ? 'gRPC'
+                  : entry.request.method;
 
           const label = `${methodOrProtocol} ${url}`;
           const description = isWs
@@ -71,7 +74,9 @@ export class HistoryTreeProvider implements vscode.TreeDataProvider<HistoryTreeI
               ? `↓${entry.sseSession?.eventCount ?? 0}`
               : isMqtt
                 ? `↑${entry.mqttSession?.publishedCount ?? 0} ↓${entry.mqttSession?.receivedCount ?? 0}`
-                : `[${entry.response?.status ?? '?'}]`;
+                : isGrpc
+                  ? `${entry.grpcSession?.methodName ?? ''} ${entry.grpcSession?.statusCode ?? ''}`.trim()
+                  : `[${entry.response?.status ?? '?'}]`;
 
           return new HistoryTreeItem(
             label,

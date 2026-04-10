@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD' | string;
 
-export type Protocol = 'http' | 'websocket' | 'sse' | 'mqtt';
+export type Protocol = 'http' | 'websocket' | 'sse' | 'mqtt' | 'grpc';
 
 export type WsStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -31,6 +31,58 @@ export interface MqttOptions {
   lastWillPayload?: string;
   lastWillQos?: 0 | 1 | 2;
   lastWillRetain?: boolean;
+}
+
+export type GrpcStatus = 'idle' | 'connecting' | 'streaming' | 'done' | 'error';
+
+export type GrpcCallType = 'unary' | 'server_streaming' | 'client_streaming' | 'bidi_streaming';
+
+export interface GrpcMessage {
+  id: string;
+  direction: 'sent' | 'received';
+  data: string;
+  timestamp: number;
+  isEnd?: boolean;
+  isError?: boolean;
+  errorMessage?: string;
+}
+
+export interface GrpcFieldDef {
+  name: string;
+  typeName: string;   // "string", "int32", "bool", or a nested message type name
+  repeated: boolean;
+}
+
+export interface GrpcMessageDef {
+  fullName: string;
+  fields: GrpcFieldDef[];
+}
+
+export interface GrpcMethodDef {
+  name: string;
+  callType: GrpcCallType;
+  requestStream: boolean;
+  responseStream: boolean;
+  requestType: string;
+  responseType: string;
+}
+
+export interface GrpcServiceDef {
+  name: string;
+  methods: GrpcMethodDef[];
+}
+
+export interface GrpcOptions {
+  tls?: 'none' | 'tls' | 'mtls';
+  caCert?: string;
+  clientCert?: string;
+  clientKey?: string;
+  metadata?: { key: string; value: string; enabled: boolean }[];
+  protoSource?: 'reflection' | 'proto';
+  protoContent?: string;
+  protoFileName?: string;
+  serviceName?: string;
+  methodName?: string;
 }
 
 export interface SseEvent {

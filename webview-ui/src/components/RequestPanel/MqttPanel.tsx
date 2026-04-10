@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useTabStore } from '../../stores/tabStore';
 import type { MqttMessage } from '../../stores/requestStore';
 import { vscode } from '../../vscode';
+import { useI18n } from '../../i18n';
 
 function formatBytes(b: number): string {
   if (b < 1024) return `${b} B`;
@@ -24,6 +25,7 @@ const MAX_DISPLAY = 500;
 export function MqttPanel() {
   const { getActiveTab, updateTab } = useTabStore();
   const tab = getActiveTab();
+  const t = useI18n();
 
   const [subTopic, setSubTopic] = useState('');
   const [subQos, setSubQos] = useState<0 | 1 | 2>(0);
@@ -109,10 +111,10 @@ export function MqttPanel() {
         : 'var(--panel-fg)';
 
   const statusLabel = tab.mqttStatus === 'connected'
-    ? `Connected${isConnected && duration > 0 ? ' · ' + formatDuration(duration) : ''}`
-    : tab.mqttStatus === 'connecting' ? 'Connecting…'
-    : tab.mqttStatus === 'error' ? 'Error'
-    : 'Disconnected';
+    ? `${t('mqttStatusConnected')}${isConnected && duration > 0 ? ' · ' + formatDuration(duration) : ''}`
+    : tab.mqttStatus === 'connecting' ? t('mqttStatusConnecting')
+    : tab.mqttStatus === 'error' ? t('mqttStatusError')
+    : t('mqttStatusDisconnected');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', fontSize: 13, overflow: 'hidden' }}>
@@ -125,21 +127,56 @@ export function MqttPanel() {
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor, display: 'inline-block' }} />
           <span style={{ color: statusColor, fontWeight: 500 }}>{statusLabel}</span>
         </span>
-        <span style={{ opacity: 0.6 }}>↑ {sent} published</span>
-        <span style={{ opacity: 0.6 }}>↓ {received} received</span>
-        <span style={{ opacity: 0.6 }}>{subscriptions.length} subscription{subscriptions.length !== 1 ? 's' : ''}</span>
-        <button
-          className="send-btn"
-          style={{ marginLeft: 'auto', padding: '2px 10px', fontSize: 12 }}
-          onClick={() => updateTab(tab.id, { mqttMessages: [] })}
-        >
-          Clear
-        </button>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 12, opacity: 0.7 }}>
-          <input type="checkbox" checked={autoScroll} onChange={(e) => setAutoScroll(e.target.checked)} />
-          Auto-scroll
-        </label>
+        <span style={{ opacity: 0.6 }}>↑ {sent} {t('mqttPublishedLabel')}</span>
+        <span style={{ opacity: 0.6 }}>↓ {received} {t('mqttReceivedLabel')}</span>
+        <span style={{ opacity: 0.6 }}>{subscriptions.length} {subscriptions.length !== 1 ? t('mqttSubscriptions') : t('mqttSubscription')}</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button
+            onClick={() => setAutoScroll((v) => !v)}
+            title="Toggle auto-scroll"
+            style={{
+              fontSize: 11,
+              background: 'none',
+              border: '1px solid var(--border-color, #555)',
+              borderRadius: 3,
+              padding: '2px 7px',
+              cursor: 'pointer',
+              opacity: autoScroll ? 1 : 0.45,
+              color: 'var(--panel-fg)',
+            }}
+          >
+            {t('mqttAutoScroll')}
+          </button>
+          <button
+            style={{
+              fontSize: 11,
+              background: 'none',
+              border: '1px solid var(--border-color, #555)',
+              borderRadius: 3,
+              padding: '2px 7px',
+              cursor: 'pointer',
+              color: 'var(--panel-fg)',
+            }}
+            onClick={() => updateTab(tab.id, { mqttMessages: [] })}
+          >
+            {t('mqttClear')}
+          </button>
+        </div>
       </div>
+
+      {/* Error detail banner */}
+      {tab.mqttStatus === 'error' && tab.responseError && (
+        <div style={{
+          padding: '6px 14px',
+          fontSize: 12,
+          color: 'var(--vscode-errorForeground, #f48771)',
+          borderBottom: '1px solid var(--border-color, #555)',
+          flexShrink: 0,
+          fontFamily: 'monospace',
+        }}>
+          {tab.responseError}
+        </div>
+      )}
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Left: subscriptions + message log */}
@@ -149,12 +186,12 @@ export function MqttPanel() {
             padding: '8px 14px', borderBottom: '1px solid var(--border-color, #555)',
             flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6,
           }}>
-            <div style={{ fontWeight: 600, opacity: 0.7, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Subscriptions</div>
+            <div style={{ fontWeight: 600, opacity: 0.7, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('mqttSubscriptionsSection')}</div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               <input
                 className="url-input"
                 type="text"
-                placeholder="Topic filter (e.g. sensors/#)"
+                placeholder={t('mqttTopicPlaceholder')}
                 value={subTopic}
                 onChange={(e) => setSubTopic(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSubscribe()}
@@ -181,7 +218,7 @@ export function MqttPanel() {
                 onClick={handleSubscribe}
                 style={{ padding: '4px 12px', fontSize: 12 }}
               >
-                Subscribe
+                {t('mqttSubscribeBtn')}
               </button>
             </div>
             {subscriptions.length > 0 && (
@@ -213,7 +250,7 @@ export function MqttPanel() {
           <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
             {messages.length === 0 && (
               <div style={{ textAlign: 'center', opacity: 0.4, marginTop: 24, fontSize: 12 }}>
-                {isConnected ? 'No messages yet. Subscribe to a topic or publish a message.' : 'Connect to a broker to start.'}
+                {isConnected ? t('mqttNoMessages') : t('mqttConnectToStart')}
               </div>
             )}
             {truncated && (
@@ -289,11 +326,11 @@ export function MqttPanel() {
           width: 240, flexShrink: 0, borderLeft: '1px solid var(--border-color, #555)',
           display: 'flex', flexDirection: 'column', padding: '10px 12px', gap: 8,
         }}>
-          <div style={{ fontWeight: 600, opacity: 0.7, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Publish</div>
+          <div style={{ fontWeight: 600, opacity: 0.7, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('mqttPublishSection')}</div>
           <input
             className="url-input"
             type="text"
-            placeholder="Topic"
+            placeholder={t('mqttTopicPubPlaceholder')}
             value={pubTopic}
             disabled={!isConnected}
             onChange={(e) => setPubTopic(e.target.value)}
@@ -301,7 +338,7 @@ export function MqttPanel() {
           />
           <textarea
             className="url-input"
-            placeholder="Payload (Ctrl+Enter to send)"
+            placeholder={t('mqttPayloadPlaceholder')}
             value={pubPayload}
             disabled={!isConnected}
             onChange={(e) => setPubPayload(e.target.value)}
@@ -331,7 +368,7 @@ export function MqttPanel() {
                 disabled={!isConnected}
                 onChange={(e) => setPubRetain(e.target.checked)}
               />
-              Retain
+              {t('mqttRetain')}
             </label>
           </div>
           <button
@@ -340,11 +377,11 @@ export function MqttPanel() {
             onClick={handlePublish}
             style={{ padding: '6px 0', fontSize: 13 }}
           >
-            Publish
+            {t('mqttPublishBtn')}
           </button>
           {!isConnected && !isConnecting && (
             <div style={{ fontSize: 11, opacity: 0.45, textAlign: 'center', marginTop: 4 }}>
-              Connect to a broker first
+              {t('mqttConnectFirst')}
             </div>
           )}
         </div>

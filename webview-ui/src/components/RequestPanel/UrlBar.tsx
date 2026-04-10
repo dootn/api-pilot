@@ -168,6 +168,7 @@ export function UrlBar() {
   const isWsMode = tab.protocol === 'websocket';
   const isSseMode = tab.protocol === 'sse';
   const isMqttMode = tab.protocol === 'mqtt';
+  const isGrpcMode = tab.protocol === 'grpc';
 
   const handleWsToggle = () => {
     if (!tab.url.trim()) return;
@@ -198,6 +199,39 @@ export function UrlBar() {
         auth: tab.auth,
         preScript: tab.preScript,
         postScript: tab.postScript,
+        sslVerify: tab.sslVerify ?? true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+  };
+
+  const handleGrpcCall = () => {
+    if (!tab.url.trim()) return;
+
+    if (tab.grpcStatus === 'streaming' || tab.grpcStatus === 'connecting') {
+      if (tab.grpcCallId) {
+        vscode.postMessage({ type: 'grpcCancel', payload: { callId: tab.grpcCallId } });
+      }
+      updateTab(tab.id, { grpcStatus: 'idle', grpcCallId: undefined, loading: false });
+      return;
+    }
+
+    updateTab(tab.id, { loading: true, grpcMessages: [], responseError: null });
+    vscode.postMessage({
+      type: 'grpcCall',
+      tabId: tab.id,
+      payload: {
+        id: tab.id,
+        name: tab.name,
+        protocol: tab.protocol,
+        method: tab.method,
+        url: tab.url.trim(),
+        params: tab.params.filter((p) => p.key),
+        headers: tab.headers.filter((h) => h.key),
+        body: tab.body,
+        auth: tab.auth,
+        grpcOptions: tab.grpcOptions,
         sslVerify: tab.sslVerify ?? true,
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -284,6 +318,11 @@ export function UrlBar() {
       return;
     }
 
+    if (isGrpcMode) {
+      handleGrpcCall();
+      return;
+    }
+
     if (isMqttMode) {
       handleMqttToggle();
       return;
@@ -336,6 +375,10 @@ export function UrlBar() {
     } else if (lower.startsWith('mqtt://') || lower.startsWith('mqtts://')) {
       if (!tab.protocol || tab.protocol === 'http') {
         updates.protocol = 'mqtt';
+      }
+    } else if (lower.startsWith('grpc://') || lower.startsWith('grpcs://')) {
+      if (!tab.protocol || tab.protocol === 'http') {
+        updates.protocol = 'grpc';
       }
     } else if (lower.startsWith('http://') || lower.startsWith('https://')) {
       if (tab.protocol === 'websocket') {
@@ -421,11 +464,9 @@ export function UrlBar() {
       id: tab!.id,
       name: tab!.isCustomNamed
         ? tab!.name
-        : (tab!.url
-            ? (tab!.protocol === 'websocket' || tab!.protocol === 'sse' || tab!.protocol === 'mqtt'
+        : (tab!.protocol === 'websocket' || tab!.protocol === 'sse' || tab!.protocol === 'mqtt' || tab!.protocol === 'grpc'
                 ? tab!.url
-                : `${tab!.method} ${tab!.url}`)
-            : tab!.name),
+                : `${tab!.method} ${tab!.url}`),
       protocol: tab!.protocol,
       method: tab!.method,
       url: saveUrl,
@@ -488,7 +529,9 @@ export function UrlBar() {
               ? 'var(--vscode-terminal-ansiYellow, #dcdcaa)'
               : tab.protocol === 'mqtt'
                 ? 'var(--vscode-terminal-ansiMagenta, #c586c0)'
-                : 'var(--panel-fg)',
+                : tab.protocol === 'grpc'
+                  ? 'var(--vscode-terminal-ansiBlue, #569cd6)'
+                  : 'var(--panel-fg)',
           cursor: 'pointer',
           flexShrink: 0,
         }}
@@ -497,12 +540,13 @@ export function UrlBar() {
         <option value="websocket">WS</option>
         <option value="sse">SSE</option>
         <option value="mqtt">MQTT</option>
+        <option value="grpc">gRPC</option>
       </select>
 
       {/* Method selector + URL input: connected group, no gap between them */}
       <div style={{ display: 'flex', flex: 1, minWidth: 0 }}>
-        {/* Method selector — hidden in WS, SSE, or MQTT mode */}
-        {!isWsMode && !isSseMode && !isMqttMode && (
+        {/* Method selector — hidden in WS, SSE, MQTT, or gRPC mode */}
+        {!isWsMode && !isSseMode && !isMqttMode && !isGrpcMode && (
         <select
           className={`method-select ${METHOD_CLASSES[tab.method] || 'method-get'}`}
           value={tab.method}
@@ -563,7 +607,7 @@ export function UrlBar() {
             ref={urlInputRef}
             className="url-input"
             type="text"
-            placeholder={isWsMode ? 'Enter WebSocket URL (e.g. ws://localhost:3456/ws)' : isSseMode ? 'Enter SSE URL (e.g. http://localhost:3458/sse)' : isMqttMode ? 'Enter MQTT broker URL (e.g. mqtt://localhost:1883)' : 'Enter request URL (e.g. https://api.example.com/users)'}
+            placeholder={isWsMode ? 'Enter WebSocket URL (e.g. ws://localhost:3456/ws)' : isSseMode ? 'Enter SSE URL (e.g. http://localhost:3458/sse)' : isMqttMode ? 'Enter MQTT broker URL (e.g. mqtt://localhost:1883)' : isGrpcMode ? 'Enter gRPC target (e.g. grpc://localhost:50051 or host:port)' : 'Enter request URL (e.g. https://api.example.com/users)'}
             value={tab.url}
             onChange={handleUrlChange}
             onKeyDown={handleUrlKeyDown}
@@ -628,9 +672,9 @@ export function UrlBar() {
       </div>
 
       <button
-        className={`send-btn ${(tab.loading || tab.wsStatus === 'connected' || tab.sseStatus === 'connected' || tab.mqttStatus === 'connected') ? 'cancel' : ''}`}
+        className={`send-btn ${(tab.loading || tab.wsStatus === 'connected' || tab.sseStatus === 'connected' || tab.mqttStatus === 'connected' || tab.grpcStatus === 'streaming') ? 'cancel' : ''}`}
         onClick={handleSend}
-        disabled={!tab.url.trim() && !tab.loading && tab.wsStatus !== 'connected' && tab.sseStatus !== 'connected' && tab.mqttStatus !== 'connected'}
+        disabled={!tab.url.trim() && !tab.loading && tab.wsStatus !== 'connected' && tab.sseStatus !== 'connected' && tab.mqttStatus !== 'connected' && tab.grpcStatus !== 'streaming'}
       >
         {isWsMode
           ? tab.wsStatus === 'connected'
@@ -650,13 +694,19 @@ export function UrlBar() {
                 : tab.mqttStatus === 'connecting' || tab.loading
                   ? 'Connecting…'
                   : 'Connect'
-              : tab.loading
-                ? t('urlCancel')
-                : t('urlSend')}
+              : isGrpcMode
+                ? tab.grpcStatus === 'streaming' || tab.grpcStatus === 'connecting'
+                  ? 'Cancel'
+                  : tab.loading
+                    ? 'Calling…'
+                    : 'Invoke'
+                : tab.loading
+                  ? t('urlCancel')
+                  : t('urlSend')}
       </button>
 
-      {/* SSL verify toggle — only meaningful for HTTPS (not WS, SSE, or MQTT mode) */}
-      {!isWsMode && !isSseMode && !isMqttMode && tab.url.trim().toLowerCase().startsWith('https') && (
+      {/* SSL verify toggle — only meaningful for HTTPS (not WS, SSE, MQTT, or gRPC mode) */}
+      {!isWsMode && !isSseMode && !isMqttMode && !isGrpcMode && tab.url.trim().toLowerCase().startsWith('https') && (
         <button
           className="ssl-toggle-btn"
           title={(tab.sslVerify ?? true) ? t('urlSslVerifyOn') : t('urlSslVerifyOff')}

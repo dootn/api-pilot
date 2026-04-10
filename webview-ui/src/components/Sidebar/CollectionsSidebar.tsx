@@ -40,6 +40,7 @@ const METHOD_COLORS: Record<string, string> = {
   WS:   'var(--vscode-terminal-ansiCyan, #4ec9b0)',
   SSE:  'var(--vscode-terminal-ansiYellow, #dcdcaa)',
   MQTT: 'var(--vscode-terminal-ansiMagenta, #c586c0)',
+  gRPC: 'var(--vscode-terminal-ansiBlue, #569cd6)',
 };
 
 export function CollectionsSidebar() {
@@ -483,6 +484,7 @@ export function CollectionsSidebar() {
         const method = protocol === 'websocket' ? 'WS'
           : protocol === 'sse' ? 'SSE'
           : protocol === 'mqtt' ? 'MQTT'
+          : protocol === 'grpc' ? 'gRPC'
           : rawMethod;
         const requestClass = [
           'sidebar-tree-item sidebar-request',

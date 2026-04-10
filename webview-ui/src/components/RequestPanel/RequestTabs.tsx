@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTabStore } from '../../stores/tabStore';
 import { KeyValueEditor } from '../shared/KeyValueEditor';
 import { HeadersEditor } from './HeadersEditor';
@@ -7,11 +7,12 @@ import { AuthEditor } from './AuthEditor';
 import { ScriptEditor } from './ScriptEditor';
 import { CodeModal } from './CodeModal';
 import { MqttOptions } from './MqttOptions';
+import { GrpcOptions } from './GrpcOptions';
 import { useEnvironments } from '../../hooks/useEnvironments';
 import { useI18n, type TranslationKey } from '../../i18n';
 import type { RequestTab } from '../../stores/tabStore';
 
-type Tab = 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'mqtt-options';
+type Tab = 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'mqtt-options' | 'grpc-options';
 
 function getTabBadge(id: Tab, tab: RequestTab): string | number | null {
   switch (id) {
@@ -35,6 +36,11 @@ function getTabBadge(id: Tab, tab: RequestTab): string | number | null {
       const keys = ['clientId', 'username', 'lastWillTopic'] as const;
       return keys.some((k) => opts[k]) ? '●' : null;
     }
+    case 'grpc-options': {
+      const opts = tab.grpcOptions;
+      if (!opts) return null;
+      return (opts.serviceName || opts.protoContent) ? '●' : null;
+    }
     default:
       return null;
   }
@@ -47,6 +53,7 @@ const TAB_DEFS: { id: Tab; key: TranslationKey; label?: string }[] = [
   { id: 'auth',    key: 'tabAuth'    },
   { id: 'scripts', key: 'tabScripts' },
   { id: 'mqtt-options', key: 'tabParams', label: 'Options' },
+  { id: 'grpc-options', key: 'tabParams', label: 'Options' },
 ];
 
 export function RequestTabs() {
@@ -73,13 +80,31 @@ export function RequestTabs() {
   const isWsMode = tab.protocol === 'websocket';
   const isSseMode = tab.protocol === 'sse';
   const isMqttMode = tab.protocol === 'mqtt';
+  const isGrpcMode = tab.protocol === 'grpc';
 
-  // In WS mode, filter out the body tab; in SSE/MQTT mode, filter out body and scripts
-  // In MQTT mode also show the mqtt-options tab; in non-MQTT modes hide it
+  // Auto-switch to grpc-options when entering gRPC mode with an incompatible active tab
+  useEffect(() => {
+    if (isGrpcMode && ['params', 'headers', 'auth', 'body', 'scripts'].includes(tab.activeTab)) {
+      updateTab(tab.id, { activeTab: 'grpc-options' });
+    }
+  }, [isGrpcMode, tab.id, tab.activeTab, updateTab]);
+
+  // Auto-switch to mqtt-options when entering MQTT mode with an incompatible active tab
+  useEffect(() => {
+    if (isMqttMode && ['params', 'headers', 'auth', 'body', 'scripts'].includes(tab.activeTab)) {
+      updateTab(tab.id, { activeTab: 'mqtt-options' });
+    }
+  }, [isMqttMode, tab.id, tab.activeTab, updateTab]);
+
+  // In WS mode, filter out the body tab; in SSE/MQTT/gRPC mode, filter out body and scripts
+  // Also filter out params, headers, auth in gRPC and MQTT modes (handled via options instead)
+  // In MQTT mode also show the mqtt-options tab; in gRPC mode show grpc-options; hide both in other modes
   const visibleTabs = TAB_DEFS
     .filter((def) => !(isWsMode && def.id === 'body'))
-    .filter((def) => !((isSseMode || isMqttMode) && (def.id === 'body' || def.id === 'scripts')))
-    .filter((def) => !(def.id === 'mqtt-options' && !isMqttMode));
+    .filter((def) => !((isSseMode || isMqttMode || isGrpcMode) && (def.id === 'body' || def.id === 'scripts')))
+    .filter((def) => !((isGrpcMode || isMqttMode) && (def.id === 'params' || def.id === 'headers' || def.id === 'auth')))
+    .filter((def) => !(def.id === 'mqtt-options' && !isMqttMode))
+    .filter((def) => !(def.id === 'grpc-options' && !isGrpcMode));
 
   return (
     <div className="request-section">
@@ -123,15 +148,17 @@ export function RequestTabs() {
           );
         })}
 
-        {/* Code snippet button — placed after the last tab */}
-        <button
-          className="tab"
-          onClick={() => setShowCodeModal(true)}
-          style={{ marginLeft: 'auto', opacity: 0.75 }}
-          title={t('viewCodeSnippet')}
-        >
-          ⟨/⟩ Code
-        </button>
+        {/* Code snippet button — HTTP mode only */}
+        {!isWsMode && !isSseMode && !isMqttMode && !isGrpcMode && (
+          <button
+            className="tab"
+            onClick={() => setShowCodeModal(true)}
+            style={{ marginLeft: 'auto', opacity: 0.75 }}
+            title={t('viewCodeSnippet')}
+          >
+            ⟨/⟩ Code
+          </button>
+        )}
       </div>
 
       <div className="tab-content">
@@ -162,6 +189,8 @@ export function RequestTabs() {
         {tab.activeTab === 'scripts' && <ScriptEditor />}
 
         {tab.activeTab === 'mqtt-options' && isMqttMode && <MqttOptions />}
+
+        {tab.activeTab === 'grpc-options' && isGrpcMode && <GrpcOptions />}
       </div>
 
       {showCodeModal && tab && (

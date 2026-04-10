@@ -5,11 +5,12 @@ import { ResponsePanel } from './components/ResponsePanel/ResponsePanel';
 import { WsConversation } from './components/RequestPanel/WsConversation';
 import { SseConversation } from './components/RequestPanel/SseConversation';
 import { MqttPanel } from './components/RequestPanel/MqttPanel';
+import { GrpcPanel } from './components/RequestPanel/GrpcPanel';
 import { CollectionsSidebar } from './components/Sidebar/CollectionsSidebar';
 import { HistorySidebar } from './components/Sidebar/HistorySidebar';
 import { useVscodeMessage } from './hooks/useVscodeMessage';
 import { useTabStore, type RequestTab } from './stores/tabStore';
-import type { ApiResponse, WsMessage, WsStatus, SseEvent, SseStatus, MqttStatus, MqttMessage } from './stores/requestStore';
+import type { ApiResponse, WsMessage, WsStatus, SseEvent, SseStatus, MqttStatus, MqttMessage, GrpcStatus, GrpcMessage, GrpcServiceDef, GrpcMessageDef } from './stores/requestStore';
 import { useLocaleStore } from './stores/localeStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { useI18n } from './i18n';
@@ -232,6 +233,41 @@ function App() {
           }
           return;
         }
+        case 'grpcStatusChanged': {
+          const grpcMsg = message as unknown as { tabId: string; payload: { status: GrpcStatus; callId?: string; statusCode?: string; statusMessage?: string; error?: string } };
+          const { status, callId, statusCode, error } = grpcMsg.payload;
+          updateTab(grpcMsg.tabId, {
+            grpcStatus: status,
+            grpcCallId: callId,
+            loading: status === 'connecting' || status === 'streaming',
+            ...(status === 'idle' || status === 'done' || status === 'error' ? { grpcCallStartedAt: undefined } : {}),
+            ...(status === 'connecting' ? { grpcCallStartedAt: Date.now() } : {}),
+            ...(status === 'error' ? { responseError: error ?? 'gRPC error' } : {}),
+          });
+          return;
+        }
+        case 'grpcMessageReceived': {
+          const grpcMsg = message as unknown as { tabId: string; payload: GrpcMessage };
+          const tab = tabs.find((t) => t.id === grpcMsg.tabId);
+          if (tab) {
+            const existing = tab.grpcMessages ?? [];
+            updateTab(grpcMsg.tabId, { grpcMessages: [...existing, grpcMsg.payload] });
+          }
+          return;
+        }
+        case 'grpcServicesDiscovered': {
+          const grpcMsg = message as unknown as { tabId: string; payload: { services: GrpcServiceDef[]; messageDefs?: Record<string, GrpcMessageDef>; source: 'reflection' | 'proto' } };
+          updateTab(grpcMsg.tabId, {
+            grpcServices: grpcMsg.payload.services,
+            ...(grpcMsg.payload.messageDefs ? { grpcMessageDefs: grpcMsg.payload.messageDefs } : {}),
+          });
+          return;
+        }
+        case 'grpcReflectError': {
+          const grpcMsg = message as unknown as { tabId: string; payload: { error: string } };
+          updateTab(grpcMsg.tabId, { responseError: grpcMsg.payload.error });
+          return;
+        }
       }
 
       const tabId = message.requestId;
@@ -269,6 +305,7 @@ function App() {
   const isWsMode = activeTab?.protocol === 'websocket';
   const isSseMode = activeTab?.protocol === 'sse';
   const isMqttMode = activeTab?.protocol === 'mqtt';
+  const isGrpcMode = activeTab?.protocol === 'grpc';
 
   useVscodeMessage(handleMessage);
 
@@ -367,7 +404,7 @@ function App() {
             onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--border-color)')}
           />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            {isWsMode ? <WsConversation /> : isSseMode ? <SseConversation /> : isMqttMode ? <MqttPanel /> : <ResponsePanel />}
+            {isWsMode ? <WsConversation /> : isSseMode ? <SseConversation /> : isMqttMode ? <MqttPanel /> : isGrpcMode ? <GrpcPanel /> : <ResponsePanel />}
           </div>
         </div>
       </div>

@@ -119,7 +119,6 @@ export function MqttOptions() {
               color: 'var(--panel-fg)',
               border: '1px solid var(--border-color, #555)',
               borderRadius: 4,
-              width: 120,
             }}
           >
             <option value={0}>0 — At most once</option>

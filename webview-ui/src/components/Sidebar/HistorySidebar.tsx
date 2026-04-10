@@ -24,6 +24,16 @@ interface MqttSessionSummary {
   duration: number;
 }
 
+interface GrpcSessionSummary {
+  callType: string;
+  serviceName: string;
+  methodName: string;
+  sentCount: number;
+  receivedCount: number;
+  statusCode?: string;
+  duration: number;
+}
+
 interface HistoryEntry {
   id: string;
   timestamp: number;
@@ -39,6 +49,7 @@ interface HistoryEntry {
   wsSession?: WsSessionSummary;
   sseSession?: SseSessionSummary;
   mqttSession?: MqttSessionSummary;
+  grpcSession?: GrpcSessionSummary;
 }
 
 interface HistoryGroup {
@@ -198,13 +209,16 @@ export function HistorySidebar() {
                     const isWs = protocol === 'websocket';
                     const isSse = protocol === 'sse';
                     const isMqtt = protocol === 'mqtt';
+                    const isGrpc = protocol === 'grpc';
                     const displayMethod = isWs
                       ? 'WS'
                       : isSse
                         ? 'SSE'
                         : isMqtt
                           ? 'MQTT'
-                          : method;
+                          : isGrpc
+                            ? 'gRPC'
+                            : method;
                     const url = shortenUrl(entry.request.url || '');
                     return (
                       <div
@@ -218,7 +232,7 @@ export function HistorySidebar() {
                       >
                         <span
                           className="sidebar-method"
-                          style={{ color: isWs ? 'var(--vscode-terminal-ansiCyan, #4ec9b0)' : isSse ? 'var(--vscode-terminal-ansiYellow, #dcdcaa)' : isMqtt ? 'var(--vscode-terminal-ansiMagenta, #c586c0)' : (METHOD_COLORS[method] || '#888') }}
+                          style={{ color: isWs ? 'var(--vscode-terminal-ansiCyan, #4ec9b0)' : isSse ? 'var(--vscode-terminal-ansiYellow, #dcdcaa)' : isMqtt ? 'var(--vscode-terminal-ansiMagenta, #c586c0)' : isGrpc ? 'var(--vscode-terminal-ansiBlue, #569cd6)' : (METHOD_COLORS[method] || '#888') }}
                         >
                           {displayMethod}
                         </span>
@@ -236,6 +250,10 @@ export function HistorySidebar() {
                         ) : isMqtt ? (
                           <span className="sidebar-status" style={{ color: 'var(--vscode-terminal-ansiMagenta, #c586c0)', fontSize: 10 }}>
                             ↑{entry.mqttSession?.publishedCount ?? 0} ↓{entry.mqttSession?.receivedCount ?? 0}
+                          </span>
+                        ) : isGrpc ? (
+                          <span className="sidebar-status" style={{ color: 'var(--vscode-terminal-ansiBlue, #569cd6)', fontSize: 10 }}>
+                            {entry.grpcSession?.methodName ?? ''} {entry.grpcSession?.statusCode ?? ''}
                           </span>
                         ) : (
                           <span

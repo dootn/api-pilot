@@ -54,6 +54,19 @@
 - **Publish panel**: compose and send messages with topic, payload, QoS (0/1/2), and Retain controls; `Ctrl+Enter` sends.
 - Sessions are automatically saved to **Request History** with publish/receive counts, subscribed topics, and duration on disconnect.
 
+### gRPC
+
+- Select **gRPC** from the protocol dropdown in the URL bar to switch into gRPC mode.
+- **Service Discovery**: use **Server Reflection** (auto-discover services from the server, no proto file needed) or **Upload .proto** to load a proto definition manually.
+- **Service & Method selector**: once services are discovered, pick the service and method from dropdowns in the **Options** tab.
+- **All call types supported**: Unary, Server Streaming, Client Streaming, and Bidirectional Streaming.
+- **Message panel**: shows all sent (↑ REQ) and received (↓ RES) messages in a scrolling log; click any message to expand its JSON payload.
+- **Client / Bidi streaming**: after invoking, a **Send** panel appears at the bottom to send additional messages; `Ctrl+Enter` sends. An **End Stream** button closes the write side.
+- **TLS / Security**: supports Plaintext, TLS (CA certificate), and mTLS (client certificate + key).
+- **Metadata**: key-value pairs sent as gRPC headers with per-row enable/disable.
+- URL format: `grpc://host:port` (plaintext) or `grpcs://host:port` (TLS), or bare `host:port`.
+- Sessions are automatically saved to **Request History** with method name and gRPC status code.
+
 ### Response Viewer
 
 - **Status & Timing**: HTTP status code, status text, response time (ms), and body size — each labeled for clarity
@@ -115,7 +128,7 @@
 
 1. Open VS Code and click the **API Pilot** icon in the Activity Bar.
 2. Click `+` to create a new request.
-3. Enter a URL (http(s) or ws(s)) or select the **SSE** or **MQTT** protocol to connect to a Server-Sent Events endpoint or MQTT broker. For HTTP requests choose a method and click **Send**; for WebSocket/SSE/MQTT click **Connect**.
+3. Enter a URL (http(s) or ws(s)) or select the **SSE**, **MQTT**, or **gRPC** protocol to connect to a Server-Sent Events endpoint, MQTT broker, or gRPC server. For HTTP requests choose a method and click **Send**; for WebSocket/SSE/MQTT click **Connect**; for gRPC click **Invoke**.
 4. View the formatted response, live WebSocket conversation, or real-time SSE event stream below.
 
 ---

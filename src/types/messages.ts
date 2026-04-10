@@ -170,3 +170,60 @@ export interface MqttMessageReceivedMessage {
   tabId: string;
   payload: import('./index').MqttMessage;
 }
+
+// gRPC messages (Webview -> Extension)
+export interface GrpcCallMessage {
+  type: 'grpcCall';
+  tabId: string;
+  payload: import('./index').ApiRequest;
+}
+
+export interface GrpcSendMessage {
+  type: 'grpcSend';
+  payload: { callId: string; data: string };
+}
+
+export interface GrpcCancelMessage {
+  type: 'grpcCancel';
+  payload: { callId: string };
+}
+
+export interface GrpcReflectMessage {
+  type: 'grpcReflect';
+  tabId: string;
+  payload: import('./index').ApiRequest;
+}
+
+// gRPC messages (Extension -> Webview)
+export interface GrpcStatusChangedMessage {
+  type: 'grpcStatusChanged';
+  tabId: string;
+  payload: {
+    status: import('./index').GrpcStatus;
+    callId?: string;
+    statusCode?: string;
+    statusMessage?: string;
+    error?: string;
+  };
+}
+
+export interface GrpcMessageReceivedMessage {
+  type: 'grpcMessageReceived';
+  tabId: string;
+  payload: import('./index').GrpcMessage;
+}
+
+export interface GrpcServicesDiscoveredMessage {
+  type: 'grpcServicesDiscovered';
+  tabId: string;
+  payload: {
+    services: import('./index').GrpcServiceDef[];
+    source: 'reflection' | 'proto';
+  };
+}
+
+export interface GrpcReflectErrorMessage {
+  type: 'grpcReflectError';
+  tabId: string;
+  payload: { error: string };
+}

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { HttpMethod, KeyValuePair, RequestBody, AuthConfig, ApiResponse, SSLInfo, Protocol, WsStatus, WsMessage, SseStatus, SseEvent, MqttStatus, MqttMessage, MqttOptions } from './requestStore';
+import type { HttpMethod, KeyValuePair, RequestBody, AuthConfig, ApiResponse, SSLInfo, Protocol, WsStatus, WsMessage, SseStatus, SseEvent, MqttStatus, MqttMessage, MqttOptions, GrpcStatus, GrpcMessage, GrpcOptions, GrpcServiceDef, GrpcMessageDef } from './requestStore';
 import { vscode } from '../vscode';
 
 export interface RequestTab {
@@ -14,7 +14,7 @@ export interface RequestTab {
   headers: KeyValuePair[];
   body: RequestBody;
   auth: AuthConfig;
-  activeTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'mqtt-options';
+  activeTab: 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'mqtt-options' | 'grpc-options';
   response: ApiResponse | null;
   responseError: string | null;
   loading: boolean;
@@ -42,9 +42,17 @@ export interface RequestTab {
   mqttMessages?: MqttMessage[];
   mqttConnectedAt?: number;
   mqttSubscriptions?: string[];
+  // gRPC options (persisted) and runtime state
+  grpcOptions?: GrpcOptions;
+  grpcStatus?: GrpcStatus;
+  grpcCallId?: string;
+  grpcMessages?: GrpcMessage[];
+  grpcCallStartedAt?: number;
+  grpcServices?: GrpcServiceDef[];        // discovered via reflection/proto (persisted)
+  grpcMessageDefs?: Record<string, GrpcMessageDef>; // message field defs (runtime, not persisted)
 }
 
-type PersistedTab = Omit<RequestTab, 'response' | 'responseError' | 'loading' | 'isDirty' | 'wsStatus' | 'wsConnectionId' | 'wsMessages' | 'wsConnectedAt' | 'sseStatus' | 'sseConnectionId' | 'sseEvents' | 'sseConnectedAt' | 'mqttStatus' | 'mqttConnectionId' | 'mqttMessages' | 'mqttConnectedAt' | 'mqttSubscriptions'>;
+type PersistedTab = Omit<RequestTab, 'response' | 'responseError' | 'loading' | 'isDirty' | 'wsStatus' | 'wsConnectionId' | 'wsMessages' | 'wsConnectedAt' | 'sseStatus' | 'sseConnectionId' | 'sseEvents' | 'sseConnectedAt' | 'mqttStatus' | 'mqttConnectionId' | 'mqttMessages' | 'mqttConnectedAt' | 'mqttSubscriptions' | 'grpcStatus' | 'grpcCallId' | 'grpcMessages' | 'grpcCallStartedAt' | 'grpcMessageDefs'>;
 
 interface TabState {
   tabs: RequestTab[];
@@ -74,7 +82,7 @@ function createDefaultTab(): RequestTab {
     headers: [{ key: '', value: '', enabled: true }],
     body: { type: 'none' },
     auth: { type: 'none' },
-    activeTab: 'params' as 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'mqtt-options',
+    activeTab: 'params' as 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'mqtt-options' | 'grpc-options',
     response: null,
     responseError: null,
     loading: false,
@@ -90,7 +98,7 @@ function ensureTrailingEmpty(arr: KeyValuePair[]): KeyValuePair[] {
 }
 
 function stripTransient(tab: RequestTab): PersistedTab {
-  const { response: _r, responseError: _re, loading: _l, isDirty: _d, wsStatus: _ws, wsConnectionId: _wci, wsMessages: _wm, wsConnectedAt: _wca, sseStatus: _ss, sseConnectionId: _sci, sseEvents: _se, sseConnectedAt: _sca, mqttStatus: _mqs, mqttConnectionId: _mqci, mqttMessages: _mqm, mqttConnectedAt: _mqca, mqttSubscriptions: _mqsubs, ...rest } = tab;
+  const { response: _r, responseError: _re, loading: _l, isDirty: _d, wsStatus: _ws, wsConnectionId: _wci, wsMessages: _wm, wsConnectedAt: _wca, sseStatus: _ss, sseConnectionId: _sci, sseEvents: _se, sseConnectedAt: _sca, mqttStatus: _mqs, mqttConnectionId: _mqci, mqttMessages: _mqm, mqttConnectedAt: _mqca, mqttSubscriptions: _mqsubs, grpcStatus: _gs, grpcCallId: _gci, grpcMessages: _gm, grpcCallStartedAt: _gca, grpcMessageDefs: _gmd, ...rest } = tab;
   return rest;
 }
 
@@ -115,7 +123,7 @@ export const useTabStore = create<TabState>((set, get) => ({
       newTab.name = data.name;
     } else if (data.url) {
       try {
-        const scheme = data.protocol === 'websocket' ? 'WS' : data.protocol === 'sse' ? 'SSE' : (data.method || 'GET');
+        const scheme = data.protocol === 'websocket' ? 'WS' : data.protocol === 'sse' ? 'SSE' : data.protocol === 'mqtt' ? 'MQTT' : data.protocol === 'grpc' ? 'gRPC' : (data.method || 'GET');
         const isWS = data.protocol === 'websocket';
         const normalizedUrl = isWS ? data.url.replace(/^wss?:\/\//, 'http://') : data.url;
         newTab.name = `${scheme} ${new URL(normalizedUrl).pathname}`;

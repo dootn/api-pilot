@@ -1,6 +1,6 @@
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
 
-export type Protocol = 'http' | 'websocket' | 'sse' | 'mqtt';
+export type Protocol = 'http' | 'websocket' | 'sse' | 'mqtt' | 'grpc';
 
 export type WsStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -107,6 +107,7 @@ export interface ApiRequest {
   postScript?: string;
   sslVerify?: boolean;
   mqttOptions?: MqttOptions;   // MQTT-specific connection options
+  grpcOptions?: GrpcOptions;   // gRPC-specific options
   createdAt: number;
   updatedAt: number;
 }
@@ -187,6 +188,79 @@ export interface MqttSessionSummary {
   duration: number;  // ms
 }
 
+export type GrpcStatus = 'idle' | 'connecting' | 'streaming' | 'done' | 'error';
+
+export type GrpcCallType = 'unary' | 'server_streaming' | 'client_streaming' | 'bidi_streaming';
+
+export interface GrpcMessage {
+  id: string;
+  direction: 'sent' | 'received';
+  data: string;            // JSON-encoded protobuf message
+  timestamp: number;
+  isEnd?: boolean;         // server/bidi: end-of-stream marker
+  isError?: boolean;
+  errorMessage?: string;
+}
+
+export interface GrpcFieldDef {
+  name: string;
+  typeName: string;   // "string", "int32", "bool", or a nested message type name
+  repeated: boolean;
+}
+
+export interface GrpcMessageDef {
+  fullName: string;
+  fields: GrpcFieldDef[];
+}
+
+export interface GrpcMethodDef {
+  name: string;
+  callType: GrpcCallType;
+  requestStream: boolean;
+  responseStream: boolean;
+  requestType: string;
+  responseType: string;
+}
+
+export interface GrpcServiceDef {
+  name: string;            // fully-qualified, e.g. "helloworld.Greeter"
+  methods: GrpcMethodDef[];
+}
+
+export interface GrpcOptions {
+  /** TLS mode */
+  tls?: 'none' | 'tls' | 'mtls';
+  /** CA certificate PEM (for TLS/mTLS) */
+  caCert?: string;
+  /** Client certificate PEM (mTLS only) */
+  clientCert?: string;
+  /** Client key PEM (mTLS only) */
+  clientKey?: string;
+  /** Custom metadata key-value pairs (sent as gRPC headers) */
+  metadata?: { key: string; value: string; enabled: boolean }[];
+  /** Proto source: 'reflection' | 'proto' */
+  protoSource?: 'reflection' | 'proto';
+  /** Proto file content (when protoSource === 'proto') */
+  protoContent?: string;
+  /** Proto file name (for display only) */
+  protoFileName?: string;
+  /** Selected service name */
+  serviceName?: string;
+  /** Selected method name */
+  methodName?: string;
+}
+
+export interface GrpcSessionSummary {
+  callType: GrpcCallType;
+  serviceName: string;
+  methodName: string;
+  sentCount: number;
+  receivedCount: number;
+  statusCode?: string;     // gRPC status code string, e.g. 'OK', 'NOT_FOUND'
+  statusMessage?: string;
+  duration: number;        // ms
+}
+
 export interface HistoryEntry {
   id: string;
   request: ApiRequest;
@@ -194,6 +268,7 @@ export interface HistoryEntry {
   wsSession?: WsSessionSummary;
   sseSession?: SseSessionSummary;
   mqttSession?: MqttSessionSummary;
+  grpcSession?: GrpcSessionSummary;
   timestamp: number;
 }
 

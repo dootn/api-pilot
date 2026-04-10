@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useTabStore } from '../../stores/tabStore';
 import type { SseEvent } from '../../stores/requestStore';
+import { useI18n } from '../../i18n';
 
 const TRUNCATE_LEN = 500;
 
@@ -154,7 +155,9 @@ function EventRow({ evt }: { evt: SseEvent }) {
 export function SseConversation() {
   const { activeTabId, tabs, updateTab } = useTabStore();
   const tab = tabs.find((t) => t.id === activeTabId);
+  const t = useI18n();
   const [tick, setTick] = useState(0);
+  const [autoScroll, setAutoScroll] = useState(true);
   const listRef = useRef<HTMLDivElement>(null);
 
   // Tick every second to update connection duration display
@@ -166,9 +169,10 @@ export function SseConversation() {
 
   // Auto-scroll to bottom when new events arrive
   useEffect(() => {
+    if (!autoScroll) return;
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [tab?.sseEvents?.length]);
+  }, [tab?.sseEvents?.length, autoScroll]);
 
   if (!tab) return null;
 
@@ -176,10 +180,20 @@ export function SseConversation() {
 
   const events = tab.sseEvents ?? [];
   const isConnected = tab.sseStatus === 'connected';
+  const isError = tab.sseStatus === 'error';
 
   const handleClear = () => {
     updateTab(tab.id, { sseEvents: [] });
   };
+
+  const statusKey = (tab.sseStatus ?? 'disconnected') as 'connected' | 'connecting' | 'disconnected' | 'error';
+  const statusLabelMap = {
+    connected: t('sseStatusConnected'),
+    connecting: t('sseStatusConnecting'),
+    disconnected: t('sseStatusDisconnected'),
+    error: t('sseStatusError'),
+  };
+  const statusLabel = statusLabelMap[statusKey] ?? statusKey;
 
   const statusColor: Record<string, string> = {
     connected: 'var(--vscode-terminal-ansiGreen, #4ec9b0)',
@@ -209,7 +223,7 @@ export function SseConversation() {
             alignItems: 'center',
             gap: 5,
             fontWeight: 600,
-            color: statusColor[tab.sseStatus ?? 'disconnected'],
+            color: statusColor[statusKey],
           }}
         >
           <span
@@ -217,12 +231,12 @@ export function SseConversation() {
               width: 8,
               height: 8,
               borderRadius: '50%',
-              background: statusColor[tab.sseStatus ?? 'disconnected'],
+              background: statusColor[statusKey],
               display: 'inline-block',
               flexShrink: 0,
             }}
           />
-          {(tab.sseStatus ?? 'disconnected').charAt(0).toUpperCase() + (tab.sseStatus ?? 'disconnected').slice(1)}
+          {statusLabel}
         </span>
 
         {isConnected && tab.sseConnectedAt && (
@@ -231,25 +245,56 @@ export function SseConversation() {
 
         <span style={{ opacity: 0.55 }}>↓{events.length} events</span>
 
-        <div style={{ flex: 1 }} />
-
-        <button
-          onClick={handleClear}
-          style={{
-            fontSize: 11,
-            padding: '2px 7px',
-            background: 'none',
-            border: '1px solid var(--border-color)',
-            borderRadius: 3,
-            cursor: 'pointer',
-            color: 'var(--panel-fg)',
-            opacity: events.length ? 0.7 : 0.3,
-          }}
-          disabled={!events.length}
-        >
-          Clear
-        </button>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button
+            onClick={() => setAutoScroll((v) => !v)}
+            title="Toggle auto-scroll"
+            style={{
+              fontSize: 11,
+              background: 'none',
+              border: '1px solid var(--border-color, #555)',
+              borderRadius: 3,
+              padding: '2px 7px',
+              cursor: 'pointer',
+              opacity: autoScroll ? 1 : 0.45,
+              color: 'var(--panel-fg)',
+            }}
+          >
+            {t('sseAutoScroll')}
+          </button>
+          <button
+            onClick={handleClear}
+            style={{
+              fontSize: 11,
+              padding: '2px 7px',
+              background: 'none',
+              border: '1px solid var(--border-color)',
+              borderRadius: 3,
+              cursor: 'pointer',
+              color: 'var(--panel-fg)',
+              opacity: events.length ? 0.7 : 0.3,
+            }}
+            disabled={!events.length}
+          >
+            {t('sseClear')}
+          </button>
+        </div>
       </div>
+
+      {/* Error detail banner */}
+      {isError && tab.responseError && (
+        <div style={{
+          padding: '6px 12px',
+          fontSize: 12,
+          color: 'var(--vscode-errorForeground, #f48771)',
+          borderBottom: '1px solid var(--border-color)',
+          flexShrink: 0,
+          fontFamily: 'monospace',
+          background: 'var(--panel-bg)',
+        }}>
+          {tab.responseError}
+        </div>
+      )}
 
       {/* Event list */}
       <div
@@ -273,7 +318,7 @@ export function SseConversation() {
               userSelect: 'none',
             }}
           >
-            {isConnected ? 'Connected. Waiting for events…' : 'Not connected. Use Connect above.'}
+            {isConnected ? t('sseWaiting') : t('sseNotConnected')}
           </div>
         ) : (
           events.map((evt) => <EventRow key={evt.id} evt={evt} />)

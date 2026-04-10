@@ -83,6 +83,7 @@ export class CollectionTreeProvider
           const method = protocol === 'websocket' ? 'WS'
             : protocol === 'sse' ? 'SSE'
             : protocol === 'mqtt' ? 'MQTT'
+            : protocol === 'grpc' ? 'gRPC'
             : rawMethod;
           // Strip HTTP method prefix from auto-generated names for clean display
           const rawName = item.name || req?.url || 'Unnamed Request';

@@ -50,6 +50,19 @@
 - **发布面板**（右侧）：填写主题、payload、QoS（0/1/2）和 Retain，点击 Publish 或按 `Ctrl+Enter` 发送。
 - 断开连接时自动将会话（发布数/接收数、已订阅主题、持续时间）保存至**请求历史**。
 
+### gRPC
+
+- 在 URL 栏左侧的协议下拉框中选择 **gRPC**，切换为 gRPC 模式。
+- **服务发现**：点击 **Server Reflection**（无需 proto 文件，自动从服务端获取接口定义），或点击 **Upload .proto** 手动上传 proto 文件。
+- **服务与方法选择**：在 **Options** 标签页的下拉框中选择要调用的 Service 和 Method。
+- **全类型调用**：支持 Unary（一元）、Server Streaming（服务端流）、Client Streaming（客户端流）、Bidi Streaming（双向流）四种call类型。
+- **消息面板**：以滚动列表形式实时展示发送（↑ REQ）和接收（↓ RES）的消息；点击任意消息可展开查看 JSON 格式的完整 payload。
+- **客户端/双向流**：Invoke 后面板底部会出现 **Send** 输入区，可持续发送消息（`Ctrl+Enter` 快捷发送）；点击 **End Stream** 关闭写入侧。
+- **TLS / 安全**：支持 Plaintext（明文）、TLS（CA 证书）和 mTLS（客户端证书+私钥）。
+- **Metadata**：以键值对形式发送 gRPC 请求头，每行可单独启用/禁用。
+- URL 格式：`grpc://host:port`（明文）或 `grpcs://host:port`（TLS），也可直接输入 `host:port`。
+- 调用完成后自动将会话（方法名、gRPC 状态码）保存至**请求历史**。
+
 ### 响应查看器
 
 - **状态与耗时**: HTTP 状态码、状态文本、响应时间（ms）、响应体大小
@@ -105,7 +118,7 @@
 
 1. 打开 VS Code，点击活动栏中的 **API Pilot** 图标。
 2. 点击 `+` 新建请求。
-3. 输入 URL（支持 `http(s)` 或 `ws(s)`），或从协议下拉框选择 **SSE**/**MQTT**。HTTP 请求选择方法并点击 **Send**；WebSocket/SSE/MQTT 输入对应地址并点击 **Connect**。
+3. 输入 URL（支持 `http(s)` 或 `ws(s)`），或从协议下拉框选择 **SSE**/**MQTT**/**gRPC**。HTTP 请求选择方法并点击 **Send**；WebSocket/SSE/MQTT 输入对应地址并点击 **Connect**；gRPC 选择服务与方法后点击 **Invoke**。
 4. 在下方查看格式化的响应结果或实时 WebSocket 会话。
 
 ---
