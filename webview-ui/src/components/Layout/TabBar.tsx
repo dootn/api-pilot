@@ -1,18 +1,13 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, memo } from 'react';
+import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTabStore } from '../../stores/tabStore';
 import { useEnvironments } from '../../hooks/useEnvironments';
 import { EnvManager } from '../EnvManager/EnvManager';
 import { useI18n } from '../../i18n';
-
-const METHOD_COLORS: Record<string, string> = {
-  GET: '#4ec9b0',
-  POST: '#cca700',
-  PUT: '#3794ff',
-  DELETE: '#f14c4c',
-  PATCH: '#c586c0',
-  OPTIONS: '#888',
-  HEAD: '#888',
-};
+import { METHOD_COLORS } from '../../utils/protocolColors';
+import { useTabScroll } from './useTabScroll';
+import { useTabDnD } from './useTabDnD';
+import { TabContextMenu } from './TabContextMenu';
 
 interface ContextMenu {
   tabId: string;
@@ -20,68 +15,100 @@ interface ContextMenu {
   y: number;
 }
 
+interface TabItemProps {
+  id: string;
+  method: string;
+  name: string;
+  url: string;
+  isCustomNamed: boolean;
+  isPinned: boolean;
+  isDirty: boolean;
+  isActive: boolean;
+  canClose: boolean;
+  isDragOver: boolean;
+  isDragging: boolean;
+  onSelect: (id: string) => void;
+  onRemove: (id: string) => void;
+  onContextMenu: (e: React.MouseEvent, id: string) => void;
+  onDragStart: (e: React.DragEvent, id: string) => void;
+  onDragOver: (e: React.DragEvent, id: string) => void;
+  onDrop: (e: React.DragEvent, id: string) => void;
+  onDragEnd: () => void;
+}
+
+const TabItem = memo(function TabItem({
+  id, method, name, url, isCustomNamed, isPinned, isDirty,
+  isActive, canClose, isDragOver, isDragging,
+  onSelect, onRemove, onContextMenu,
+  onDragStart, onDragOver, onDrop, onDragEnd,
+}: TabItemProps) {
+  const t = useI18n();
+
+  return (
+    <div
+      data-tab-id={id}
+      className={`tabbar-tab${isActive ? ' active' : ''}`}
+      onClick={(e) => {
+        onSelect(id);
+        (e.currentTarget as HTMLElement).scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }}
+      onContextMenu={(e) => onContextMenu(e, id)}
+      draggable={!isPinned}
+      onDragStart={(e) => !isPinned && onDragStart(e, id)}
+      onDragOver={(e) => onDragOver(e, id)}
+      onDrop={(e) => onDrop(e, id)}
+      onDragEnd={onDragEnd}
+      style={{
+        borderLeft: isDragOver && !isDragging ? '2px solid var(--button-bg)' : undefined,
+        opacity: isDragging ? 0.4 : 1,
+      }}
+    >
+      <span style={{ fontWeight: 600, fontSize: 10, color: METHOD_COLORS[method] || '#888' }}>
+        {method}
+      </span>
+      {isPinned && (
+        <span style={{ fontSize: 9, opacity: 0.7, lineHeight: 1 }} title={t('pinnedHint')}>📌</span>
+      )}
+      <span className="tabbar-tab-label">
+        {isCustomNamed ? name : (url || name)}
+      </span>
+      {isDirty && (
+        <span style={{ color: 'var(--warning-fg)', fontSize: 8 }}>●</span>
+      )}
+      {canClose && !isPinned && (
+        <span
+          className="tabbar-tab-close"
+          onClick={(e) => { e.stopPropagation(); onRemove(id); }}
+          title={t('closeTabHint')}
+        >
+          ×
+        </span>
+      )}
+    </div>
+  );
+});
+
 export function TabBar() {
-  const { tabs, activeTabId, setActiveTabId, addTab, removeTab, reorderTabs, pinTab, duplicateTab, updateTab } = useTabStore();
+  const tabs = useTabStore((s) => s.tabs);
+  const activeTabId = useTabStore((s) => s.activeTabId);
+  const setActiveTabId = useTabStore((s) => s.setActiveTabId);
+  const addTab = useTabStore((s) => s.addTab);
+  const removeTab = useTabStore((s) => s.removeTab);
+  const reorderTabs = useTabStore((s) => s.reorderTabs);
+  const pinTab = useTabStore((s) => s.pinTab);
+  const duplicateTab = useTabStore((s) => s.duplicateTab);
   const { environments, activeEnvId, switchEnv } = useEnvironments();
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const [showEnvDropdown, setShowEnvDropdown] = useState(false);
   const [showEnvManager, setShowEnvManager] = useState(false);
   const [envDropdownPos, setEnvDropdownPos] = useState<{ top: number; right: number } | null>(null);
-  const [draggingTabId, setDraggingTabId] = useState<string | null>(null);
-  const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
   const envDropdownRef = useRef<HTMLDivElement>(null);
-  const tabsScrollRef = useRef<HTMLDivElement>(null);
+
+  const { canScrollLeft, canScrollRight, scrollRef, scrollLeft, scrollRight } = useTabScroll(tabs, activeTabId);
+  const { draggingTabId, dragOverTabId, handleDragStart, handleDragOver, handleDrop, handleDragEnd } = useTabDnD(reorderTabs);
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
-
-  const updateScrollState = useCallback(() => {
-    const el = tabsScrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 0);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
-  }, []);
-
-  useEffect(() => {
-    const el = tabsScrollRef.current;
-    if (!el) return;
-    el.addEventListener('scroll', updateScrollState);
-    const ro = new ResizeObserver(updateScrollState);
-    ro.observe(el);
-    updateScrollState();
-    return () => {
-      el.removeEventListener('scroll', updateScrollState);
-      ro.disconnect();
-    };
-  }, [updateScrollState]);
-
-
-  useEffect(() => { updateScrollState(); }, [tabs, updateScrollState]);
-
-  // Scroll the active tab into the visible area of the tab bar
-  useEffect(() => {
-    const container = tabsScrollRef.current;
-    if (!container) return;
-    const activeEl = container.querySelector<HTMLElement>(`[data-tab-id="${activeTabId}"]`);
-    if (!activeEl) return;
-    // scrollIntoView with inline:'nearest' avoids over-scrolling
-    activeEl.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, [activeTabId]);
-
-  useEffect(() => {
-    const el = tabsScrollRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      if (e.deltaY !== 0) {
-        e.preventDefault();
-        el.scrollLeft += e.deltaY;
-      }
-    };
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, []);
-
+  const t = useI18n();
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -93,63 +120,23 @@ export function TabBar() {
     };
   }, [contextMenu, closeContextMenu]);
 
-  // Close env dropdown when clicking outside
-  useEffect(() => {
-    if (!showEnvDropdown) return;
-    const close = (e: MouseEvent) => {
-      if (envDropdownRef.current && !envDropdownRef.current.contains(e.target as Node)) {
-        setShowEnvDropdown(false);
-        setEnvDropdownPos(null);
-      }
-    };
-    window.addEventListener('mousedown', close);
-    return () => window.removeEventListener('mousedown', close);
-  }, [showEnvDropdown]);
+  useClickOutside(envDropdownRef, useCallback(() => { setShowEnvDropdown(false); setEnvDropdownPos(null); }, []), showEnvDropdown);
 
-  function openContextMenu(e: React.MouseEvent, tabId: string) {
+  const openContextMenu = useCallback((e: React.MouseEvent, tabId: string) => {
     e.preventDefault();
     e.stopPropagation();
     setContextMenu({ tabId, x: e.clientX, y: e.clientY });
-  }
+  }, []);
 
   const contextMenuTab = contextMenu ? tabs.find((t) => t.id === contextMenu.tabId) : null;
-
-  const t = useI18n();
-
-  function handleDragStart(e: React.DragEvent, tabId: string) {
-    setDraggingTabId(tabId);
-    e.dataTransfer.effectAllowed = 'move';
-    // Required for Firefox
-    e.dataTransfer.setData('text/plain', tabId);
-  }
-
-  function handleDragOver(e: React.DragEvent, tabId: string) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (tabId !== draggingTabId) setDragOverTabId(tabId);
-  }
-
-  function handleDrop(e: React.DragEvent, tabId: string) {
-    e.preventDefault();
-    if (draggingTabId && draggingTabId !== tabId) {
-      reorderTabs(draggingTabId, tabId);
-    }
-    setDraggingTabId(null);
-    setDragOverTabId(null);
-  }
-
-  function handleDragEnd() {
-    setDraggingTabId(null);
-    setDragOverTabId(null);
-  }
 
   return (
     <>
     <div
+      className="border-b"
       style={{
         display: 'flex',
         alignItems: 'center',
-        borderBottom: '1px solid var(--border-color)',
         background: 'var(--tab-inactive-bg)',
         overflow: 'hidden',
       }}
@@ -157,81 +144,42 @@ export function TabBar() {
       <div style={{ display: 'flex', flex: 1, minWidth: 0, alignItems: 'center' }}>
         {canScrollLeft && (
           <button
-            onClick={() => {
-              const el = tabsScrollRef.current;
-              if (el) el.scrollBy({ left: -el.clientWidth, behavior: 'smooth' });
-            }}
-            style={{ background: 'transparent', border: 'none', color: 'var(--panel-fg)', cursor: 'pointer', padding: '0 5px', fontSize: 16, flexShrink: 0, opacity: 0.7, alignSelf: 'stretch', display: 'flex', alignItems: 'center' }}
+            onClick={scrollLeft}
+            className="icon-btn"
+            style={{ padding: '0 5px', flexShrink: 0, alignSelf: 'stretch', display: 'flex', alignItems: 'center' }}
             title={t('scrollLeft')}
           >‹</button>
         )}
-        <div ref={tabsScrollRef} style={{ display: 'flex', flex: 1, overflow: 'auto', scrollbarWidth: 'none' }}>
+        <div ref={scrollRef} style={{ display: 'flex', flex: 1, overflow: 'auto', scrollbarWidth: 'none' }}>
         {tabs.map((tab) => (
-          <div
+          <TabItem
             key={tab.id}
-            data-tab-id={tab.id}
-            className={`tabbar-tab${tab.id === activeTabId ? ' active' : ''}`}
-            onClick={(e) => {
-              setActiveTabId(tab.id);
-              // Force scroll even if this tab was already active (e.g. half-visible)
-              (e.currentTarget as HTMLElement).scrollIntoView({ block: 'nearest', inline: 'nearest' });
-            }}
-            onContextMenu={(e) => openContextMenu(e, tab.id)}
-            draggable={!tab.isPinned}
-            onDragStart={(e) => !tab.isPinned && handleDragStart(e, tab.id)}
-            onDragOver={(e) => handleDragOver(e, tab.id)}
-            onDrop={(e) => handleDrop(e, tab.id)}
+            id={tab.id}
+            method={tab.method}
+            name={tab.name}
+            url={tab.url}
+            isCustomNamed={tab.isCustomNamed}
+            isPinned={tab.isPinned}
+            isDirty={tab.isDirty}
+            isActive={tab.id === activeTabId}
+            canClose={tabs.length > 1}
+            isDragOver={tab.id === dragOverTabId}
+            isDragging={tab.id === draggingTabId}
+            onSelect={setActiveTabId}
+            onRemove={removeTab}
+            onContextMenu={openContextMenu}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
             onDragEnd={handleDragEnd}
-            style={{
-              borderLeft: tab.id === dragOverTabId && tab.id !== draggingTabId
-                ? '2px solid var(--button-bg)'
-                : undefined,
-              opacity: tab.id === draggingTabId ? 0.4 : 1,
-            }}
-          >
-            <span
-              style={{
-                fontWeight: 600,
-                fontSize: 10,
-                color: METHOD_COLORS[tab.method] || '#888',
-              }}
-            >
-              {tab.method}
-            </span>
-
-            {tab.isPinned && (
-              <span style={{ fontSize: 9, opacity: 0.7, lineHeight: 1 }} title={t('pinnedHint')}>📌</span>
-            )}
-
-            <span className="tabbar-tab-label">
-                {tab.isCustomNamed ? tab.name : (tab.url || tab.name)}
-              </span>
-
-            {tab.isDirty && (
-              <span style={{ color: 'var(--warning-fg)', fontSize: 8 }}>●</span>
-            )}
-            {tabs.length > 1 && !tab.isPinned && (
-              <span
-                className="tabbar-tab-close"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeTab(tab.id);
-                }}
-                title={t('closeTabHint')}
-              >
-                ×
-              </span>
-            )}
-          </div>
+          />
         ))}
         </div>
         {canScrollRight && (
           <button
-            onClick={() => {
-              const el = tabsScrollRef.current;
-              if (el) el.scrollBy({ left: el.clientWidth, behavior: 'smooth' });
-            }}
-            style={{ background: 'transparent', border: 'none', color: 'var(--panel-fg)', cursor: 'pointer', padding: '0 5px', fontSize: 16, flexShrink: 0, opacity: 0.7, alignSelf: 'stretch', display: 'flex', alignItems: 'center' }}
+            onClick={scrollRight}
+            className="icon-btn"
+            style={{ padding: '0 5px', flexShrink: 0, alignSelf: 'stretch', display: 'flex', alignItems: 'center' }}
             title={t('scrollRight')}
           >›</button>
         )}
@@ -240,17 +188,8 @@ export function TabBar() {
 
       <button
         onClick={addTab}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          color: 'var(--panel-fg)',
-          cursor: 'pointer',
-          padding: '6px 10px',
-          fontSize: 16,
-          lineHeight: 1,
-          opacity: 0.6,
-          flexShrink: 0,
-        }}
+        className="icon-btn"
+        style={{ padding: '6px 10px', opacity: 0.6, flexShrink: 0 }}
         title="New Request (Ctrl+T)"
       >
         +
@@ -284,72 +223,15 @@ export function TabBar() {
       </div>
 
       {contextMenu && contextMenuTab && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: 'fixed',
-            top: contextMenu.y,
-            left: contextMenu.x,
-            zIndex: 9999,
-            background: 'var(--vscode-menu-background, #252526)',
-            border: '1px solid var(--border-color)',
-            borderRadius: 4,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-            minWidth: 140,
-            padding: '4px 0',
-          }}
-        >
-          <div
-            onClick={() => {
-              pinTab(contextMenuTab.id, !contextMenuTab.isPinned);
-              closeContextMenu();
-            }}
-            style={{
-              padding: '6px 14px',
-              cursor: 'pointer',
-              fontSize: 12,
-              color: 'var(--panel-fg)',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--vscode-list-hoverBackground, #2a2d2e)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-          >
-            {contextMenuTab.isPinned ? t('unpinTab') : t('pinTab')}
-          </div>
-          <div
-            onClick={() => {
-              duplicateTab(contextMenuTab.id);
-              closeContextMenu();
-            }}
-            style={{
-              padding: '6px 14px',
-              cursor: 'pointer',
-              fontSize: 12,
-              color: 'var(--panel-fg)',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--vscode-list-hoverBackground, #2a2d2e)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-          >
-            Duplicate Tab
-          </div>
-          {tabs.length > 1 && !contextMenuTab.isPinned && (
-            <div
-              onClick={() => {
-                closeContextMenu();
-                removeTab(contextMenuTab.id);
-              }}
-              style={{
-                padding: '6px 14px',
-                cursor: 'pointer',
-                fontSize: 12,
-                color: '#f14c4c',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--vscode-list-hoverBackground, #2a2d2e)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-            >
-              {t('closeTab')}
-            </div>
-          )}
-        </div>
+        <TabContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          tab={contextMenuTab}
+          canClose={tabs.length > 1 && !contextMenuTab.isPinned}
+          onPin={() => { pinTab(contextMenuTab.id, !contextMenuTab.isPinned); closeContextMenu(); }}
+          onDuplicate={() => { duplicateTab(contextMenuTab.id); closeContextMenu(); }}
+          onClose={() => { closeContextMenu(); removeTab(contextMenuTab.id); }}
+        />
       )}
     </div>
 

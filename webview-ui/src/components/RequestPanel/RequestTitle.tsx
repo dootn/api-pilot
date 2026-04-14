@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
-import { useTabStore } from '../../stores/tabStore';
+import { useTabStore, useActiveTab } from '../../stores/tabStore';
 import { vscode } from '../../vscode';
 import { useI18n } from '../../i18n';
+import { Input, Textarea } from '../shared/ui';
 
 export function RequestTitle() {
-  const { activeTabId, tabs, updateTab, renameTab } = useTabStore();
-  const tab = tabs.find((t) => t.id === activeTabId);
+  const updateTab = useTabStore((s) => s.updateTab);
+  const renameTab = useTabStore((s) => s.renameTab);
+  const tab = useActiveTab();
   const t = useI18n();
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
@@ -114,7 +116,7 @@ export function RequestTitle() {
           {isDescriptionExpanded ? '▼' : '▶'}
         </button>
         {editing ? (
-          <input
+          <Input
             ref={inputRef}
             className="request-title-input"
             value={editValue}
@@ -150,7 +152,7 @@ export function RequestTitle() {
       {isDescriptionExpanded && (
         <div className="request-description-section">
           {editingDescription ? (
-            <input
+            <Input
               ref={descriptionInputRef}
               className="request-description-input"
               placeholder={t('requestAddDesc')}
@@ -182,7 +184,7 @@ export function RequestTitle() {
         <div className="import-modal-overlay" onClick={() => setImportModalOpen(false)}>
           <div className="import-modal" onClick={(e) => e.stopPropagation()}>
             <div className="import-modal-title">{t('quickImportTitle')}</div>
-            <textarea
+            <Textarea
               ref={importTextareaRef}
               className="import-modal-textarea"
               value={importInput}

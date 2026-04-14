@@ -1,30 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
-import { useTabStore } from '../../stores/tabStore';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useTabStore, useActiveTab } from '../../stores/tabStore';
 import type { MqttMessage } from '../../stores/requestStore';
 import { vscode } from '../../vscode';
-import { useI18n } from '../../i18n';
-
-function formatBytes(b: number): string {
-  if (b < 1024) return `${b} B`;
-  return `${(b / 1024).toFixed(1)} KB`;
-}
-
-function formatTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString(undefined, { hour12: false });
-}
-
-function formatDuration(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  if (m > 0) return `${m}m ${s % 60}s`;
-  return `${s}s`;
-}
-
-const MAX_DISPLAY = 500;
+import { useI18n, type TranslationKey } from '../../i18n';
+import { formatBytes, formatTime, formatDurationMs } from '../../utils/formatters';
+import { MAX_DISPLAY_MESSAGES } from '../../utils/constants';
+import { Input, Checkbox, Select, Textarea, Option } from '../shared/ui';
 
 export function MqttPanel() {
-  const { getActiveTab, updateTab } = useTabStore();
-  const tab = getActiveTab();
+  const updateTab = useTabStore((s) => s.updateTab);
+  const tab = useActiveTab();
   const t = useI18n();
 
   const [subTopic, setSubTopic] = useState('');
@@ -35,14 +21,7 @@ export function MqttPanel() {
   const [pubRetain, setPubRetain] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [autoScroll, setAutoScroll] = useState(true);
-  const logEndRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll to bottom on new messages
-  useEffect(() => {
-    if (autoScroll && logEndRef.current) {
-      logEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [tab?.mqttMessages?.length, autoScroll]);
+  const listRef = useRef<HTMLDivElement>(null);
 
   if (!tab) return null;
 
@@ -50,11 +29,11 @@ export function MqttPanel() {
   const subscriptions: string[] = tab.mqttSubscriptions ?? [];
   const isConnected = tab.mqttStatus === 'connected';
   const isConnecting = tab.mqttStatus === 'connecting' || tab.loading;
-  const duration = tab.mqttConnectedAt ? Date.now() - tab.mqttConnectedAt : 0;
+  const durationMs = tab.mqttConnectedAt ? Date.now() - tab.mqttConnectedAt : 0;
   const sent = messages.filter((m) => m.direction === 'sent').length;
   const received = messages.filter((m) => m.direction === 'received').length;
-  const displayed = messages.slice(-MAX_DISPLAY);
-  const truncated = messages.length > MAX_DISPLAY;
+  const displayed = messages.slice(-MAX_DISPLAY_MESSAGES);
+  const truncated = messages.length > MAX_DISPLAY_MESSAGES;
 
   function handleSubscribe() {
     if (!subTopic.trim() || !tab?.mqttConnectionId) return;
@@ -111,52 +90,33 @@ export function MqttPanel() {
         : 'var(--panel-fg)';
 
   const statusLabel = tab.mqttStatus === 'connected'
-    ? `${t('mqttStatusConnected')}${isConnected && duration > 0 ? ' · ' + formatDuration(duration) : ''}`
+    ? `${t('mqttStatusConnected')}${isConnected && durationMs > 0 ? ' · ' + formatDurationMs(durationMs) : ''}`
     : tab.mqttStatus === 'connecting' ? t('mqttStatusConnecting')
     : tab.mqttStatus === 'error' ? t('mqttStatusError')
     : t('mqttStatusDisconnected');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', fontSize: 13, overflow: 'hidden' }}>
+    <div className="conv-container">
       {/* Status bar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 14, padding: '6px 14px',
-        borderBottom: '1px solid var(--border-color, #555)', flexShrink: 0, flexWrap: 'wrap',
-      }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor, display: 'inline-block' }} />
-          <span style={{ color: statusColor, fontWeight: 500 }}>{statusLabel}</span>
+      <div className="conv-status-bar">
+        <span className="conv-status-label">
+          <span className="conv-status-dot" style={{ background: statusColor }} />
+          <span style={{ color: statusColor }}>{statusLabel}</span>
         </span>
-        <span style={{ opacity: 0.6 }}>↑ {sent} {t('mqttPublishedLabel')}</span>
-        <span style={{ opacity: 0.6 }}>↓ {received} {t('mqttReceivedLabel')}</span>
-        <span style={{ opacity: 0.6 }}>{subscriptions.length} {subscriptions.length !== 1 ? t('mqttSubscriptions') : t('mqttSubscription')}</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+        <span className="conv-status-dim">↑ {sent} {t('mqttPublishedLabel')}</span>
+        <span className="conv-status-dim">↓ {received} {t('mqttReceivedLabel')}</span>
+        <span className="conv-status-dim">{subscriptions.length} {subscriptions.length !== 1 ? t('mqttSubscriptions') : t('mqttSubscription')}</span>
+        <div className="conv-actions">
           <button
             onClick={() => setAutoScroll((v) => !v)}
             title="Toggle auto-scroll"
-            style={{
-              fontSize: 11,
-              background: 'none',
-              border: '1px solid var(--border-color, #555)',
-              borderRadius: 3,
-              padding: '2px 7px',
-              cursor: 'pointer',
-              opacity: autoScroll ? 1 : 0.45,
-              color: 'var(--panel-fg)',
-            }}
+            className="conv-action-btn"
+            style={{ opacity: autoScroll ? 1 : 0.45 }}
           >
             {t('mqttAutoScroll')}
           </button>
           <button
-            style={{
-              fontSize: 11,
-              background: 'none',
-              border: '1px solid var(--border-color, #555)',
-              borderRadius: 3,
-              padding: '2px 7px',
-              cursor: 'pointer',
-              color: 'var(--panel-fg)',
-            }}
+            className="conv-action-btn"
             onClick={() => updateTab(tab.id, { mqttMessages: [] })}
           >
             {t('mqttClear')}
@@ -166,79 +126,56 @@ export function MqttPanel() {
 
       {/* Error detail banner */}
       {tab.mqttStatus === 'error' && tab.responseError && (
-        <div style={{
-          padding: '6px 14px',
-          fontSize: 12,
-          color: 'var(--vscode-errorForeground, #f48771)',
-          borderBottom: '1px solid var(--border-color, #555)',
-          flexShrink: 0,
-          fontFamily: 'monospace',
-        }}>
+        <div className="mqtt-error-banner">
           {tab.responseError}
         </div>
       )}
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div className="mqtt-body">
         {/* Left: subscriptions + message log */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="mqtt-left">
           {/* Subscriptions */}
-          <div style={{
-            padding: '8px 14px', borderBottom: '1px solid var(--border-color, #555)',
-            flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6,
-          }}>
-            <div style={{ fontWeight: 600, opacity: 0.7, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('mqttSubscriptionsSection')}</div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-              <input
-                className="url-input"
+          <div className="mqtt-sub-section">
+            <div className="mqtt-section-header">{t('mqttSubscriptionsSection')}</div>
+            <div className="mqtt-sub-row">
+              <Input
+                className="url-input mqtt-sub-input"
                 type="text"
                 placeholder={t('mqttTopicPlaceholder')}
                 value={subTopic}
                 onChange={(e) => setSubTopic(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSubscribe()}
                 disabled={!isConnected}
-                style={{ flex: 1, minWidth: 180, padding: '4px 8px', fontSize: 13 }}
               />
-              <select
+              <Select
+                className="mqtt-select"
                 value={subQos}
                 onChange={(e) => setSubQos(Number(e.target.value) as 0 | 1 | 2)}
                 disabled={!isConnected}
-                style={{
-                  padding: '4px 8px', fontSize: 12,
-                  background: 'var(--input-bg, #3c3c3c)', color: 'var(--panel-fg)',
-                  border: '1px solid var(--border-color, #555)', borderRadius: 4, width: 80,
-                }}
+                style={{ width: 80 }}
               >
-                <option value={0}>QoS 0</option>
-                <option value={1}>QoS 1</option>
-                <option value={2}>QoS 2</option>
-              </select>
+                <Option value={0}>QoS 0</Option>
+                <Option value={1}>QoS 1</Option>
+                <Option value={2}>QoS 2</Option>
+              </Select>
               <button
-                className="send-btn"
+                className="send-btn mqtt-sub-btn"
                 disabled={!isConnected || !subTopic.trim()}
                 onClick={handleSubscribe}
-                style={{ padding: '4px 12px', fontSize: 12 }}
               >
                 {t('mqttSubscribeBtn')}
               </button>
             </div>
             {subscriptions.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              <div className="mqtt-sub-badges">
                 {subscriptions.map((t) => (
-                  <span key={t} style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    background: 'var(--vscode-badge-background, #4d4d4d)',
-                    color: 'var(--vscode-badge-foreground, #fff)',
-                    borderRadius: 10, padding: '2px 8px', fontSize: 11,
-                  }}>
+                  <span key={t} className="mqtt-sub-badge">
                     {t}
                     <button
                       onClick={() => handleUnsubscribe(t)}
                       disabled={!isConnected}
                       title="Unsubscribe"
-                      style={{
-                        background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                        color: 'inherit', opacity: 0.6, fontSize: 12, lineHeight: 1,
-                      }}
+                      className="mqtt-unsub-btn"
                     >✕</button>
                   </span>
                 ))}
@@ -247,87 +184,24 @@ export function MqttPanel() {
           </div>
 
           {/* Message log */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
-            {messages.length === 0 && (
-              <div style={{ textAlign: 'center', opacity: 0.4, marginTop: 24, fontSize: 12 }}>
-                {isConnected ? t('mqttNoMessages') : t('mqttConnectToStart')}
-              </div>
-            )}
-            {truncated && (
-              <div style={{ textAlign: 'center', opacity: 0.5, fontSize: 11, padding: '4px 0' }}>
-                (Showing last {MAX_DISPLAY} of {messages.length} messages)
-              </div>
-            )}
-            {displayed.map((msg) => {
-              const isSent = msg.direction === 'sent';
-              const isExpanded = expandedIds.has(msg.id);
-              const truncPayload = msg.payload.length > 200 && !isExpanded;
-              return (
-                <div key={msg.id} style={{
-                  padding: '6px 14px',
-                  borderBottom: '1px solid var(--border-color-subtle, rgba(128,128,128,0.15))',
-                  fontFamily: 'monospace',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
-                      background: isSent ? 'var(--vscode-terminal-ansiBlue, #3b8eda)' : 'var(--vscode-terminal-ansiGreen, #4ec94e)',
-                      color: '#fff',
-                    }}>
-                      {isSent ? '↑ PUB' : '↓ SUB'}
-                    </span>
-                    <span style={{
-                      fontSize: 11, padding: '1px 6px', borderRadius: 3,
-                      background: 'var(--vscode-badge-background, #4d4d4d)',
-                      color: 'var(--vscode-badge-foreground, #ccc)',
-                    }}>
-                      {msg.topic}
-                    </span>
-                    <span style={{ fontSize: 10, opacity: 0.5 }}>QoS {msg.qos}</span>
-                    {msg.retained && (
-                      <span style={{ fontSize: 10, opacity: 0.6, fontStyle: 'italic' }}>retained</span>
-                    )}
-                    <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.45 }}>
-                      {formatTime(msg.timestamp)} · {formatBytes(msg.size)}
-                    </span>
-                    <button
-                      onClick={() => copyPayload(msg.payload)}
-                      title="Copy payload"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.5, fontSize: 12, padding: 0 }}
-                    >⎘</button>
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-                      opacity: 0.85, lineHeight: 1.4,
-                      maxHeight: isExpanded ? 'none' : '4.5em',
-                      overflow: isExpanded ? 'visible' : 'hidden',
-                    }}
-                  >
-                    {truncPayload ? msg.payload.slice(0, 200) : msg.payload}
-                  </div>
-                  {msg.payload.length > 200 && (
-                    <button
-                      onClick={() => toggleExpand(msg.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.5, fontSize: 11, padding: '2px 0' }}
-                    >
-                      {isExpanded ? 'Show less' : `Show all (${msg.payload.length} chars)`}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-            <div ref={logEndRef} />
-          </div>
+          <MqttMessageList
+            listRef={listRef}
+            messages={messages}
+            displayed={displayed}
+            truncated={truncated}
+            isConnected={isConnected}
+            expandedIds={expandedIds}
+            toggleExpand={toggleExpand}
+            copyPayload={copyPayload}
+            autoScroll={autoScroll}
+            t={t}
+          />
         </div>
 
         {/* Right: publish panel */}
-        <div style={{
-          width: 240, flexShrink: 0, borderLeft: '1px solid var(--border-color, #555)',
-          display: 'flex', flexDirection: 'column', padding: '10px 12px', gap: 8,
-        }}>
-          <div style={{ fontWeight: 600, opacity: 0.7, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('mqttPublishSection')}</div>
-          <input
+        <div className="mqtt-pub-panel">
+          <div className="mqtt-section-header">{t('mqttPublishSection')}</div>
+          <Input
             className="url-input"
             type="text"
             placeholder={t('mqttTopicPubPlaceholder')}
@@ -336,34 +210,29 @@ export function MqttPanel() {
             onChange={(e) => setPubTopic(e.target.value)}
             style={{ padding: '4px 8px', fontSize: 13 }}
           />
-          <textarea
-            className="url-input"
+          <Textarea
+            className="url-input mqtt-pub-textarea"
             placeholder={t('mqttPayloadPlaceholder')}
             value={pubPayload}
             disabled={!isConnected}
             onChange={(e) => setPubPayload(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handlePublish(); }}
             rows={5}
-            style={{ padding: '4px 8px', fontSize: 12, resize: 'vertical', fontFamily: 'monospace' }}
           />
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <select
+          <div className="mqtt-pub-controls">
+            <Select
+              className="mqtt-select"
               value={pubQos}
               onChange={(e) => setPubQos(Number(e.target.value) as 0 | 1 | 2)}
               disabled={!isConnected}
-              style={{
-                flex: 1, padding: '4px 6px', fontSize: 12,
-                background: 'var(--input-bg, #3c3c3c)', color: 'var(--panel-fg)',
-                border: '1px solid var(--border-color, #555)', borderRadius: 4,
-              }}
+              style={{ flex: 1 }}
             >
-              <option value={0}>QoS 0</option>
-              <option value={1}>QoS 1</option>
-              <option value={2}>QoS 2</option>
-            </select>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}>
-              <input
-                type="checkbox"
+              <Option value={0}>QoS 0</Option>
+              <Option value={1}>QoS 1</Option>
+              <Option value={2}>QoS 2</Option>
+            </Select>
+            <label className="mqtt-retain-label">
+              <Checkbox
                 checked={pubRetain}
                 disabled={!isConnected}
                 onChange={(e) => setPubRetain(e.target.checked)}
@@ -380,12 +249,111 @@ export function MqttPanel() {
             {t('mqttPublishBtn')}
           </button>
           {!isConnected && !isConnecting && (
-            <div style={{ fontSize: 11, opacity: 0.45, textAlign: 'center', marginTop: 4 }}>
+            <div className="mqtt-connect-hint">
               {t('mqttConnectFirst')}
             </div>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── Virtualized message list sub-component ────────────── */
+function MqttMessageList({
+  listRef,
+  messages,
+  displayed,
+  truncated,
+  isConnected,
+  expandedIds,
+  toggleExpand,
+  copyPayload,
+  autoScroll,
+  t,
+}: {
+  listRef: React.RefObject<HTMLDivElement>;
+  messages: MqttMessage[];
+  displayed: MqttMessage[];
+  truncated: boolean;
+  isConnected: boolean;
+  expandedIds: Set<string>;
+  toggleExpand: (id: string) => void;
+  copyPayload: (payload: string) => void;
+  autoScroll: boolean;
+  t: (key: TranslationKey) => string;
+}) {
+  const virtualizer = useVirtualizer({
+    count: displayed.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => 48,
+    overscan: 10,
+  });
+
+  useEffect(() => {
+    if (!autoScroll || displayed.length === 0) return;
+    virtualizer.scrollToIndex(displayed.length - 1, { align: 'end' });
+  }, [displayed.length, autoScroll]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div ref={listRef} className="conv-list" style={{ padding: '4px 0' }}>
+      {messages.length === 0 && (
+        <div className="conv-empty" style={{ height: 'auto', marginTop: 24, fontSize: 12 }}>
+          {isConnected ? t('mqttNoMessages') : t('mqttConnectToStart')}
+        </div>
+      )}
+      {truncated && (
+        <div className="conv-truncated">
+          (Showing last {MAX_DISPLAY_MESSAGES} of {messages.length} messages)
+        </div>
+      )}
+      {displayed.length > 0 && (
+        <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative' }}>
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const msg = displayed[virtualRow.index];
+            const isSent = msg.direction === 'sent';
+            const isExpanded = expandedIds.has(msg.id);
+            const truncPayload = msg.payload.length > 200 && !isExpanded;
+            return (
+              <div
+                key={msg.id}
+                data-index={virtualRow.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <div className="mqtt-msg-row">
+                  <div className="mqtt-msg-header">
+                    <span className={`mqtt-msg-dir ${isSent ? 'mqtt-msg-dir-sent' : 'mqtt-msg-dir-received'}`}>
+                      {isSent ? '↑ PUB' : '↓ SUB'}
+                    </span>
+                    <span className="mqtt-msg-topic">{msg.topic}</span>
+                    <span className="mqtt-msg-qos">QoS {msg.qos}</span>
+                    {msg.retained && <span className="mqtt-msg-retained">retained</span>}
+                    <span className="mqtt-msg-meta">
+                      {formatTime(msg.timestamp)} · {formatBytes(msg.size)}
+                    </span>
+                    <button onClick={() => copyPayload(msg.payload)} title="Copy payload" className="mqtt-msg-copy">⎘</button>
+                  </div>
+                  <div className={`mqtt-msg-content${isExpanded ? '' : ' mqtt-msg-content-collapsed'}`}>
+                    {truncPayload ? msg.payload.slice(0, 200) : msg.payload}
+                  </div>
+                  {msg.payload.length > 200 && (
+                    <button onClick={() => toggleExpand(msg.id)} className="mqtt-msg-expand">
+                      {isExpanded ? 'Show less' : `Show all (${msg.payload.length} chars)`}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

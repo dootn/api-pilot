@@ -1,72 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { vscode } from '../../vscode';
 import { useVscodeMessage } from '../../hooks/useVscodeMessage';
 import { useTabStore } from '../../stores/tabStore';
-import type { ApiResponse } from '../../stores/requestStore';
+import type { HistoryEntry } from '../../types';
 import { useI18n } from '../../i18n';
-
-interface WsSessionSummary {
-  messageCount: number;
-  sentCount: number;
-  receivedCount: number;
-  duration: number;
-}
-
-interface SseSessionSummary {
-  eventCount: number;
-  duration: number;
-}
-
-interface MqttSessionSummary {
-  publishedCount: number;
-  receivedCount: number;
-  subscribedTopics: string[];
-  duration: number;
-}
-
-interface GrpcSessionSummary {
-  callType: string;
-  serviceName: string;
-  methodName: string;
-  sentCount: number;
-  receivedCount: number;
-  statusCode?: string;
-  duration: number;
-}
-
-interface HistoryEntry {
-  id: string;
-  timestamp: number;
-  request: {
-    id: string;
-    name: string;
-    method: string;
-    url: string;
-    protocol?: string;
-    [key: string]: unknown;
-  };
-  response?: ApiResponse;
-  wsSession?: WsSessionSummary;
-  sseSession?: SseSessionSummary;
-  mqttSession?: MqttSessionSummary;
-  grpcSession?: GrpcSessionSummary;
-}
+import { METHOD_COLORS } from '../../utils/protocolColors';
+import { Input } from '../shared/ui';
 
 interface HistoryGroup {
   date: string;
   label: string;
   entries: HistoryEntry[];
 }
-
-const METHOD_COLORS: Record<string, string> = {
-  GET: '#4ec9b0',
-  POST: '#cca700',
-  PUT: '#3794ff',
-  DELETE: '#f14c4c',
-  PATCH: '#c586c0',
-  OPTIONS: '#888',
-  HEAD: '#888',
-};
 
 function statusColor(status: number): string {
   if (status >= 200 && status < 300) return '#4ec9b0';
@@ -125,6 +70,20 @@ export function HistorySidebar() {
     });
   };
 
+  const lowerFilter = filterText.toLowerCase().trim();
+  const visibleGroups = useMemo(() => {
+    if (!lowerFilter) return groups;
+    return groups.flatMap((group) => {
+      const matchedEntries = group.entries.filter(
+        (entry) =>
+          (entry.request.url ?? '').toLowerCase().includes(lowerFilter) ||
+          entry.request.method.toLowerCase().includes(lowerFilter) ||
+          (entry.request.name ?? '').toLowerCase().includes(lowerFilter)
+      );
+      return matchedEntries.length > 0 ? [{ ...group, entries: matchedEntries }] : [];
+    });
+  }, [groups, lowerFilter]);
+
   return (
     <div className="history-sidebar">
       <div className="sidebar-actions">
@@ -138,44 +97,21 @@ export function HistorySidebar() {
       </div>
 
       {/* Filter input */}
-      <div style={{ padding: '4px 8px', borderBottom: '1px solid var(--border-color)' }}>
-        <input
-          type="text"
+      <div className="border-b" style={{ padding: '4px 8px' }}>
+        <Input
+          inputSize="sm"
+          fullWidth
           value={filterText}
           onChange={(e) => setFilterText(e.target.value)}
           placeholder={t('sidebarFilter')}
-          style={{
-            width: '100%',
-            padding: '4px 8px',
-            fontSize: 11,
-            background: 'var(--input-bg)',
-            color: 'var(--input-fg)',
-            border: '1px solid var(--input-border)',
-            borderRadius: 4,
-            outline: 'none',
-            boxSizing: 'border-box',
-          }}
         />
       </div>
 
       <div className="sidebar-tree">
-        {(() => {
-          const lowerFilter = filterText.toLowerCase().trim();
-          const visibleGroups = lowerFilter
-            ? groups.flatMap((group) => {
-                const matchedEntries = group.entries.filter(
-                  (entry) =>
-                    (entry.request.url ?? '').toLowerCase().includes(lowerFilter) ||
-                    entry.request.method.toLowerCase().includes(lowerFilter) ||
-                    (entry.request.name ?? '').toLowerCase().includes(lowerFilter)
-                );
-                return matchedEntries.length > 0 ? [{ ...group, entries: matchedEntries }] : [];
-              })
-            : groups;
-          if (visibleGroups.length === 0) {
-            return <div className="sidebar-empty">{t('hisEmpty')}</div>;
-          }
-          return visibleGroups.map((group) => {
+        {visibleGroups.length === 0 ? (
+          <div className="sidebar-empty">{t('hisEmpty')}</div>
+        ) : (
+          visibleGroups.map((group) => {
             const expanded = lowerFilter ? true : expandedDates.has(group.date);
             return (
               <div key={group.date}>
@@ -281,8 +217,8 @@ export function HistorySidebar() {
                   })}
               </div>
             );
-          });
-        })()}
+          })
+        )}
       </div>
     </div>
   );

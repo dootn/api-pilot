@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { memo } from 'react';
 import { type KeyValuePair } from '../../stores/requestStore';
 import { VarInput } from '../../utils/varHighlight';
 import { useI18n } from '../../i18n';
-import { parseBulkText, itemsToBulkText, mergeDescriptions } from './bulkEditUtils';
+import { Textarea, Button, Checkbox } from './ui';
+import { useBulkEdit } from './useBulkEdit';
 
 interface Props {
   items: KeyValuePair[];
@@ -15,10 +16,9 @@ interface Props {
   varValues?: Map<string, string>;
 }
 
-export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valuePlaceholder = 'Value', knownVarNames, varValues }: Props) {
+export const KeyValueEditor = memo(function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valuePlaceholder = 'Value', knownVarNames, varValues }: Props) {
   const t = useI18n();
-  const [bulkMode, setBulkMode] = useState(false);
-  const [bulkText, setBulkText] = useState('');
+  const { bulkMode, bulkText, setBulkText, enterBulk, exitBulk } = useBulkEdit({ items, onChange });
 
   const updateItem = (index: number, field: keyof KeyValuePair, value: string | boolean) => {
     const newItems = [...items];
@@ -36,31 +36,18 @@ export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valueP
     onChange([...items, { key: '', value: '', enabled: true }]);
   };
 
-  const enterBulk = () => {
-    setBulkText(itemsToBulkText(items));
-    setBulkMode(true);
-  };
-
-  const exitBulk = () => {
-    const parsed = mergeDescriptions(parseBulkText(bulkText), items);
-    onChange(parsed.length > 0
-      ? [...parsed, { key: '', value: '', enabled: true }]
-      : [{ key: '', value: '', enabled: true }]);
-    setBulkMode(false);
-  };
-
   if (bulkMode) {
     return (
       <div className="kv-editor">
-        <textarea
-          className="body-textarea"
+        <Textarea
+          code
+          fullWidth
           value={bulkText}
           onChange={(e) => setBulkText(e.target.value)}
           placeholder={t('bulkEditPlaceholder')}
-          spellCheck={false}
-          style={{ minHeight: 120, fontFamily: 'var(--vscode-editor-font-family, monospace)', fontSize: 12 }}
+          style={{ minHeight: 120 }}
         />
-        <button className="kv-add-btn" onClick={exitBulk}>{t('tableViewBtn')}</button>
+        <Button variant="secondary" btnSize="sm" onClick={exitBulk}>{t('tableViewBtn')}</Button>
       </div>
     );
   }
@@ -69,8 +56,7 @@ export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valueP
     <div className="kv-editor">
       {items.map((item, index) => (
         <div key={index} className="kv-row">
-          <input
-            type="checkbox"
+          <Checkbox
             className="kv-checkbox"
             checked={item.enabled}
             onChange={(e) => updateItem(index, 'enabled', e.target.checked)}
@@ -109,10 +95,10 @@ export function KeyValueEditor({ items, onChange, keyPlaceholder = 'Key', valueP
           </button>
         </div>
       ))}
-      <div style={{ display: 'flex', gap: 4 }}>
-        <button className="kv-add-btn" onClick={addItem}>{t('addItem')}</button>
-        <button className="kv-add-btn" style={{ opacity: 0.65 }} onClick={enterBulk}>{t('bulkEditBtn')}</button>
+      <div className="flex-row gap-4">
+        <Button variant="secondary" btnSize="sm" onClick={addItem}>{t('addItem')}</Button>
+        <Button variant="ghost" btnSize="sm" onClick={enterBulk}>{t('bulkEditBtn')}</Button>
       </div>
     </div>
   );
-}
+});

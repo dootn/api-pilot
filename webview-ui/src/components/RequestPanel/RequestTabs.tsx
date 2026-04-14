@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useTabStore } from '../../stores/tabStore';
+import { useTabStore, useActiveTab } from '../../stores/tabStore';
 import { KeyValueEditor } from '../shared/KeyValueEditor';
 import { HeadersEditor } from './HeadersEditor';
 import { BodyEditor } from './BodyEditor';
@@ -57,8 +57,8 @@ const TAB_DEFS: { id: Tab; key: TranslationKey; label?: string }[] = [
 ];
 
 export function RequestTabs() {
-  const { activeTabId, tabs, updateTab } = useTabStore();
-  const tab = tabs.find((t) => t.id === activeTabId);
+  const updateTab = useTabStore((s) => s.updateTab);
+  const tab = useActiveTab();
   const { environments, activeEnvId } = useEnvironments();
   const t = useI18n();
   const [showCodeModal, setShowCodeModal] = useState(false);
@@ -120,26 +120,7 @@ export function RequestTabs() {
               {def.label ?? t(def.key)}
               {badge !== null && (
                 <span
-                  style={{
-                    marginLeft: 5,
-                    fontSize: 10,
-                    fontWeight: 600,
-                    padding: '1px 5px',
-                    borderRadius: 8,
-                    background: tab.activeTab === def.id
-                      ? 'var(--button-bg)'
-                      : 'var(--badge-bg)',
-                    color: tab.activeTab === def.id
-                      ? 'var(--button-fg)'
-                      : 'var(--badge-fg)',
-                    lineHeight: '14px',
-                    display: 'inline-block',
-                    verticalAlign: 'middle',
-                    maxWidth: 60,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
+                  className={`tab-badge${tab.activeTab === def.id ? ' tab-badge-active' : ''}`}
                 >
                   {badge}
                 </span>
@@ -151,9 +132,9 @@ export function RequestTabs() {
         {/* Code snippet button — HTTP mode only */}
         {!isWsMode && !isSseMode && !isMqttMode && !isGrpcMode && (
           <button
-            className="tab"
+            className="tab ml-auto"
             onClick={() => setShowCodeModal(true)}
-            style={{ marginLeft: 'auto', opacity: 0.75 }}
+            style={{ opacity: 0.75 }}
             title={t('viewCodeSnippet')}
           >
             ⟨/⟩ Code

@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { BodyType, ViewMode } from './types';
+import { useCopyToClipboard } from '../../../hooks/useCopyToClipboard';
+import { ToggleGroup, Button, Input } from '../../shared/ui';
 
 const MODE_LABELS: Record<ViewMode, string> = {
   pretty: 'Pretty',
@@ -36,7 +38,7 @@ export function Toolbar({
   onPrev,
   onNext,
 }: Props) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
   const [showSearch, setShowSearch] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const canCopy = TEXT_BASED_TYPES.has(type);
@@ -63,13 +65,11 @@ export function Toolbar({
 
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(raw);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      copy(raw);
     } catch {
       // Clipboard API not available
     }
-  }, [raw]);
+  }, [raw, copy]);
 
   const handleToggleSearch = useCallback(() => {
     if (showSearch) {
@@ -78,80 +78,41 @@ export function Toolbar({
     setShowSearch((v) => !v);
   }, [showSearch, onSearchChange]);
 
-  const modeButtonStyle = (active: boolean): React.CSSProperties => ({
-    padding: '2px 10px',
-    fontSize: 11,
-    cursor: 'pointer',
-    background: active ? 'var(--badge-bg, rgba(255,255,255,0.12))' : 'transparent',
-    color: active ? 'var(--vscode-button-foreground, #ffffff)' : 'var(--panel-fg)',
-    border: '1px solid var(--border-color)',
-    borderRadius: 4,
-    outline: 'none',
-    fontWeight: active ? 600 : 400,
-    opacity: active ? 1 : 0.65,
-  });
-
-  const iconButtonStyle: React.CSSProperties = {
-    padding: '2px 8px',
-    fontSize: 11,
-    cursor: 'pointer',
-    background: 'transparent',
-    color: 'var(--panel-fg)',
-    border: '1px solid var(--border-color)',
-    borderRadius: 4,
-    outline: 'none',
-    opacity: 0.7,
-  };
+  const modeOptions = availableModes.map((m) => ({ value: m, label: MODE_LABELS[m] }));
 
   if (availableModes.length <= 1 && !canCopy && !canSearch) return null;
 
   return (
     <div
+      className="border-b"
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: 4,
         padding: '4px 12px',
-        borderBottom: '1px solid var(--border-color)',
         flexWrap: 'wrap',
         flexShrink: 0,
       }}
     >
       {/* Mode buttons */}
       {availableModes.length > 1 && (
-        <div style={{ display: 'flex', gap: 4 }}>
-          {availableModes.map((m) => (
-            <button key={m} style={modeButtonStyle(mode === m)} onClick={() => setMode(m)}>
-              {MODE_LABELS[m]}
-            </button>
-          ))}
-        </div>
+        <ToggleGroup options={modeOptions} value={mode} onChange={setMode} />
       )}
 
       {/* Search input + match count + navigation (inline, expands when open) */}
       {canSearch && showSearch && (
         <>
-          <input
+          <Input
             ref={searchInputRef}
+            inputSize="sm"
             type="text"
             value={searchTerm}
             onChange={(e) => onSearchChange!(e.target.value)}
             placeholder="Search…"
-            style={{
-              flex: 1,
-              minWidth: 120,
-              maxWidth: 260,
-              padding: '2px 8px',
-              fontSize: 11,
-              border: '1px solid var(--border-color)',
-              borderRadius: 4,
-              background: 'var(--input-bg, var(--panel-bg))',
-              color: 'var(--panel-fg)',
-              outline: 'none',
-            }}
+            style={{ flex: 1, minWidth: 120, maxWidth: 260 }}
           />
           {searchTerm.trim() && (
-            <span style={{ fontSize: 11, opacity: 0.7, whiteSpace: 'nowrap' }}>
+            <span className="text-secondary" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
               {matchCount === 0
                 ? 'No matches'
                 : `${currentMatchIdx + 1} / ${matchCount}`}
@@ -159,32 +120,29 @@ export function Toolbar({
           )}
           {matchCount > 0 && (
             <>
-              <button style={iconButtonStyle} title="Previous match" onClick={onPrev}>↑</button>
-              <button style={iconButtonStyle} title="Next match" onClick={onNext}>↓</button>
+              <Button variant="ghost" btnSize="sm" title="Previous match" onClick={onPrev}>↑</Button>
+              <Button variant="ghost" btnSize="sm" title="Next match" onClick={onNext}>↓</Button>
             </>
           )}
         </>
       )}
 
       {/* Right-side action buttons */}
-      <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+      <div className="flex-row ml-auto gap-4">
         {canSearch && (
-          <button
-            style={{
-              ...iconButtonStyle,
-              opacity: showSearch ? 1 : 0.7,
-              background: showSearch ? 'var(--badge-bg, rgba(255,255,255,0.1))' : 'transparent',
-            }}
+          <Button
+            variant="ghost"
+            style={showSearch ? { opacity: 1, background: 'var(--badge-bg, rgba(255,255,255,0.1))' } : {}}
             title={showSearch ? 'Close search' : 'Search'}
             onClick={handleToggleSearch}
           >
             🔍
-          </button>
+          </Button>
         )}
         {canCopy && (
-          <button style={iconButtonStyle} onClick={handleCopy}>
+          <Button variant="ghost" onClick={handleCopy}>
             {copied ? '✓ Copied' : 'Copy'}
-          </button>
+          </Button>
         )}
       </div>
     </div>

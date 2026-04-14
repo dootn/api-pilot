@@ -256,9 +256,14 @@ export const useTabStore = create<TabState>((set, get) => ({
   },
 }));
 
+/** Convenience selector: returns the active tab (or undefined). */
+export function useActiveTab(): RequestTab | undefined {
+  return useTabStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
+}
+
 // Debounced persist — save to extension (written to .api-pilot/session/tabs.json)
 let _saveTimer: ReturnType<typeof setTimeout> | null = null;
-useTabStore.subscribe((state) => {
+useTabStore.subscribe(() => {
   if (_saveTimer) clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => {
     const { tabs, activeTabId } = useTabStore.getState();

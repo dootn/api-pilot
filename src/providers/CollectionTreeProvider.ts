@@ -218,9 +218,9 @@ export class CollectionTreeItem extends vscode.TreeItem {
     public readonly itemId?: string,
     collectionData?: Collection,
     folderItems?: CollectionItem[],
-    private requestData?: string,
+    requestData?: string,
     collectionId?: string,
-    method?: string
+    _method?: string
   ) {
     super(label, collapsibleState);
     this.collectionData = collectionData;
@@ -239,13 +239,7 @@ export class CollectionTreeItem extends vscode.TreeItem {
         this.iconPath = new vscode.ThemeIcon('folder');
         break;
       case 'request': {
-        const resolvedMethod = method || 'GET';
-        // Remove icon, method name is now part of the label
-        // this.iconPath = new vscode.ThemeIcon(
-        //   'circle-filled',
-        //   new vscode.ThemeColor(methodColor(resolvedMethod))
-        // );
-        // this.description = resolvedMethod;
+        // Icon removed — method name is now part of the label
         if (requestData) {
           this.command = {
             command: 'apiPilot.openRequest',
@@ -262,15 +256,3 @@ export class CollectionTreeItem extends vscode.TreeItem {
   }
 }
 
-/** Map HTTP method to a VS Code ThemeColor id (Postman-style palette) */
-function methodColor(method: string): string {
-  switch (method.toUpperCase()) {
-    case 'GET':     return 'charts.green';
-    case 'POST':    return 'charts.orange';
-    case 'PUT':     return 'charts.blue';
-    case 'DELETE':  return 'charts.red';
-    case 'PATCH':   return 'charts.purple';
-    case 'OPTIONS': return 'charts.yellow';
-    default:        return 'charts.foreground';
-  }
-}

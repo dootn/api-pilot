@@ -1,30 +1,23 @@
 import { request, Agent } from 'undici';
 import type * as vscode from 'vscode';
-import { ApiRequest, SseEvent, SseStatus, KeyValuePair } from '../types';
-import { VariableResolver } from './VariableResolver';
+import { ApiRequest, SseEvent, KeyValuePair } from '../types';
 import { HistoryService } from './HistoryService';
+import { BaseConnectionClient, type BaseConnection } from './BaseConnectionClient';
 
-interface SseConnection {
-  connectionId: string;
-  tabId: string;
+interface SseConnection extends BaseConnection {
   request: ApiRequest;
-  connectedAt?: number;
   receivedCount: number;
   abortController: AbortController;
 }
 
-export class SseClient {
-  /** connectionId -> connection info */
-  private connections = new Map<string, SseConnection>();
-  /** tabId -> connectionId */
-  private tabConnections = new Map<string, string>();
-  private variableResolver = new VariableResolver();
-
+export class SseClient extends BaseConnectionClient<SseConnection> {
   constructor(
-    private webview: vscode.Webview,
-    private historyService?: HistoryService,
-    private maxHistory = 1000,
-  ) {}
+    webview: vscode.Webview,
+    historyService?: HistoryService,
+    maxHistory = 1000,
+  ) {
+    super(webview, historyService, maxHistory);
+  }
 
   connect(tabId: string, request: ApiRequest, envVariables: KeyValuePair[]): void {
     // Close any existing connection for this tab first
@@ -73,12 +66,6 @@ export class SseClient {
     this.connections.delete(connectionId);
     this.tabConnections.delete(conn.tabId);
     this.postStatus(conn.tabId, 'disconnected');
-  }
-
-  disposeAll(): void {
-    for (const connectionId of [...this.connections.keys()]) {
-      this.disconnect(connectionId);
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -273,7 +260,7 @@ export class SseClient {
     return headers;
   }
 
-  private saveSessionHistory(conn: SseConnection): void {
+  protected saveSessionHistory(conn: SseConnection): void {
     if (!this.historyService) return;
     if (conn.receivedCount === 0) return;  // nothing received — don't pollute history
     const duration = conn.connectedAt ? Date.now() - conn.connectedAt : 0;
@@ -284,7 +271,7 @@ export class SseClient {
     );
   }
 
-  private postStatus(tabId: string, status: SseStatus, connectionId?: string, error?: string): void {
+  protected postStatus(tabId: string, status: string, connectionId?: string, error?: string): void {
     this.webview.postMessage({
       type: 'sseStatusChanged',
       tabId,

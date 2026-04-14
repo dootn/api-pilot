@@ -125,7 +125,7 @@ export class HistoryTreeItem extends vscode.TreeItem {
     public readonly entry?: HistoryEntry,
     public readonly groupDate?: string,
     description?: string,
-    method?: string
+    _method?: string
   ) {
     super(label, collapsibleState);
     this.description = description;

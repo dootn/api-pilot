@@ -1,114 +1,28 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useTabStore } from '../../stores/tabStore';
-import type { HttpMethod, Protocol } from '../../stores/requestStore';
-import { useSettingsStore } from '../../stores/settingsStore';
+import { useTabStore, useActiveTab } from '../../stores/tabStore';
 import { vscode } from '../../vscode';
 import { useEnvironments } from '../../hooks/useEnvironments';
+import { useProtocolMode } from '../../hooks/useProtocolMode';
 import { renderVarHighlight } from '../../utils/varHighlight';
 import { useI18n } from '../../i18n';
-
-const DEFAULT_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'];
-
-const METHOD_CLASSES: Record<string, string> = {
-  GET: 'method-get',
-  POST: 'method-post',
-  PUT: 'method-put',
-  DELETE: 'method-delete',
-  PATCH: 'method-patch',
-  OPTIONS: 'method-options',
-  HEAD: 'method-head',
-};
-
-interface FolderItem {
-  type: string;
-  name: string;
-  items?: FolderItem[];
-}
-
-interface CollectionBrief {
-  id: string;
-  name: string;
-  items: FolderItem[];
-}
-
-function FolderRows({
-  collectionId,
-  items,
-  depth,
-  onSave,
-}: {
-  collectionId: string;
-  items: FolderItem[];
-  depth: number;
-  onSave: (collectionId: string, folderId?: string) => void;
-}) {
-  const folders = items.filter((i) => i.type === 'folder');
-  if (folders.length === 0) return null;
-  return (
-    <>
-      {folders.map((folder) => (
-        <div key={folder.name}>
-          <div
-            className="save-dropdown-item"
-            style={{ paddingLeft: 12 + depth * 14 }}
-            onClick={() => onSave(collectionId, folder.name)}
-          >
-            {'  '.repeat(depth)}📂 {folder.name}
-          </div>
-          {folder.items?.length ? (
-            <FolderRows
-              collectionId={collectionId}
-              items={folder.items}
-              depth={depth + 1}
-              onSave={onSave}
-            />
-          ) : null}
-        </div>
-      ))}
-    </>
-  );
-}
-
-function SaveColTree({
-  col,
-  onSave,
-}: {
-  col: CollectionBrief;
-  onSave: (collectionId: string, folderId?: string) => void;
-}) {
-  return (
-    <>
-      <div
-        className="save-dropdown-item"
-        onClick={() => onSave(col.id)}
-        style={{ fontWeight: 600 }}
-      >
-        📁 {col.name}
-      </div>
-      {col.items?.length ? (
-        <FolderRows collectionId={col.id} items={col.items} depth={1} onSave={onSave} />
-      ) : null}
-    </>
-  );
-}
+import { ProtocolSelector, MethodSelector } from './ProtocolSelector';
+import { SaveDialog } from './SaveDialog';
+import { useProtocolHandlers } from './useProtocolHandlers';
+import { Input } from '../shared/ui';
 
 /** Thin alias — delegates to the shared renderVarHighlight utility. */
 const renderHighlightedUrl = renderVarHighlight;
 
 export function UrlBar() {
-  const { activeTabId, tabs, updateTab } = useTabStore();
+  const updateTab = useTabStore((s) => s.updateTab);
   const t = useI18n();
-  const customHttpMethods = useSettingsStore((s) => s.customHttpMethods);
-  const [showSaveDropdown, setShowSaveDropdown] = useState(false);
-  const [collections, setCollections] = useState<CollectionBrief[]>([]);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
-  const saveDropdownRef = useRef<HTMLDivElement>(null);
-  const urlInputRef = useRef<HTMLInputElement>(null);
   const [varSuggestions, setVarSuggestions] = useState<{ key: string; value: string }[]>([]);
   const [showVarDropdown, setShowVarDropdown] = useState(false);
   const [varActiveIdx, setVarActiveIdx] = useState(-1);
   const { environments, activeEnvId } = useEnvironments();
-  const tab = tabs.find((t) => t.id === activeTabId);
+  const urlInputRef = useRef<HTMLInputElement>(null);
+  const tab = useActiveTab();
+  const { isWs, isSse, isMqtt, isGrpc, isConnectionProtocol } = useProtocolMode(tab?.protocol);
 
   const activeEnvVars = useMemo(() => {
     const env = environments.find((e) => e.id === activeEnvId);
@@ -127,32 +41,6 @@ export function UrlBar() {
 
   const urlHighlightRef = useRef<HTMLDivElement>(null);
 
-  // Load collections and listen for response when save dropdown opens
-  useEffect(() => {
-    if (!showSaveDropdown) return;
-    const handler = (event: MessageEvent) => {
-      const msg = event.data;
-      if (msg.type === 'collections') {
-        setCollections((msg.payload as CollectionBrief[]) ?? []);
-      }
-    };
-    window.addEventListener('message', handler);
-    vscode.postMessage({ type: 'getCollections' });
-    return () => window.removeEventListener('message', handler);
-  }, [showSaveDropdown]);
-
-  // Close save dropdown when clicking outside
-  useEffect(() => {
-    if (!showSaveDropdown) return;
-    const close = (e: MouseEvent) => {
-      if (saveDropdownRef.current && !saveDropdownRef.current.contains(e.target as Node)) {
-        setShowSaveDropdown(false);
-      }
-    };
-    window.addEventListener('mousedown', close);
-    return () => window.removeEventListener('mousedown', close);
-  }, [showSaveDropdown]);
-
   // Sync horizontal scroll of backing highlight layer with the visible input
   useEffect(() => {
     const input = urlInputRef.current;
@@ -165,202 +53,7 @@ export function UrlBar() {
 
   if (!tab) return null;
 
-  const isWsMode = tab.protocol === 'websocket';
-  const isSseMode = tab.protocol === 'sse';
-  const isMqttMode = tab.protocol === 'mqtt';
-  const isGrpcMode = tab.protocol === 'grpc';
-
-  const handleWsToggle = () => {
-    if (!tab.url.trim()) return;
-
-    if (tab.wsStatus === 'connected' || tab.wsStatus === 'connecting') {
-      // Disconnect
-      if (tab.wsConnectionId) {
-        vscode.postMessage({ type: 'wsDisconnect', payload: { connectionId: tab.wsConnectionId } });
-      }
-      updateTab(tab.id, { wsStatus: 'disconnected', wsConnectionId: undefined, loading: false });
-      return;
-    }
-
-    // Connect
-    updateTab(tab.id, { loading: true, wsMessages: [], responseError: null });
-    vscode.postMessage({
-      type: 'wsConnect',
-      tabId: tab.id,
-      payload: {
-        id: tab.id,
-        name: tab.name,
-        protocol: tab.protocol,
-        method: tab.method,
-        url: tab.url.trim(),
-        params: tab.params.filter((p) => p.key),
-        headers: tab.headers.filter((h) => h.key),
-        body: tab.body,
-        auth: tab.auth,
-        preScript: tab.preScript,
-        postScript: tab.postScript,
-        sslVerify: tab.sslVerify ?? true,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      },
-    });
-  };
-
-  const handleGrpcCall = () => {
-    if (!tab.url.trim()) return;
-
-    if (tab.grpcStatus === 'streaming' || tab.grpcStatus === 'connecting') {
-      if (tab.grpcCallId) {
-        vscode.postMessage({ type: 'grpcCancel', payload: { callId: tab.grpcCallId } });
-      }
-      updateTab(tab.id, { grpcStatus: 'idle', grpcCallId: undefined, loading: false });
-      return;
-    }
-
-    updateTab(tab.id, { loading: true, grpcMessages: [], responseError: null });
-    vscode.postMessage({
-      type: 'grpcCall',
-      tabId: tab.id,
-      payload: {
-        id: tab.id,
-        name: tab.name,
-        protocol: tab.protocol,
-        method: tab.method,
-        url: tab.url.trim(),
-        params: tab.params.filter((p) => p.key),
-        headers: tab.headers.filter((h) => h.key),
-        body: tab.body,
-        auth: tab.auth,
-        grpcOptions: tab.grpcOptions,
-        sslVerify: tab.sslVerify ?? true,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      },
-    });
-  };
-
-  const handleMqttToggle = () => {
-    if (!tab.url.trim()) return;
-
-    if (tab.mqttStatus === 'connected' || tab.mqttStatus === 'connecting') {
-      if (tab.mqttConnectionId) {
-        vscode.postMessage({ type: 'mqttDisconnect', payload: { connectionId: tab.mqttConnectionId } });
-      }
-      updateTab(tab.id, { mqttStatus: 'disconnected', mqttConnectionId: undefined, loading: false });
-      return;
-    }
-
-    updateTab(tab.id, { loading: true, mqttMessages: [], mqttSubscriptions: [], responseError: null });
-    vscode.postMessage({
-      type: 'mqttConnect',
-      tabId: tab.id,
-      payload: {
-        id: tab.id,
-        name: tab.name,
-        protocol: tab.protocol,
-        method: tab.method,
-        url: tab.url.trim(),
-        params: tab.params.filter((p) => p.key),
-        headers: tab.headers.filter((h) => h.key),
-        body: { type: 'none' },
-        auth: tab.auth,
-        preScript: undefined,
-        postScript: undefined,
-        sslVerify: tab.sslVerify ?? true,
-        mqttOptions: tab.mqttOptions,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      },
-    });
-  };
-
-  const handleSseToggle = () => {
-    if (!tab.url.trim()) return;
-
-    if (tab.sseStatus === 'connected' || tab.sseStatus === 'connecting') {
-      // Disconnect
-      if (tab.sseConnectionId) {
-        vscode.postMessage({ type: 'sseDisconnect', payload: { connectionId: tab.sseConnectionId } });
-      }
-      updateTab(tab.id, { sseStatus: 'disconnected', sseConnectionId: undefined, loading: false });
-      return;
-    }
-
-    // Connect
-    updateTab(tab.id, { loading: true, sseEvents: [], responseError: null });
-    vscode.postMessage({
-      type: 'sseConnect',
-      tabId: tab.id,
-      payload: {
-        id: tab.id,
-        name: tab.name,
-        protocol: tab.protocol,
-        method: 'GET',
-        url: tab.url.trim(),
-        params: tab.params.filter((p) => p.key),
-        headers: tab.headers.filter((h) => h.key),
-        body: { type: 'none' },
-        auth: tab.auth,
-        preScript: undefined,
-        postScript: undefined,
-        sslVerify: tab.sslVerify ?? true,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      },
-    });
-  };
-
-  const handleSend = () => {
-    if (!tab.url.trim()) return;
-
-    if (isWsMode) {
-      handleWsToggle();
-      return;
-    }
-
-    if (isGrpcMode) {
-      handleGrpcCall();
-      return;
-    }
-
-    if (isMqttMode) {
-      handleMqttToggle();
-      return;
-    }
-
-    if (isSseMode) {
-      handleSseToggle();
-      return;
-    }
-
-    if (tab.loading) {
-      vscode.postMessage({ type: 'cancelRequest', requestId: tab.id });
-      updateTab(tab.id, { loading: false });
-      return;
-    }
-
-    updateTab(tab.id, { loading: true, response: null, responseError: null });
-
-    vscode.postMessage({
-      type: 'sendRequest',
-      requestId: tab.id,
-      payload: {
-        id: tab.id,
-        name: tab.name,
-        method: tab.method,
-        url: tab.url.trim(),
-        params: tab.params.filter((p) => p.key),
-        headers: tab.headers.filter((h) => h.key),
-        body: tab.body,
-        auth: tab.auth,
-        preScript: tab.preScript,
-        postScript: tab.postScript,
-        sslVerify: tab.sslVerify ?? true,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      },
-    });
-  };
+  const { handleSend } = useProtocolHandlers(tab, updateTab, { isWs, isSse, isMqtt, isGrpc });
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newUrl = e.target.value;
@@ -487,93 +180,35 @@ export function UrlBar() {
       type: 'updateCollectionRequest',
       payload: { collectionId: tab.collectionId, request: buildSaveRequest() },
     });
-    // Reset dirty flag after successful save
     updateTab(tab.id, { isDirty: false });
-    setSaveStatus('saved');
-    setTimeout(() => setSaveStatus('idle'), 2000);
   }
 
   function handleSaveAs(collectionId: string, folderId?: string) {
     if (!tab) return;
-    const req = buildSaveRequest(); // uses tab.id — keeps collection request id in sync with the tab id
+    const req = buildSaveRequest();
     vscode.postMessage({
       type: 'saveToCollection',
       payload: { collectionId, folderId, request: req },
     });
-    // Update the tab so that it is now bound to this collection, and clear dirty flag
     updateTab(tab.id, { collectionId, isDirty: false });
-    setSaveStatus('saved');
-    setShowSaveDropdown(false);
-    setTimeout(() => setSaveStatus('idle'), 2000);
   }
 
   return (
     <div className="url-bar">
       {/* Protocol selector */}
-      <select
-        value={tab.protocol ?? 'http'}
-        onChange={(e) => {
-          const p = e.target.value as Protocol;
-          updateTab(tab.id, { protocol: p });
-        }}
-        style={{
-          fontSize: 12,
-          fontWeight: 600,
-          padding: '4px 6px',
-          borderRadius: '4px 0 0 4px',
-          border: '1px solid var(--border-color, #555)',
-          background: 'var(--input-bg, #3c3c3c)',
-          color: tab.protocol === 'websocket'
-            ? 'var(--vscode-terminal-ansiCyan, #4ec9b0)'
-            : tab.protocol === 'sse'
-              ? 'var(--vscode-terminal-ansiYellow, #dcdcaa)'
-              : tab.protocol === 'mqtt'
-                ? 'var(--vscode-terminal-ansiMagenta, #c586c0)'
-                : tab.protocol === 'grpc'
-                  ? 'var(--vscode-terminal-ansiBlue, #569cd6)'
-                  : 'var(--panel-fg)',
-          cursor: 'pointer',
-          flexShrink: 0,
-        }}
-      >
-        <option value="http">HTTP</option>
-        <option value="websocket">WS</option>
-        <option value="sse">SSE</option>
-        <option value="mqtt">MQTT</option>
-        <option value="grpc">gRPC</option>
-      </select>
+      <ProtocolSelector
+        protocol={tab.protocol}
+        onChange={(p) => updateTab(tab.id, { protocol: p })}
+      />
 
       {/* Method selector + URL input: connected group, no gap between them */}
       <div style={{ display: 'flex', flex: 1, minWidth: 0 }}>
         {/* Method selector — hidden in WS, SSE, MQTT, or gRPC mode */}
-        {!isWsMode && !isSseMode && !isMqttMode && !isGrpcMode && (
-        <select
-          className={`method-select ${METHOD_CLASSES[tab.method] || 'method-get'}`}
-          value={tab.method}
-          onChange={(e) => {
-            updateTab(tab.id, { method: e.target.value as HttpMethod });
-          }}
-        >
-          {DEFAULT_METHODS.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-          {/* Custom methods from VS Code settings */}
-          {customHttpMethods.filter((m) => !DEFAULT_METHODS.includes(m as HttpMethod)).map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-          {/* Show current method if it's not in default or settings list (legacy tabs) */}
-          {!DEFAULT_METHODS.includes(tab.method as any) &&
-            !customHttpMethods.includes(tab.method) &&
-            (tab.method as string) !== '__custom__' && (
-            <option key={tab.method} value={tab.method}>
-              {tab.method}
-            </option>
-          )}
-        </select>
+        {!isConnectionProtocol && (
+          <MethodSelector
+            method={tab.method}
+            onChange={(m) => updateTab(tab.id, { method: m })}
+          />
         )}
 
         <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
@@ -603,11 +238,11 @@ export function UrlBar() {
               {renderHighlightedUrl(tab.url, knownVarNames, varValues)}
             </div>
           )}
-          <input
+          <Input
             ref={urlInputRef}
             className="url-input"
             type="text"
-            placeholder={isWsMode ? 'Enter WebSocket URL (e.g. ws://localhost:3456/ws)' : isSseMode ? 'Enter SSE URL (e.g. http://localhost:3458/sse)' : isMqttMode ? 'Enter MQTT broker URL (e.g. mqtt://localhost:1883)' : isGrpcMode ? 'Enter gRPC target (e.g. grpc://localhost:50051 or host:port)' : 'Enter request URL (e.g. https://api.example.com/users)'}
+            placeholder={isWs ? 'Enter WebSocket URL (e.g. ws://localhost:3456/ws)' : isSse ? 'Enter SSE URL (e.g. http://localhost:3458/sse)' : isMqtt ? 'Enter MQTT broker URL (e.g. mqtt://localhost:1883)' : isGrpc ? 'Enter gRPC target (e.g. grpc://localhost:50051 or host:port)' : 'Enter request URL (e.g. https://api.example.com/users)'}
             value={tab.url}
             onChange={handleUrlChange}
             onKeyDown={handleUrlKeyDown}
@@ -676,25 +311,25 @@ export function UrlBar() {
         onClick={handleSend}
         disabled={!tab.url.trim() && !tab.loading && tab.wsStatus !== 'connected' && tab.sseStatus !== 'connected' && tab.mqttStatus !== 'connected' && tab.grpcStatus !== 'streaming'}
       >
-        {isWsMode
+        {isWs
           ? tab.wsStatus === 'connected'
             ? 'Disconnect'
             : tab.wsStatus === 'connecting' || tab.loading
               ? 'Connecting…'
               : 'Connect'
-          : isSseMode
+          : isSse
             ? tab.sseStatus === 'connected'
               ? 'Disconnect'
               : tab.sseStatus === 'connecting' || tab.loading
                 ? 'Connecting…'
                 : 'Connect'
-            : isMqttMode
+            : isMqtt
               ? tab.mqttStatus === 'connected'
                 ? 'Disconnect'
                 : tab.mqttStatus === 'connecting' || tab.loading
                   ? 'Connecting…'
                   : 'Connect'
-              : isGrpcMode
+              : isGrpc
                 ? tab.grpcStatus === 'streaming' || tab.grpcStatus === 'connecting'
                   ? 'Cancel'
                   : tab.loading
@@ -706,7 +341,7 @@ export function UrlBar() {
       </button>
 
       {/* SSL verify toggle — only meaningful for HTTPS (not WS, SSE, MQTT, or gRPC mode) */}
-      {!isWsMode && !isSseMode && !isMqttMode && !isGrpcMode && tab.url.trim().toLowerCase().startsWith('https') && (
+      {!isConnectionProtocol && tab.url.trim().toLowerCase().startsWith('https') && (
         <button
           className="ssl-toggle-btn"
           title={(tab.sslVerify ?? true) ? t('urlSslVerifyOn') : t('urlSslVerifyOff')}
@@ -727,47 +362,12 @@ export function UrlBar() {
         </button>
       )}
 
-      {/* Save: update existing collection item — shown when tab is bound to a collection */}
-      {tab.collectionId && (
-        <button
-          className={`save-btn ${saveStatus === 'saved' ? 'saved' : ''}`}
-          onClick={handleDirectSave}
-          title={t('urlSaveTitleUpdate')}
-          disabled={!tab.url.trim()}
-        >
-          {saveStatus === 'saved' ? t('urlSavedBtn') : t('urlSaveBtn')}
-        </button>
-      )}
-
-      {/* Save As: always available, picks collection */}
-      <div className="save-wrap" ref={saveDropdownRef}>
-        <button
-          className="save-btn"
-          onClick={() => { setShowSaveDropdown((v) => !v); }}
-          title={t('urlSaveTitleAs')}
-          disabled={!tab.url.trim()}
-        >
-          {tab.collectionId ? t('urlSaveAsBtn') : t('urlSaveNewBtn')}
-        </button>
-
-        {showSaveDropdown && (
-          <div className="save-dropdown">
-            {collections.length === 0 ? (
-              <div style={{ padding: '8px 12px', fontSize: 12, opacity: 0.6 }}>
-                {t('urlNoCollections')}
-              </div>
-            ) : (
-              collections.map((col) => (
-                <SaveColTree
-                  key={col.id}
-                  col={col}
-                  onSave={(collectionId, folderId) => handleSaveAs(collectionId, folderId)}
-                />
-              ))
-            )}
-          </div>
-        )}
-      </div>
+      <SaveDialog
+        collectionId={tab.collectionId}
+        disabled={!tab.url.trim()}
+        onDirectSave={handleDirectSave}
+        onSaveAs={handleSaveAs}
+      />
     </div>
   );
 }

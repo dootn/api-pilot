@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import type { RequestTab } from '../../stores/tabStore';
 import {
   generateCurl,
@@ -8,6 +8,9 @@ import {
 } from '../../utils/codeGenerators';
 import { useEnvironments } from '../../hooks/useEnvironments';
 import { useI18n } from '../../i18n';
+import { useCopyToClipboard } from '../../hooks/useCopyToClipboard';
+import { Modal } from '../shared/Modal';
+import { ToggleGroup, Button } from '../shared/ui';
 
 type CodeLang = 'curl' | 'js-fetch' | 'js-axios' | 'python';
 
@@ -43,7 +46,7 @@ function buildCode(lang: CodeLang, tab: RequestTab): string {
 
 export function CodeModal({ tab, onClose }: { tab: RequestTab; onClose: () => void }) {
   const [activeLang, setActiveLang] = useState<CodeLang>('curl');
-  const [copied, setCopied] = useState(false);
+  const { copied, copy, reset: resetCopied } = useCopyToClipboard();
   const { environments, activeEnvId } = useEnvironments();
   const t = useI18n();
 
@@ -56,129 +59,46 @@ export function CodeModal({ tab, onClose }: { tab: RequestTab; onClose: () => vo
   const resolvedTab = useMemo(() => resolveTabVars(tab, varMap), [tab, varMap]);
   const code = buildCode(activeLang, resolvedTab);
 
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(code).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [code]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const handleCopy = () => copy(code);
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(0,0,0,0.55)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        style={{
-          width: 'min(720px, 96vw)',
-          maxHeight: '80vh',
-          background: 'var(--panel-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: 6,
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-        }}
-      >
+    <Modal onClose={onClose} width="min(720px, 96vw)" maxHeight="80vh">
+      <div className="code-modal-content">
         {/* Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '10px 14px',
-          borderBottom: '1px solid var(--border-color)',
-        }}>
-          <span style={{ fontWeight: 600, fontSize: 13 }}>{t('codeSnippetTitle')}</span>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'transparent', border: 'none', cursor: 'pointer',
-              color: 'var(--panel-fg)', fontSize: 16, lineHeight: 1, padding: '0 2px',
-              opacity: 0.7,
-            }}
-            title={t('closeBtn')}
-          >✕</button>
+        <div className="code-modal-header border-b">
+          <span className="code-modal-title">{t('codeSnippetTitle')}</span>
+          <button onClick={onClose} className="icon-btn" title={t('closeBtn')}>✕</button>
         </div>
 
         {/* Language tabs */}
-        <div style={{
-          display: 'flex', gap: 2, padding: '0 14px',
-          borderBottom: '1px solid var(--border-color)',
-        }}>
-          {CODE_TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => { setActiveLang(t.id); setCopied(false); }}
-              style={{
-                padding: '6px 12px',
-                background: 'transparent',
-                border: 'none',
-                borderBottom: activeLang === t.id
-                  ? '2px solid var(--button-bg)'
-                  : '2px solid transparent',
-                cursor: 'pointer',
-                color: 'var(--panel-fg)',
-                fontSize: 12,
-                opacity: activeLang === t.id ? 1 : 0.6,
-                fontWeight: activeLang === t.id ? 600 : 400,
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="code-modal-tabs border-b">
+          <ToggleGroup
+            options={CODE_TABS.map(t => ({ value: t.id, label: t.label }))}
+            value={activeLang}
+            onChange={(v) => { setActiveLang(v); resetCopied(); }}
+          />
         </div>
 
         {/* Code area */}
-        <div style={{ flex: 1, overflow: 'auto', padding: 14 }}>
-          <pre style={{
-            margin: 0,
-            fontFamily: 'var(--vscode-editor-font-family, monospace)',
-            fontSize: 12,
-            lineHeight: 1.5,
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-all',
-            color: 'var(--panel-fg)',
-          }}>{code}</pre>
+        <div className="code-modal-body">
+          <pre className="code-modal-pre">{code}</pre>
         </div>
 
         {/* Footer */}
-        <div style={{
-          display: 'flex', justifyContent: 'flex-end', gap: 8,
-          padding: '8px 14px',
-          borderTop: '1px solid var(--border-color)',
-        }}>
-          <button
+        <div className="code-modal-footer border-t">
+          <Button
+            variant={copied ? 'primary' : 'primary'}
+            btnSize="sm"
             onClick={handleCopy}
-            style={{
-              padding: '4px 14px',
-              background: copied ? 'var(--success-fg, #4ec9b0)' : 'var(--button-bg)',
-              color: 'var(--button-fg)',
-              border: 'none', borderRadius: 3, cursor: 'pointer', fontSize: 12,
-            }}
+            style={copied ? { background: 'var(--success-fg, #4ec9b0)' } : undefined}
           >
             {copied ? t('codeSnippetCopied') : t('codeSnippetCopy')}
-          </button>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '4px 14px',
-              background: 'transparent', color: 'var(--panel-fg)',
-              border: '1px solid var(--border-color)', borderRadius: 3,
-              cursor: 'pointer', fontSize: 12,
-            }}
-          >
+          </Button>
+          <Button variant="secondary" btnSize="sm" onClick={onClose}>
             {t('closeBtn')}
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

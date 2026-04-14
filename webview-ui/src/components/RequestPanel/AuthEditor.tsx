@@ -1,8 +1,10 @@
-import { useTabStore } from '../../stores/tabStore';
+import { useTabStore, useActiveTab } from '../../stores/tabStore';
 import type { AuthConfig } from '../../stores/requestStore';
 import { useI18n } from '../../i18n';
+import { Select, ToggleGroup, Input, Option } from '../shared/ui';
+import { EmptyState } from '../shared/EmptyState';
 
-const AUTH_TYPES: { value: AuthConfig['type']; label: string }[] = [
+const AUTH_OPTIONS: { value: AuthConfig['type']; label: string }[] = [
   { value: 'none', label: 'None' },
   { value: 'bearer', label: 'Bearer' },
   { value: 'basic', label: 'Basic' },
@@ -10,8 +12,8 @@ const AUTH_TYPES: { value: AuthConfig['type']; label: string }[] = [
 ];
 
 export function AuthEditor() {
-  const { activeTabId, tabs, updateTab } = useTabStore();
-  const tab = tabs.find((t) => t.id === activeTabId);
+  const updateTab = useTabStore((s) => s.updateTab);
+  const tab = useActiveTab();
   const t = useI18n();
   if (!tab) return null;
 
@@ -26,39 +28,22 @@ export function AuthEditor() {
   return (
     <div className="auth-editor">
       {/* Horizontal radio-style type selector */}
-      <div style={{ display: 'flex', gap: 2, padding: '6px 8px 4px', flexWrap: 'wrap' }}>
-        {AUTH_TYPES.map(({ value, label }) => (
-          <button
-            key={value}
-            onClick={() => handleTypeChange(value)}
-            style={{
-              padding: '3px 10px',
-              fontSize: 12,
-              border: '1px solid',
-              borderRadius: 3,
-              cursor: 'pointer',
-              borderColor: auth.type === value ? 'var(--button-bg)' : 'var(--border-color)',
-              background: auth.type === value ? 'var(--button-bg)' : 'transparent',
-              color: auth.type === value ? 'var(--button-fg)' : 'var(--panel-fg)',
-              fontWeight: auth.type === value ? 600 : 400,
-              opacity: auth.type === value ? 1 : 0.75,
-            }}
-          >
-            {label}
-          </button>
-        ))}
+      <div style={{ padding: '6px 8px 4px' }}>
+        <ToggleGroup
+          options={AUTH_OPTIONS}
+          value={auth.type}
+          onChange={handleTypeChange}
+        />
       </div>
 
       {auth.type === 'none' && (
-        <div className="empty-state" style={{ padding: '20px' }}>
-          <span style={{ opacity: 0.6 }}>{t('noAuth')}</span>
-        </div>
+        <EmptyState padding={20}>{t('noAuth')}</EmptyState>
       )}
 
       {auth.type === 'bearer' && (
         <div className="auth-field">
           <label>{t('authToken')}</label>
-          <input
+          <Input
             type="text"
             value={auth.token ?? ''}
             onChange={(e) => setAuth({ ...auth, token: e.target.value })}
@@ -72,7 +57,7 @@ export function AuthEditor() {
         <>
           <div className="auth-field">
             <label>{t('authUsername')}</label>
-            <input
+            <Input
               type="text"
               value={auth.username ?? ''}
               onChange={(e) => setAuth({ ...auth, username: e.target.value })}
@@ -82,7 +67,7 @@ export function AuthEditor() {
           </div>
           <div className="auth-field">
             <label>{t('authPassword')}</label>
-            <input
+            <Input
               type="password"
               value={auth.password ?? ''}
               onChange={(e) => setAuth({ ...auth, password: e.target.value })}
@@ -96,7 +81,7 @@ export function AuthEditor() {
         <>
           <div className="auth-field">
             <label>{t('authKey')}</label>
-            <input
+            <Input
               type="text"
               value={auth.key ?? ''}
               onChange={(e) => setAuth({ ...auth, key: e.target.value })}
@@ -106,7 +91,7 @@ export function AuthEditor() {
           </div>
           <div className="auth-field">
             <label>{t('authValue')}</label>
-            <input
+            <Input
               type="text"
               value={auth.value ?? ''}
               onChange={(e) => setAuth({ ...auth, value: e.target.value })}
@@ -116,15 +101,14 @@ export function AuthEditor() {
           </div>
           <div className="auth-field">
             <label>{t('authAddTo')}</label>
-            <select
-              className="method-select"
+            <Select
               value={auth.in ?? 'header'}
               onChange={(e) => setAuth({ ...auth, in: e.target.value as 'header' | 'query' })}
               style={{ width: '100%' }}
             >
-              <option value="header">{t('authHeaderOption')}</option>
-              <option value="query">{t('authQueryOption')}</option>
-            </select>
+              <Option value="header">{t('authHeaderOption')}</Option>
+              <Option value="query">{t('authQueryOption')}</Option>
+            </Select>
           </div>
         </>
       )}

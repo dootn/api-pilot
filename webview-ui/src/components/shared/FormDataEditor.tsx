@@ -1,9 +1,10 @@
 import { type FormDataField } from '../../stores/requestStore';
 import { VarInput } from '../../utils/varHighlight';
 import { vscode } from '../../vscode';
-import { useEffect, useState } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import { useI18n } from '../../i18n';
-import { parseBulkText, itemsToBulkText, mergeDescriptions } from './bulkEditUtils';
+import { Textarea, Button, Checkbox } from './ui';
+import { useBulkEdit } from './useBulkEdit';
 
 interface Props {
   items: FormDataField[];
@@ -17,7 +18,7 @@ interface Props {
   varValues?: Map<string, string>;
 }
 
-export function FormDataEditor({ 
+export const FormDataEditor = memo(function FormDataEditor({ 
   items, 
   onChange, 
   requestId,
@@ -27,8 +28,20 @@ export function FormDataEditor({
   varValues
 }: Props) {
   const t = useI18n();
-  const [bulkMode, setBulkMode] = useState(false);
-  const [bulkText, setBulkText] = useState('');
+  const toText = useCallback((items: FormDataField[]) => items.filter((i) => i.type === 'text'), []);
+  const fromText = useCallback((parsed: FormDataField[], original: FormDataField[]) => {
+    const fileItems = original.filter((i) => i.type === 'file');
+    const merged = [...fileItems, ...parsed.map((kv) => ({ ...kv, type: 'text' as const }))];
+    return merged.length > 0
+      ? [...merged, { key: '', value: '', enabled: true, type: 'text' as const }]
+      : [{ key: '', value: '', enabled: true, type: 'text' as const }];
+  }, []);
+  const { bulkMode, bulkText, setBulkText, enterBulk, exitBulk } = useBulkEdit({
+    items: items as any,
+    onChange: onChange as any,
+    toText: toText as any,
+    fromText: fromText as any,
+  });
   
   // Listen for file picked messages
   useEffect(() => {
@@ -89,38 +102,18 @@ export function FormDataEditor({
     onChange([...items, { key: '', value: '', enabled: true, type: 'text' as const }]);
   };
 
-  const enterBulk = () => {
-    // Only export text fields to bulk edit
-    setBulkText(itemsToBulkText(items.filter((i) => i.type === 'text')));
-    setBulkMode(true);
-  };
-
-  const exitBulk = () => {
-    const fileItems = items.filter((i) => i.type === 'file');
-    const textItems = items
-      .filter((i) => i.type === 'text')
-      .map(({ key, value, enabled, description }) => ({ key, value, enabled, description }));
-    const parsed = mergeDescriptions(parseBulkText(bulkText), textItems)
-      .map((kv) => ({ ...kv, type: 'text' as const }));
-    const merged = [...fileItems, ...parsed];
-    onChange(merged.length > 0
-      ? [...merged, { key: '', value: '', enabled: true, type: 'text' as const }]
-      : [{ key: '', value: '', enabled: true, type: 'text' as const }]);
-    setBulkMode(false);
-  };
-
   if (bulkMode) {
     return (
       <div className="kv-editor">
-        <textarea
-          className="body-textarea"
+        <Textarea
+          code
+          fullWidth
+          className="fd-bulk-textarea"
           value={bulkText}
           onChange={(e) => setBulkText(e.target.value)}
           placeholder={t('bulkEditPlaceholder')}
-          spellCheck={false}
-          style={{ minHeight: 120, fontFamily: 'var(--vscode-editor-font-family, monospace)', fontSize: 12 }}
         />
-        <button className="kv-add-btn" onClick={exitBulk}>{t('tableViewBtn')}</button>
+        <Button variant="secondary" btnSize="sm" onClick={exitBulk}>{t('tableViewBtn')}</Button>
       </div>
     );
   }
@@ -129,8 +122,7 @@ export function FormDataEditor({
     <div className="kv-editor">
       {items.map((item, index) => (
         <div key={index} className="kv-row">
-          <input
-            type="checkbox"
+          <Checkbox
             className="kv-checkbox"
             checked={item.enabled}
             onChange={(e) => updateItem(index, 'enabled', e.target.checked)}
@@ -139,17 +131,7 @@ export function FormDataEditor({
           {/* Type selector */}
           <button
             onClick={() => toggleType(index)}
-            style={{
-              padding: '2px 6px',
-              fontSize: 10,
-              border: '1px solid var(--border-color)',
-              borderRadius: 3,
-              cursor: 'pointer',
-              background: item.type === 'file' ? 'var(--button-bg)' : 'transparent',
-              color: item.type === 'file' ? 'var(--button-fg)' : 'var(--panel-fg)',
-              minWidth: 38,
-              fontWeight: item.type === 'file' ? 600 : 400,
-            }}
+            className={`fd-type-toggle ${item.type === 'file' ? 'fd-type-toggle-file' : 'fd-type-toggle-text'}`}
             title={t('formDataToggleType')}
           >
             {item.type === 'file' ? '📎' : 'T'}
@@ -176,31 +158,16 @@ export function FormDataEditor({
               spellCheck={false}
             />
           ) : (
-            <div style={{ 
-              flex: 1, 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 6,
-              padding: '0 4px',
-            }}>
+            <div className="fd-file-section">
               <button
                 onClick={() => selectFile(index)}
                 disabled={!item.key}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: 11,
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 3,
-                  cursor: item.key ? 'pointer' : 'not-allowed',
-                  background: 'transparent',
-                  color: 'var(--panel-fg)',
-                  opacity: item.key ? 1 : 0.5,
-                }}
+                className="fd-choose-file-btn"
               >
                 {t('chooseFile')}
               </button>
               {item.fileName && (
-                <span style={{ fontSize: 11, color: 'var(--success-fg)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span className="fd-file-name">
                   ✓ {item.fileName}
                   <button
                     onClick={() => {
@@ -208,16 +175,7 @@ export function FormDataEditor({
                       newItems[index] = { ...newItems[index], filePath: undefined, fileName: undefined, fileData: undefined };
                       onChange(newItems);
                     }}
-                    style={{
-                      padding: '0 4px',
-                      fontSize: 11,
-                      border: 'none',
-                      borderRadius: 3,
-                      cursor: 'pointer',
-                      background: 'transparent',
-                      color: 'var(--error-fg)',
-                      lineHeight: 1,
-                    }}
+                    className="fd-remove-file-btn"
                     title={t('removeItem')}
                   >
                     ×
@@ -225,7 +183,7 @@ export function FormDataEditor({
                 </span>
               )}
               {!item.fileName && item.key && (
-                <span style={{ fontSize: 11, opacity: 0.5 }}>
+                <span className="fd-no-file">
                   {t('noFileSelected')}
                 </span>
               )}
@@ -249,10 +207,10 @@ export function FormDataEditor({
           </button>
         </div>
       ))}
-      <div style={{ display: 'flex', gap: 4 }}>
-        <button className="kv-add-btn" onClick={addItem}>{t('addItem')}</button>
-        <button className="kv-add-btn" style={{ opacity: 0.65 }} onClick={enterBulk}>{t('bulkEditBtn')}</button>
+      <div className="fd-bottom-actions">
+        <Button variant="secondary" btnSize="sm" onClick={addItem}>{t('addItem')}</Button>
+        <Button variant="ghost" btnSize="sm" onClick={enterBulk}>{t('bulkEditBtn')}</Button>
       </div>
     </div>
   );
-}
+});

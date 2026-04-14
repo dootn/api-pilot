@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useClickOutside } from '../../hooks/useClickOutside';
 import { renderVarHighlight } from '../../utils/varHighlight';
 
 interface AutoCompleteProps {
@@ -41,16 +42,7 @@ export function AutoComplete({
     return () => input.removeEventListener('scroll', onScroll);
   });
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  useClickOutside(containerRef, useCallback(() => setIsOpen(false), []));
 
   // Scroll active item into view
   useEffect(() => {
@@ -213,22 +205,12 @@ export function AutoComplete({
                     : 'var(--panel-fg)',
               }}
             >
-              <span style={{ fontWeight: 500 }}>{item.label}</span>
-              {item.description && (
-                <span
-                  style={{
-                    fontSize: 11,
-                    opacity: 0.6,
-                    marginLeft: 8,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    maxWidth: '50%',
-                  }}
-                >
-                  {item.description}
-                </span>
-              )}
+              <span
+                title={item.description}
+                style={{ fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
+                {item.label}
+              </span>
             </div>
           ))}
         </div>

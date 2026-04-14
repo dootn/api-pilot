@@ -1,0 +1,546 @@
+/* ===== Shared conversation styles (WS / SSE / MQTT / gRPC panels) ===== */
+
+.conv-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+/* Status bar */
+.conv-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+  flex-shrink: 0;
+  background: var(--panel-bg);
+  flex-wrap: wrap;
+}
+
+.conv-status-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+}
+
+.conv-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.conv-status-dim {
+  opacity: 0.55;
+}
+
+.conv-spacer {
+  flex: 1;
+}
+
+/* Action buttons in status bar */
+.conv-action-btn {
+  font-size: 11px;
+  padding: 2px 7px;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--panel-fg);
+}
+
+.conv-action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.conv-action-btn:not(:disabled) {
+  opacity: 0.7;
+}
+
+.conv-action-btn:not(:disabled):hover {
+  opacity: 1;
+}
+
+/* Message list */
+.conv-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  background: var(--panel-bg);
+}
+
+.conv-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  opacity: 0.4;
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* Message / event row */
+.conv-row {
+  display: flex;
+  gap: 8px;
+  padding: 4px 10px;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border-color, #3c3c3c);
+}
+
+.conv-row-sent {
+  background: var(--vscode-diffEditor-insertedLineBackground, rgba(78, 201, 176, 0.06));
+}
+
+/* Direction arrow */
+.conv-arrow {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 13px;
+  width: 14px;
+  padding-top: 1px;
+}
+
+.conv-arrow-sent {
+  color: var(--vscode-terminal-ansiCyan, #4ec9b0);
+}
+
+.conv-arrow-received {
+  color: var(--vscode-terminal-ansiYellow, #dcdcaa);
+}
+
+/* Timestamp */
+.conv-timestamp {
+  flex-shrink: 0;
+  font-size: 11px;
+  opacity: 0.5;
+  padding-top: 2px;
+  width: 66px;
+}
+
+/* Badge (binary / event type / id) */
+.conv-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: #fff;
+  margin-top: 2px;
+}
+
+.conv-badge-binary {
+  background: var(--vscode-terminal-ansiMagenta, #c678dd);
+}
+
+.conv-badge-event {
+  background: var(--vscode-terminal-ansiBlue, #569cd6);
+}
+
+.conv-badge-id {
+  background: var(--badge-bg, #555);
+  color: var(--badge-fg, #ccc);
+}
+
+.conv-badge-calltype {
+  background: var(--vscode-terminal-ansiBlue, #569cd6);
+  opacity: 0.85;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+/* Message content */
+.conv-content {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  flex: 1;
+  word-break: break-all;
+  white-space: pre-wrap;
+  opacity: 0.95;
+  min-width: 0;
+}
+
+.conv-link {
+  color: var(--vscode-textLink-foreground, #3794ff);
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+/* Copy button */
+.conv-copy-btn {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 1px 6px;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.conv-copy-btn:hover {
+  opacity: 1;
+}
+
+.conv-copy-btn.copied {
+  color: var(--success-fg, #4ec9b0);
+}
+
+/* Size label */
+.conv-size {
+  flex-shrink: 0;
+  font-size: 10px;
+  opacity: 0.4;
+  padding-top: 2px;
+}
+
+/* Actions group (right-aligned in status bar) */
+.conv-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* ===== MQTT-specific ===== */
+
+.mqtt-error-banner {
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--vscode-errorForeground, #f48771);
+  border-bottom: 1px solid var(--border-color, #555);
+  flex-shrink: 0;
+  font-family: monospace;
+}
+
+.mqtt-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.mqtt-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mqtt-section-header {
+  font-weight: 600;
+  opacity: 0.7;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Subscriptions section */
+.mqtt-sub-section {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-color, #555);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mqtt-sub-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mqtt-sub-input {
+  flex: 1;
+  min-width: 180px;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.mqtt-select {
+  padding: 4px 8px;
+  font-size: 12px;
+  background: var(--input-bg, #3c3c3c);
+  color: var(--panel-fg);
+  border: 1px solid var(--border-color, #555);
+  border-radius: 4px;
+}
+
+.mqtt-sub-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+.mqtt-sub-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.mqtt-sub-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #fff);
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.mqtt-unsub-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+  opacity: 0.6;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.mqtt-unsub-btn:hover {
+  opacity: 1;
+}
+
+/* Message rows */
+.mqtt-msg-row {
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border-color-subtle, rgba(128,128,128,0.15));
+  font-family: monospace;
+}
+
+.mqtt-msg-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 3px;
+}
+
+.mqtt-msg-dir {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: #fff;
+}
+
+.mqtt-msg-dir-sent {
+  background: var(--vscode-terminal-ansiBlue, #3b8eda);
+}
+
+.mqtt-msg-dir-received {
+  background: var(--vscode-terminal-ansiGreen, #4ec94e);
+}
+
+.mqtt-msg-topic {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #ccc);
+}
+
+.mqtt-msg-qos {
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+.mqtt-msg-retained {
+  font-size: 10px;
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.mqtt-msg-meta {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.45;
+}
+
+.mqtt-msg-copy {
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.5;
+  font-size: 12px;
+  padding: 0;
+  color: var(--panel-fg);
+}
+
+.mqtt-msg-copy:hover {
+  opacity: 1;
+}
+
+.mqtt-msg-content {
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  opacity: 0.85;
+  line-height: 1.4;
+}
+
+.mqtt-msg-content-collapsed {
+  max-height: 4.5em;
+  overflow: hidden;
+}
+
+.mqtt-msg-expand {
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.5;
+  font-size: 11px;
+  padding: 2px 0;
+  color: var(--panel-fg);
+}
+
+.mqtt-msg-expand:hover {
+  opacity: 1;
+}
+
+.conv-truncated {
+  text-align: center;
+  opacity: 0.5;
+  font-size: 11px;
+  padding: 4px 0;
+}
+
+/* Publish panel */
+.mqtt-pub-panel {
+  width: 240px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border-color, #555);
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  gap: 8px;
+}
+
+.mqtt-pub-textarea {
+  padding: 4px 8px;
+  font-size: 12px;
+  resize: vertical;
+  font-family: monospace;
+}
+
+.mqtt-pub-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.mqtt-retain-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.mqtt-connect-hint {
+  font-size: 11px;
+  opacity: 0.45;
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* ===== gRPC-specific ===== */
+
+.grpc-status-icon {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.grpc-method-name {
+  opacity: 0.65;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+.grpc-hint {
+  padding: 12px 14px;
+  font-size: 12px;
+  opacity: 0.55;
+  font-style: italic;
+  border-bottom: 1px solid var(--border-color, #444);
+  flex-shrink: 0;
+}
+
+.grpc-error-banner {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--vscode-errorForeground, #f48771);
+  border-bottom: 1px solid var(--border-color, #444);
+  flex-shrink: 0;
+  font-family: monospace;
+}
+
+.grpc-end-marker {
+  padding: 3px 12px;
+  font-size: 11px;
+  opacity: 0.45;
+  font-style: italic;
+}
+
+.grpc-msg-row {
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--border-color, #333);
+  cursor: pointer;
+}
+
+.grpc-msg-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.grpc-msg-dir {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.grpc-msg-final {
+  font-size: 10px;
+  opacity: 0.55;
+  font-style: italic;
+}
+
+.grpc-msg-toggle {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.4;
+}
+
+.grpc-msg-expanded {
+  margin-top: 4px;
+  font-size: 11px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+  background: var(--input-bg, #2d2d2d);
+  padding: 6px 8px;
+  border-radius: 3px;
+}
+
+.grpc-msg-collapsed {
+  font-size: 11px;
+  opacity: 0.65;
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}

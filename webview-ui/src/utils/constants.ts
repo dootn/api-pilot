@@ -1,0 +1,1 @@
+export const MAX_DISPLAY_MESSAGES = 500;

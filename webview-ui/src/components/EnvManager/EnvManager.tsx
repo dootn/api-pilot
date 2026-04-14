@@ -3,6 +3,8 @@ import { vscode } from '../../vscode';
 import { KeyValueEditor } from '../shared/KeyValueEditor';
 import type { KeyValuePair } from '../../stores/requestStore';
 import { useI18n } from '../../i18n';
+import { Input } from '../shared/ui';
+import { EmptyState } from '../shared/EmptyState';
 
 interface Environment {
   id: string;
@@ -151,11 +153,11 @@ export function EnvManager({ onClose }: Props) {
           {/* Left: environment list */}
           <div className="env-list">
             <div className="env-list-header">
-              <span style={{ fontSize: 11, opacity: 0.6, textTransform: 'uppercase' }}>{t('envListLabel')}</span>
+              <span className="text-secondary" style={{ fontSize: 11, textTransform: 'uppercase' }}>{t('envListLabel')}</span>
               <button className="env-add-btn" onClick={handleCreate} title={t('envNewBtnTitle')}>{t('envNewBtn')}</button>
             </div>
             {environments.length === 0 && (
-              <div style={{ padding: '12px 8px', fontSize: 12, opacity: 0.5 }}>{t('envNoEnvironments')}</div>
+              <div className="text-secondary" style={{ padding: '12px 8px', fontSize: 12 }}>{t('envNoEnvironments')}</div>
             )}            {environments.map((env) => (
               <div
                 key={env.id}
@@ -170,7 +172,7 @@ export function EnvManager({ onClose }: Props) {
                 </button>
 
                 {renamingId === env.id ? (
-                  <input
+                  <Input
                     ref={renameInputRef}
                     value={renameValue}
                     onChange={(e) => setRenameValue(e.target.value)}
@@ -181,17 +183,7 @@ export function EnvManager({ onClose }: Props) {
                       e.stopPropagation();
                     }}
                     onClick={(e) => e.stopPropagation()}
-                    style={{
-                      flex: 1,
-                      fontSize: 12,
-                      background: 'var(--input-bg)',
-                      color: 'var(--panel-fg)',
-                      border: '1px solid var(--button-bg)',
-                      borderRadius: 3,
-                      padding: '1px 4px',
-                      outline: 'none',
-                      minWidth: 0,
-                    }}
+                    style={{ flex: 1, padding: '1px 4px', minWidth: 0, borderColor: 'var(--button-bg)' }}
                   />
                 ) : (
                   <span
@@ -211,13 +203,11 @@ export function EnvManager({ onClose }: Props) {
           {/* Right: variable editor */}
           <div className="env-editor">
             {!selectedEnv ? (
-              <div className="empty-state" style={{ padding: 24 }}>
-                {t('envSelectOrCreate')}
-              </div>
+              <EmptyState padding={24}>{t('envSelectOrCreate')}</EmptyState>
             ) : (
               <>
                 <div className="env-editor-top">
-                  <input
+                  <Input
                     ref={nameInputRef}
                     className="env-name-input"
                     value={draftName}

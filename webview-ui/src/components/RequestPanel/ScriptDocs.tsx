@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
 import { useI18n } from '../../i18n';
+import { Modal } from '../shared/Modal';
 
 interface ApiMethod {
   sig: string;
@@ -120,49 +120,16 @@ const CODE: React.CSSProperties = {
 export function ScriptDocs({ onClose }: { onClose: () => void }) {
   const t = useI18n();
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(0,0,0,0.55)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        style={{
-          background: 'var(--panel-bg)',
-          border: '1px solid var(--border-color)',
-          borderRadius: 8,
-          width: '720px',
-          maxWidth: '95vw',
-          maxHeight: '82vh',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-        }}
-      >
+    <Modal onClose={onClose} width="720px" maxHeight="82vh">
         {/* Header */}
-        <div style={{
+        <div className="border-b" style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '12px 16px',
-          borderBottom: '1px solid var(--border-color)',
           flexShrink: 0,
         }}>
           <span style={{ fontSize: 14, fontWeight: 600 }}>{t('scriptDocsTitle')}</span>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'transparent', border: 'none', color: 'var(--panel-fg)',
-              cursor: 'pointer', fontSize: 16, padding: '0 4px', opacity: 0.7,
-            }}
-          >✕</button>
+          <button onClick={onClose} className="icon-btn">✕</button>
         </div>
 
         {/* Scrollable body */}
@@ -218,7 +185,6 @@ export function ScriptDocs({ onClose }: { onClose: () => void }) {
             </div>
           ))}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

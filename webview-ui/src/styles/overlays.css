@@ -1,0 +1,212 @@
+/* Shared modal overlay + panel */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* cURL import modal */
+.import-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.import-modal {
+  background: var(--vscode-editor-background, #1e1e1e);
+  border: 1px solid var(--vscode-panel-border, #454545);
+  border-radius: 8px;
+  padding: 20px;
+  width: 540px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.import-modal-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--panel-fg);
+}
+
+.import-modal-textarea {
+  background: var(--input-bg);
+  color: var(--input-fg);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
+  padding: 10px;
+  font-size: 12px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  line-height: 1.5;
+  height: 160px;
+  resize: vertical;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.import-modal-textarea:focus {
+  border-color: var(--vscode-focusBorder, #007acc);
+}
+
+.import-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.import-modal-cancel {
+  background: transparent;
+  border: 1px solid var(--vscode-button-secondaryBackground, #3a3d41);
+  color: var(--panel-fg);
+  padding: 5px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.import-modal-cancel:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(255,255,255,0.05));
+}
+
+.import-modal-confirm {
+  background: var(--button-bg);
+  border: none;
+  color: var(--button-fg);
+  padding: 5px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.import-modal-confirm:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.import-modal-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Code snippet modal */
+.code-modal-content {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.code-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+}
+.code-modal-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+.code-modal-tabs {
+  padding: 0 14px;
+}
+.code-modal-body {
+  flex: 1;
+  overflow: auto;
+  padding: 14px;
+}
+.code-modal-pre {
+  margin: 0;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--panel-fg);
+}
+.code-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 14px;
+}
+
+/* Save to collection button */
+.save-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.save-btn {
+  background: transparent;
+  color: var(--vscode-descriptionForeground, #888);
+  border: 1px solid var(--border-color);
+  padding: 6px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--panel-fg);
+}
+
+.save-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.save-btn.saved {
+  color: var(--success-fg);
+  border-color: var(--success-fg);
+  font-size: 12px;
+}
+
+.save-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 9998;
+  background: var(--vscode-menu-background, #252526);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  min-width: 180px;
+  max-width: 260px;
+  padding: 4px 0;
+}
+
+.save-dropdown-item {
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--panel-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.save-dropdown-item:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+}

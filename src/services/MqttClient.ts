@@ -1,32 +1,27 @@
 import * as mqtt from 'mqtt';
 import type * as vscode from 'vscode';
 import {
-  ApiRequest, MqttMessage, MqttStatus, MqttOptions, MqttSubscription, KeyValuePair,
+  ApiRequest, MqttMessage, MqttSubscription, KeyValuePair,
 } from '../types';
-import { VariableResolver } from './VariableResolver';
 import { HistoryService } from './HistoryService';
+import { BaseConnectionClient, type BaseConnection } from './BaseConnectionClient';
 
-interface MqttConnection {
-  connectionId: string;
-  tabId: string;
+interface MqttConnection extends BaseConnection {
   request: ApiRequest;
   client: mqtt.MqttClient;
   subscriptions: MqttSubscription[];
-  connectedAt?: number;
   publishedCount: number;
   receivedCount: number;
 }
 
-export class MqttClient {
-  private connections = new Map<string, MqttConnection>();
-  private tabConnections = new Map<string, string>();
-  private variableResolver = new VariableResolver();
-
+export class MqttClient extends BaseConnectionClient<MqttConnection> {
   constructor(
-    private webview: vscode.Webview,
-    private historyService?: HistoryService,
-    private maxHistory = 1000,
-  ) {}
+    webview: vscode.Webview,
+    historyService?: HistoryService,
+    maxHistory = 1000,
+  ) {
+    super(webview, historyService, maxHistory);
+  }
 
   connect(tabId: string, request: ApiRequest, envVariables: KeyValuePair[]): void {
     // Close any existing connection for this tab
@@ -201,12 +196,6 @@ export class MqttClient {
     });
   }
 
-  disposeAll(): void {
-    for (const connectionId of [...this.connections.keys()]) {
-      this.disconnect(connectionId);
-    }
-  }
-
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
@@ -220,7 +209,7 @@ export class MqttClient {
     return url;
   }
 
-  private saveSessionHistory(conn: MqttConnection): void {
+  protected saveSessionHistory(conn: MqttConnection): void {
     if (!this.historyService) return;
     if (conn.publishedCount === 0 && conn.receivedCount === 0) return;
     const duration = conn.connectedAt ? Date.now() - conn.connectedAt : 0;
@@ -236,7 +225,7 @@ export class MqttClient {
     );
   }
 
-  private postStatus(tabId: string, status: MqttStatus, connectionId?: string, error?: string): void {
+  protected postStatus(tabId: string, status: string, connectionId?: string, error?: string): void {
     this.webview.postMessage({
       type: 'mqttStatusChanged',
       tabId,

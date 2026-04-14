@@ -1,4 +1,4 @@
-import { request, Agent } from 'undici';
+import { request, Agent, Dispatcher } from 'undici';
 import * as tls from 'tls';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import diagnosticsChannel from 'node:diagnostics_channel';
@@ -67,7 +67,7 @@ export class HttpClient {
       const effectiveTimeout = timeoutMs ?? 30000;
       const timingStore: TimingStore = {};
       const response = await timingStorage.run(timingStore, () => request(url, {
-        method: resolvedRequest.method,
+        method: resolvedRequest.method as Dispatcher.HttpMethod,
         headers,
         body,
         signal: controller.signal,
@@ -202,8 +202,8 @@ export class HttpClient {
         break;
       }
       case 'apikey':
-        if (auth.in === 'header') {
-          headers[auth.key] = auth.value;
+        if (auth.in === 'header' && auth.key) {
+          headers[auth.key] = auth.value ?? '';
         }
         break;
     }

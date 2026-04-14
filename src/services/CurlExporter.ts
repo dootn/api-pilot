@@ -15,7 +15,7 @@ export function exportCurl(request: ApiRequest): string {
   let url = request.url;
   const enabledParams = request.params.filter((p) => p.enabled && p.key);
   if (request.auth.type === 'apikey' && request.auth.in === 'query' && request.auth.key) {
-    enabledParams.push({ key: request.auth.key, value: request.auth.value, enabled: true });
+    enabledParams.push({ key: request.auth.key, value: request.auth.value ?? '', enabled: true });
   }
   if (enabledParams.length > 0) {
     const qs = enabledParams

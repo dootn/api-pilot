@@ -1,10 +1,5 @@
 import type { BodyType } from './types';
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+import { formatBytes as formatSize } from '../../../utils/formatters';
 
 interface Props {
   type: Extract<BodyType, 'image' | 'video' | 'audio' | 'pdf' | 'binary'>;

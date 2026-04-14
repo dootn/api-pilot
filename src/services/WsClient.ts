@@ -1,33 +1,27 @@
 import * as WebSocket from 'ws';
 import type * as vscode from 'vscode';
-import { ApiRequest, WsMessage, WsStatus, KeyValuePair } from '../types';
-import { VariableResolver } from './VariableResolver';
+import { ApiRequest, WsMessage, KeyValuePair } from '../types';
 import { ScriptRunner } from './ScriptRunner';
 import { HistoryService } from './HistoryService';
+import { BaseConnectionClient, type BaseConnection } from './BaseConnectionClient';
 
-interface WsConnection {
-  connectionId: string;
-  tabId: string;
+interface WsConnection extends BaseConnection {
   request: ApiRequest;
-  connectedAt?: number;
   sentCount: number;
   receivedCount: number;
   ws?: WebSocket.WebSocket;
 }
 
-export class WsClient {
-  /** connectionId -> connection info */
-  private connections = new Map<string, WsConnection>();
-  /** tabId -> connectionId (one active connection per tab) */
-  private tabConnections = new Map<string, string>();
+export class WsClient extends BaseConnectionClient<WsConnection> {
   private scriptRunner = new ScriptRunner();
-  private variableResolver = new VariableResolver();
 
   constructor(
-    private webview: vscode.Webview,
-    private historyService?: HistoryService,
-    private maxHistory = 1000,
-  ) {}
+    webview: vscode.Webview,
+    historyService?: HistoryService,
+    maxHistory = 1000,
+  ) {
+    super(webview, historyService, maxHistory);
+  }
 
   connect(tabId: string, request: ApiRequest, envVariables: KeyValuePair[]): void {
     // Close any existing connection for this tab first
@@ -103,10 +97,6 @@ export class WsClient {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Private helpers
-  // ---------------------------------------------------------------------------
-
   private openWebSocket(
     conn: WsConnection,
     request: ApiRequest,
@@ -156,7 +146,7 @@ export class WsClient {
     });
   }
 
-  private saveSessionHistory(conn: WsConnection): void {
+  protected saveSessionHistory(conn: WsConnection): void {
     if (!this.historyService) return;
     const total = conn.sentCount + conn.receivedCount;
     if (total === 0) return;  // nothing exchanged — don't pollute history
@@ -168,7 +158,7 @@ export class WsClient {
     );
   }
 
-  private postStatus(tabId: string, status: WsStatus, connectionId?: string, error?: string): void {
+  protected postStatus(tabId: string, status: string, connectionId?: string, error?: string): void {
     this.webview.postMessage({
       type: 'wsStatusChanged',
       tabId,

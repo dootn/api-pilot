@@ -668,7 +668,7 @@ export class GrpcClient {
     }
   }
 
-  private async loadPkgDef(request: ApiRequest, _address: string, opts: GrpcOptions, tabId?: string): Promise<protoLoader.PackageDefinition> {
+  private async loadPkgDef(_request: ApiRequest, _address: string, opts: GrpcOptions, tabId?: string): Promise<protoLoader.PackageDefinition> {
     // 1. Proto file path: always freshly parse from content
     if (opts.protoSource === 'proto' && opts.protoContent) {
       const ext = opts.protoFileName ?? 'service.proto';

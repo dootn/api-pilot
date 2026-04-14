@@ -500,7 +500,6 @@ export class CollectionService {
   private migrateOldFormat(): void {
     const oldFiles = this.storage.listFiles(COLLECTIONS_DIR);
     for (const file of oldFiles) {
-      const id = file.replace('.json', '');
       const old = this.storage.readJson<Collection>(COLLECTIONS_DIR, file);
       if (old) {
         this.update(old);
