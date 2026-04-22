@@ -3,6 +3,7 @@ import { useI18n } from '../../i18n';
 interface TabInfo {
   id: string;
   isPinned: boolean;
+  hasResponse: boolean;
 }
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
   onPin: () => void;
   onDuplicate: () => void;
   onClose: () => void;
+  onCompare: () => void;
 }
 
 const MENU_STYLE: React.CSSProperties = {
@@ -40,7 +42,7 @@ const hoverOut = (e: React.MouseEvent) => {
   (e.currentTarget as HTMLElement).style.background = 'transparent';
 };
 
-export function TabContextMenu({ x, y, tab, canClose, onPin, onDuplicate, onClose }: Props) {
+export function TabContextMenu({ x, y, tab, canClose, onPin, onDuplicate, onClose, onCompare }: Props) {
   const t = useI18n();
 
   return (
@@ -51,6 +53,11 @@ export function TabContextMenu({ x, y, tab, canClose, onPin, onDuplicate, onClos
       <div onClick={onDuplicate} style={ITEM_STYLE} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
         Duplicate Tab
       </div>
+      {tab.hasResponse && (
+        <div onClick={onCompare} style={ITEM_STYLE} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
+          {t('compareWith')}
+        </div>
+      )}
       {canClose && (
         <div
           onClick={onClose}

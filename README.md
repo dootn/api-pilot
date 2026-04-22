@@ -108,6 +108,17 @@
 - Every sent request is automatically recorded, grouped by date (up to 1000 entries total), with one-click replay
 - **Search / Filter**: Real-time search box filters history entries by URL, method, or request name; matching date groups auto-expand
 
+### Response Comparison
+
+- **Right-click any HTTP tab** and choose **⇄ Compare with...** to open the comparison panel
+- **Select a tab for each side** from dropdowns — only tabs with a recorded response are listed
+- Four sub-panels cover every angle of the diff:
+  - **Summary** — status code, response time, and body size side-by-side; rows with differences are highlighted
+  - **Body** — line-level LCS diff with JSON auto-formatted before comparison; added lines in green (+), removed in red (−), with a +N/−N count shown at the top
+  - **Headers** — union table of all response header keys; rows where the values differ or a header is missing on one side are highlighted
+  - **Request** — Method + URL, query params, and request headers compared in separate tables; differing rows highlighted
+- Press `Esc` or click the backdrop to close
+
 ### cURL / Fetch Import & Export
 
 - Paste a **cURL** command (bash) or a **fetch()** snippet (Chrome DevTools / Node.js) to instantly import it as a request

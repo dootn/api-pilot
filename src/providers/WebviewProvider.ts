@@ -11,6 +11,7 @@ export interface WebviewServices {
   historyService?: HistoryService;
   storageService?: StorageService;
   version?: string;
+  repoUrl?: string;
   onCollectionChanged?: () => void;
   onHistoryChanged?: () => void;
 }
@@ -96,7 +97,7 @@ export class WebviewProvider {
 </head>
 <body>
   <div id="root"></div>
-  <script nonce="${nonce}">var APP_VERSION=${JSON.stringify(version)};</script>
+  <script nonce="${nonce}">var APP_VERSION=${JSON.stringify(version)};var REPO_URL=${JSON.stringify(this.services.repoUrl ?? '')};</script>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

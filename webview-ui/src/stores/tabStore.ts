@@ -57,10 +57,12 @@ type PersistedTab = Omit<RequestTab, 'response' | 'responseError' | 'loading' | 
 interface TabState {
   tabs: RequestTab[];
   activeTabId: string;
+  compareTabId: string | null;
   addTab: () => void;
   addTabWithData: (data: Partial<RequestTab>) => void;
   removeTab: (id: string) => void;
   setActiveTabId: (id: string) => void;
+  setCompareTabId: (id: string | null) => void;
   updateTab: (id: string, updates: Partial<RequestTab>) => void;
   renameTab: (id: string, name: string) => void;
   reorderTabs: (fromId: string, toId: string) => void;
@@ -107,6 +109,9 @@ const initialTab = createDefaultTab();
 export const useTabStore = create<TabState>((set, get) => ({
   tabs: [initialTab],
   activeTabId: initialTab.id,
+  compareTabId: null,
+
+  setCompareTabId: (id) => set({ compareTabId: id }),
 
   addTab: () => {
     const newTab = createDefaultTab();

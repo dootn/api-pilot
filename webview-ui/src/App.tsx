@@ -8,6 +8,7 @@ import { MqttPanel } from './components/RequestPanel/MqttPanel';
 import { GrpcPanel } from './components/RequestPanel/GrpcPanel';
 import { CollectionsSidebar } from './components/Sidebar/CollectionsSidebar';
 import { HistorySidebar } from './components/Sidebar/HistorySidebar';
+import { CompareModal } from './components/CompareModal';
 import { useVscodeMessage } from './hooks/useVscodeMessage';
 import { useProtocolMode } from './hooks/useProtocolMode';
 import { useMessageHandler } from './hooks/useMessageHandler';
@@ -17,6 +18,10 @@ import { vscode } from './vscode';
 
 function App() {
   const t = useI18n();
+
+  // Compare modal
+  const compareTabId = useTabStore((s) => s.compareTabId);
+  const setCompareTabId = useTabStore((s) => s.setCompareTabId);
 
   // Sidebar tab: 'collections' | 'history'
   const [sidebarTab, setSidebarTab] = useState<'collections' | 'history'>('collections');
@@ -74,6 +79,7 @@ function App() {
   useVscodeMessage(handleMessage);
 
   return (
+    <>
     <div style={{ display: 'flex', height: '100vh', background: 'var(--panel-bg)', flexDirection: 'row', border: '1px solid #ccc', borderRadius: '6px', overflow: 'hidden' }}>
       {/* Left sidebar */}
       <div style={{ width: sidebarWidth, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border-color)' }}>
@@ -115,20 +121,34 @@ function App() {
           {sidebarTab === 'collections' ? <CollectionsSidebar /> : <HistorySidebar />}
         </div>
         {/* Branding watermark */}
-        <div style={{
-          padding: '6px 0',
-          textAlign: 'center',
-          fontSize: '10px',
-          opacity: 0.22,
-          color: 'var(--panel-fg)',
-          userSelect: 'none',
-          letterSpacing: '0.1em',
-          fontWeight: 600,
-          pointerEvents: 'none',
-          borderTop: '1px solid var(--border-color)',
-        }}>
+        <a
+          href={typeof REPO_URL !== 'undefined' ? REPO_URL : '#'}
+          onClick={(e) => {
+            e.preventDefault();
+            if (typeof REPO_URL !== 'undefined') {
+              window.open(REPO_URL, '_blank');
+            }
+          }}
+          style={{
+            padding: '6px 0',
+            textAlign: 'center',
+            fontSize: '10px',
+            opacity: 0.22,
+            color: 'var(--panel-fg)',
+            userSelect: 'none',
+            letterSpacing: '0.1em',
+            fontWeight: 600,
+            borderTop: '1px solid var(--border-color)',
+            textDecoration: 'none',
+            display: 'block',
+            cursor: 'pointer',
+            transition: 'opacity 0.15s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.5')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.22')}
+        >
           API PILOT v{typeof APP_VERSION !== 'undefined' ? APP_VERSION : '1.0.0'}
-        </div>
+        </a>
       </div>
 
       {/* Sidebar resize handle */}
@@ -173,6 +193,10 @@ function App() {
         </div>
       </div>
     </div>
+    {compareTabId && (
+      <CompareModal initialTabId={compareTabId} onClose={() => setCompareTabId(null)} />
+    )}
+    </>
   );
 }
 

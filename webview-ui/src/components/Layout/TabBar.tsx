@@ -97,6 +97,7 @@ export function TabBar() {
   const reorderTabs = useTabStore((s) => s.reorderTabs);
   const pinTab = useTabStore((s) => s.pinTab);
   const duplicateTab = useTabStore((s) => s.duplicateTab);
+  const setCompareTabId = useTabStore((s) => s.setCompareTabId);
   const { environments, activeEnvId, switchEnv } = useEnvironments();
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const [showEnvDropdown, setShowEnvDropdown] = useState(false);
@@ -226,11 +227,12 @@ export function TabBar() {
         <TabContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
-          tab={contextMenuTab}
+          tab={{ ...contextMenuTab, hasResponse: !!contextMenuTab.response }}
           canClose={tabs.length > 1 && !contextMenuTab.isPinned}
           onPin={() => { pinTab(contextMenuTab.id, !contextMenuTab.isPinned); closeContextMenu(); }}
           onDuplicate={() => { duplicateTab(contextMenuTab.id); closeContextMenu(); }}
           onClose={() => { closeContextMenu(); removeTab(contextMenuTab.id); }}
+          onCompare={() => { setCompareTabId(contextMenuTab.id); closeContextMenu(); }}
         />
       )}
     </div>

@@ -19,6 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
     historyService,
     storageService,
     version: context.extension.packageJSON.version as string,
+    repoUrl: context.extension.packageJSON.repository?.url as string | undefined,
     onCollectionChanged: () => {
       webviewProvider.notifyWebview({ type: 'collectionsChanged' });
     },
