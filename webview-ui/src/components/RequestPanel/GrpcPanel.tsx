@@ -199,7 +199,7 @@ function GrpcMessageList({
                     {t('grpcStreamEndedMarker')}
                   </div>
                 ) : (
-                  <div className="grpc-msg-row" onClick={() => toggleExpand(msg.id)}>
+                  <div className="grpc-msg-row">
                     <div className="grpc-msg-header">
                       <span
                         className="grpc-msg-dir"
@@ -215,7 +215,7 @@ function GrpcMessageList({
                       </span>
                       <span className="conv-status-dim">{formatTime(msg.timestamp)}</span>
                       {msg.isEnd && !isEndMarker && <span className="grpc-msg-final">(final)</span>}
-                      <span className="grpc-msg-toggle">{isExpanded ? '▲' : '▼'}</span>
+                      <span className="grpc-msg-toggle" onClick={() => toggleExpand(msg.id)}>{isExpanded ? '▲' : '▼'}</span>
                     </div>
                     {isExpanded ? (
                       <pre

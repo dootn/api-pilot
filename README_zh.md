@@ -129,7 +129,7 @@
 
 ## 快速开始
 
-1. 打开 VS Code，点击活动栏中的 **API Pilot** 图标。
+1. 打开 VS Code，点击状态栏中的 **API Pilot** 图标。
 2. 点击 `+` 新建请求。
 3. 输入 URL（支持 `http(s)` 或 `ws(s)`），或从协议下拉框选择 **SSE**/**MQTT**/**gRPC**。HTTP 请求选择方法并点击 **Send**；WebSocket/SSE/MQTT 输入对应地址并点击 **Connect**；gRPC 选择服务与方法后点击 **Invoke**。
 4. 在下方查看格式化的响应结果或实时 WebSocket 会话。

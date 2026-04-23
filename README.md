@@ -139,7 +139,7 @@
 
 ## Quick Start
 
-1. Open VS Code and click the **API Pilot** icon in the Activity Bar.
+1. Open VS Code and click the **API Pilot** icon in the Status Bar.
 2. Click `+` to create a new request.
 3. Enter a URL (http(s) or ws(s)) or select the **SSE**, **MQTT**, or **gRPC** protocol to connect to a Server-Sent Events endpoint, MQTT broker, or gRPC server. For HTTP requests choose a method and click **Send**; for WebSocket/SSE/MQTT click **Connect**; for gRPC click **Invoke**.
 4. View the formatted response, live WebSocket conversation, or real-time SSE event stream below.
