@@ -2,7 +2,7 @@
   "name": "api-pilot",
   "displayName": "API Pilot",
   "description": "Multi-protocol API client — HTTP, WebSocket, SSE, MQTT & gRPC",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "publisher": "dootn",
   "icon": "resources/icon.png",
   "repository": {
@@ -17,7 +17,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "*"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -73,6 +73,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run build",
+    "package": "vsce package --allow-star-activation",
     "build": "npm run build:extension && npm run build:webview",
     "build:extension": "node esbuild.js --production",
     "build:webview": "cd webview-ui && npm run build",
