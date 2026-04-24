@@ -12,6 +12,7 @@ import { CompareModal } from './components/CompareModal';
 import { useVscodeMessage } from './hooks/useVscodeMessage';
 import { useProtocolMode } from './hooks/useProtocolMode';
 import { useMessageHandler } from './hooks/useMessageHandler';
+import { usePasteImport } from './hooks/usePasteImport';
 import { useTabStore, useActiveTab } from './stores/tabStore';
 import { useI18n } from './i18n';
 import { vscode } from './vscode';
@@ -72,6 +73,7 @@ function App() {
   }, []);
 
   const handleMessage = useMessageHandler();
+  usePasteImport();
 
   const activeTab = useActiveTab();
   const { isWs, isSse, isMqtt, isGrpc } = useProtocolMode(activeTab?.protocol);
