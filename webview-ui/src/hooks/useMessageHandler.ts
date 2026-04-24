@@ -3,6 +3,7 @@ import { useTabStore, type RequestTab } from '../stores/tabStore';
 import type { ApiResponse, WsMessage, WsStatus, SseEvent, SseStatus, MqttStatus, MqttMessage, GrpcStatus, GrpcMessage, GrpcServiceDef, GrpcMessageDef } from '../stores/requestStore';
 import { useLocaleStore } from '../stores/localeStore';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useUIStore } from '../stores/uiStore';
 
 export function useMessageHandler() {
   const tabs = useTabStore((s) => s.tabs);
@@ -13,6 +14,7 @@ export function useMessageHandler() {
   const restoreSession = useTabStore((s) => s.restoreSession);
   const setLocale = useLocaleStore((s) => s.setLocale);
   const setCustomHttpMethods = useSettingsStore((s) => s.setCustomHttpMethods);
+  const openImportModal = useUIStore((s) => s.openImportModal);
 
   return useCallback(
     (message: { type: string; requestId?: string; payload?: unknown }) => {
@@ -55,6 +57,10 @@ export function useMessageHandler() {
         }
         case 'setCustomMethods': {
           setCustomHttpMethods(message.payload as string[]);
+          return;
+        }
+        case 'openImportModal': {
+          openImportModal();
           return;
         }
         case 'requestRenamed': {
@@ -237,6 +243,6 @@ export function useMessageHandler() {
           break;
       }
     },
-    [updateTab, addTabWithData, restoreSession, tabs, activeTabId, setActiveTabId, setLocale, setCustomHttpMethods]
+    [updateTab, addTabWithData, restoreSession, tabs, activeTabId, setActiveTabId, setLocale, setCustomHttpMethods, openImportModal]
   );
 }

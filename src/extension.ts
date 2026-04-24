@@ -198,6 +198,16 @@ export function activate(context: vscode.ExtensionContext) {
       }
     })
   );
+
+  // Open quick import modal (keyboard shortcut: Cmd+O / Ctrl+O)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('apiPilot.openQuickImport', () => {
+      webviewProvider.revealOrCreate();
+      setTimeout(() => {
+        webviewProvider.notifyWebview({ type: 'openImportModal' });
+      }, 300);
+    })
+  );
 }
 
 export function deactivate() {
