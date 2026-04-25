@@ -26,6 +26,19 @@
         "command": "apiPilot.openPanel",
         "title": "Open API Pilot",
         "category": "API Pilot"
+      },
+      {
+        "command": "apiPilot.openQuickImport",
+        "title": "Open Quick Import",
+        "category": "API Pilot"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "apiPilot.openQuickImport",
+        "key": "ctrl+o",
+        "mac": "cmd+o",
+        "when": "true"
       }
     ],
     "configuration": {

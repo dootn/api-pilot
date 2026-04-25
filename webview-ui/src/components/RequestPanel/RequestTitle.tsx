@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTabStore, useActiveTab } from '../../stores/tabStore';
+import { useUIStore } from '../../stores/uiStore';
 import { vscode } from '../../vscode';
 import { useI18n } from '../../i18n';
 import { Input, Textarea } from '../shared/ui';
@@ -82,13 +83,22 @@ export function RequestTitle() {
     setEditingDescription(false);
   }
 
-  const [importModalOpen, setImportModalOpen] = useState(false);
+  const importModalOpen = useUIStore((s) => s.importModalOpen);
+  const setImportModalOpen = useUIStore((s) => s.setImportModalOpen);
+  const closeImportModal = useUIStore((s) => s.closeImportModal);
   const [importInput, setImportInput] = useState('');
   const importTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (importModalOpen && importTextareaRef.current) {
       importTextareaRef.current.focus();
+    }
+  }, [importModalOpen]);
+
+  // Reset input when modal opens
+  useEffect(() => {
+    if (importModalOpen) {
+      setImportInput('');
     }
   }, [importModalOpen]);
 
@@ -102,7 +112,7 @@ export function RequestTitle() {
     if (trimmed) {
       vscode.postMessage({ type: 'importRequest', payload: { input: trimmed, newTab } });
     }
-    setImportModalOpen(false);
+    closeImportModal();
   }
 
   return (
@@ -181,7 +191,7 @@ export function RequestTitle() {
       )}
 
       {importModalOpen && (
-        <div className="import-modal-overlay" onClick={() => setImportModalOpen(false)}>
+        <div className="import-modal-overlay" onClick={() => closeImportModal()}>
           <div className="import-modal" onClick={(e) => e.stopPropagation()}>
             <div className="import-modal-title">{t('quickImportTitle')}</div>
             <Textarea
@@ -191,12 +201,19 @@ export function RequestTitle() {
               onChange={(e) => setImportInput(e.target.value)}
               placeholder={t('quickImportPlaceholder')}
               onKeyDown={(e) => {
-                if (e.key === 'Escape') setImportModalOpen(false);
-                e.stopPropagation();
+                if (e.key === 'Escape') {
+                  closeImportModal();
+                  return;
+                }
+                // Allow all Cmd/Ctrl shortcuts (Cmd+A, Cmd+C, Cmd+V, etc.) to work normally
+                const isCmdOrCtrlShortcut = e.metaKey || e.ctrlKey;
+                if (!isCmdOrCtrlShortcut) {
+                  e.stopPropagation();
+                }
               }}
             />
             <div className="import-modal-actions">
-              <button className="import-modal-cancel" onClick={() => setImportModalOpen(false)}>
+              <button className="import-modal-cancel" onClick={() => closeImportModal()}>
                 {t('quickImportCancel')}
               </button>
               <button className="import-modal-confirm" onClick={() => commitImport(false)} disabled={!importInput.trim()}>
