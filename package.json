@@ -2,7 +2,7 @@
   "name": "api-pilot",
   "displayName": "API Pilot",
   "description": "Multi-protocol API client — HTTP, WebSocket, SSE, MQTT & gRPC",
-  "version": "1.7.3",
+  "version": "1.7.5",
   "publisher": "dootn",
   "icon": "resources/icon.png",
   "repository": {
