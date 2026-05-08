@@ -5,6 +5,7 @@ export const PROTOCOL_COLORS: Record<string, string> = {
   sse: 'var(--vscode-terminal-ansiYellow, #dcdcaa)',
   mqtt: 'var(--vscode-terminal-ansiMagenta, #c586c0)',
   grpc: 'var(--vscode-terminal-ansiBlue, #569cd6)',
+  dns: 'var(--vscode-terminal-ansiGreen, #b5cea8)',
   http: 'var(--panel-fg)',
 };
 
@@ -25,6 +26,7 @@ export const METHOD_COLORS: Record<string, string> = {
   SSE:  'var(--vscode-terminal-ansiYellow, #dcdcaa)',
   MQTT: 'var(--vscode-terminal-ansiMagenta, #c586c0)',
   gRPC: 'var(--vscode-terminal-ansiBlue, #569cd6)',
+  DNS:  'var(--vscode-terminal-ansiGreen, #b5cea8)',
 };
 
 /** Connection status → color for WS / SSE / MQTT / gRPC panels. */

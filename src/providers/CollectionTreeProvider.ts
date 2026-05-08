@@ -84,6 +84,7 @@ export class CollectionTreeProvider
             : protocol === 'sse' ? 'SSE'
             : protocol === 'mqtt' ? 'MQTT'
             : protocol === 'grpc' ? 'gRPC'
+            : protocol === 'dns' ? 'DNS'
             : rawMethod;
           // Strip HTTP method prefix from auto-generated names for clean display
           const rawName = item.name || req?.url || 'Unnamed Request';

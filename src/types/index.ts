@@ -1,6 +1,41 @@
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
 
-export type Protocol = 'http' | 'websocket' | 'sse' | 'mqtt' | 'grpc';
+export type Protocol = 'http' | 'websocket' | 'sse' | 'mqtt' | 'grpc' | 'dns';
+
+// DNS query type — any IANA-registered name (A, MX, HTTPS…) or a numeric type code like "65"
+export type DnsQueryType = string;
+
+export interface DnsOptions {
+  queryType: string;         // record type: 'A', 'MX', 'HTTPS', '65', …
+  dnsServer?: string;        // e.g. "udp://1.1.1.1:53" or "tcp://1.1.1.1:53"
+  timeout?: number;          // ms, default 5000
+  class?: string;            // query class: 'IN' (default), 'CH', 'HS', 'ANY'
+  recursionDesired?: boolean; // RD flag, default true
+  checkingDisabled?: boolean; // CD flag — bypass DNSSEC validation
+  dnssec?: boolean;           // add EDNS OPT with DO bit — request DNSSEC records
+  ednsBufferSize?: number;    // EDNS UDP payload size, e.g. 1232 or 4096
+}
+
+export interface DnsRecord {
+  type: string;
+  value: string;
+  ttl?: number;
+  priority?: number;   // MX, SRV
+  weight?: number;     // SRV
+  port?: number;       // SRV
+  entries?: string[];  // TXT raw chunks
+}
+
+export interface DnsResponse {
+  hostname: string;
+  queryType: string;
+  records: DnsRecord[];
+  time: number;       // query time ms
+  server?: string;    // DNS server used (undefined = system default)
+  status: 'ok' | 'error' | 'nxdomain' | 'timeout';
+  error?: string;
+  raw?: Record<string, unknown>;  // full decoded DNS response (questions, answers, authorities, additionals, flags)
+}
 
 export type WsStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -108,6 +143,7 @@ export interface ApiRequest {
   sslVerify?: boolean;
   mqttOptions?: MqttOptions;   // MQTT-specific connection options
   grpcOptions?: GrpcOptions;   // gRPC-specific options
+  dnsOptions?: DnsOptions;     // DNS-specific options
   createdAt: number;
   updatedAt: number;
 }
@@ -261,6 +297,15 @@ export interface GrpcSessionSummary {
   duration: number;        // ms
 }
 
+export interface DnsSessionSummary {
+  hostname: string;
+  queryType: string;
+  recordCount: number;
+  duration: number;  // ms
+  status: DnsResponse['status'];
+  rcode?: number;
+}
+
 export interface HistoryEntry {
   id: string;
   request: ApiRequest;
@@ -269,6 +314,8 @@ export interface HistoryEntry {
   sseSession?: SseSessionSummary;
   mqttSession?: MqttSessionSummary;
   grpcSession?: GrpcSessionSummary;
+  dnsSession?: DnsSessionSummary;
+  dnsResponse?: DnsResponse;
   timestamp: number;
 }
 

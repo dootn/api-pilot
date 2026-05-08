@@ -15,6 +15,7 @@ import { CollectionHandler } from './CollectionHandler';
 import { EnvironmentHandler } from './EnvironmentHandler';
 import { HistoryHandler } from './HistoryHandler';
 import { SessionHandler } from './SessionHandler';
+import { DnsRequestHandler } from './DnsRequestHandler';
 
 export class MessageHandler {
   private wsClient: WsClient;
@@ -27,6 +28,7 @@ export class MessageHandler {
   private envHandler: EnvironmentHandler;
   private historyHandler: HistoryHandler;
   private sessionHandler: SessionHandler;
+  private dnsHandler: DnsRequestHandler;
 
   constructor(
     webview: vscode.Webview,
@@ -47,6 +49,7 @@ export class MessageHandler {
     this.envHandler = new EnvironmentHandler(ctx);
     this.historyHandler = new HistoryHandler(ctx);
     this.sessionHandler = new SessionHandler(ctx);
+    this.dnsHandler = new DnsRequestHandler(ctx);
 
     const maxHistory = vscode.workspace.getConfiguration('api-pilot').get<number>('maxHistory', 1000);
     this.wsClient = new WsClient(webview, historyService, maxHistory);
@@ -250,6 +253,12 @@ export class MessageHandler {
           (message.payload as any).protoFileName,
         );
         break;
+      // --- DNS ---
+      case 'dnsQuery': {
+        const p = message.payload as { hostname: string; dnsOptions: import('../types').DnsOptions };
+        await this.dnsHandler.handleDnsQuery(message.requestId!, p.hostname, p.dnsOptions);
+        break;
+      }
       default:
         console.warn(`Unknown message type: ${message.type}`);
     }

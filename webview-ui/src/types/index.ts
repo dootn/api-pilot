@@ -2,7 +2,42 @@
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
 
-export type Protocol = 'http' | 'websocket' | 'sse' | 'mqtt' | 'grpc';
+export type Protocol = 'http' | 'websocket' | 'sse' | 'mqtt' | 'grpc' | 'dns';
+
+// DNS query type — any IANA type name or numeric code string
+export type DnsQueryType = string;
+
+export interface DnsOptions {
+  queryType: string;          // e.g. 'A', 'MX', 'HTTPS', '65'
+  dnsServer?: string;         // e.g. 'udp://1.1.1.1:53' or 'tcp://1.1.1.1:53'
+  timeout?: number;
+  class?: string;             // 'IN' (default), 'CH', 'HS', 'ANY'
+  recursionDesired?: boolean; // RD flag, default true
+  checkingDisabled?: boolean; // CD flag
+  dnssec?: boolean;           // EDNS DO bit
+  ednsBufferSize?: number;    // EDNS UDP payload size
+}
+
+export interface DnsRecord {
+  type: string;
+  value: string;
+  ttl?: number;
+  priority?: number;
+  weight?: number;
+  port?: number;
+  entries?: string[];
+}
+
+export interface DnsResponse {
+  hostname: string;
+  queryType: string;
+  records: DnsRecord[];
+  time: number;
+  server?: string;
+  status: 'ok' | 'error' | 'nxdomain' | 'timeout';
+  error?: string;
+  raw?: Record<string, unknown>;  // full decoded DNS response
+}
 
 export type WsStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -236,6 +271,15 @@ export interface GrpcSessionSummary {
   duration: number;
 }
 
+export interface DnsSessionSummary {
+  hostname: string;
+  queryType: string;
+  recordCount: number;
+  duration: number;
+  status: DnsResponse['status'];
+  rcode?: number;
+}
+
 export interface HistoryEntry {
   id: string;
   request: {
@@ -250,5 +294,7 @@ export interface HistoryEntry {
   sseSession?: SseSessionSummary;
   mqttSession?: MqttSessionSummary;
   grpcSession?: GrpcSessionSummary;
+  dnsSession?: DnsSessionSummary;
+  dnsResponse?: DnsResponse;
   timestamp: number;
 }

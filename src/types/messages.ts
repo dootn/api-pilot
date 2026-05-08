@@ -41,6 +41,23 @@ export interface CopyAsCurlMessage {
   payload: import('./index').ApiRequest;
 }
 
+// DNS messages (Webview -> Extension)
+export interface DnsQueryMessage {
+  type: 'dnsQuery';
+  requestId: string;
+  payload: {
+    hostname: string;    // domain to query (from URL bar)
+    dnsOptions: import('./index').DnsOptions;
+  };
+}
+
+// DNS messages (Extension -> Webview)
+export interface DnsResultMessage {
+  type: 'dnsResult';
+  requestId: string;
+  payload: import('./index').DnsResponse;
+}
+
 // Extension -> Webview messages
 export interface RequestResultMessage {
   type: 'requestResult';

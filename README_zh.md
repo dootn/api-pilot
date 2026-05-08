@@ -4,6 +4,8 @@
 
 **强大的 HTTP API 调试工具，直接内嵌在 VS Code 中 —— 无需浏览器，无需额外应用。**
 
+多协议 API 客户端 —— HTTP、WebSocket、SSE、MQTT、gRPC & DNS —— 内置历史记录与集合管理。
+
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.85+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
@@ -64,6 +66,27 @@
 - **Metadata**：以键值对形式发送 gRPC 请求头，每行可单独启用/禁用。
 - URL 格式：`grpc://host:port`（明文）或 `grpcs://host:port`（TLS），也可直接输入 `host:port`。
 - 调用完成后自动将会话（方法名、gRPC 状态码）保存至**请求历史**。
+
+### DNS 查询
+
+- 在 URL 栏的协议下拉框中选择 **DNS**，切换为 DNS 模式。
+- 在 URL 栏输入主机名（如 `example.com`），点击 **Query** 发起查询。
+- **DNS 服务器**：配置上游解析器，支持以下传输协议：
+  | URL 格式 | 协议 | 默认端口 |
+  |---|---|---|
+  | `udp://1.1.1.1:53` 或直接 `1.1.1.1` | DNS-over-UDP（明文）| 53 |
+  | `tcp://1.1.1.1:53` | DNS-over-TCP | 53 |
+  | `tls://one.one.one.one` 或 `dot://one.one.one.one` | DNS-over-TLS（DoT）| 853 |
+  | `https://cloudflare-dns.com/dns-query` 或 `doh://cloudflare-dns.com/dns-query` | DNS-over-HTTPS（DoH）| 443 |
+  留空时使用 `udp://1.1.1.1:53`。
+- **查询类型**：自由文本输入，带常用类型提示（A、AAAA、CNAME、MX、TXT、NS、SOA、SRV、PTR、CAA、HTTPS、TLSA、DS、DNSKEY 等），支持直接输入数字类型码（如 `65` 代表 HTTPS）。
+- **查询类（Class）**：自由文本输入，默认 `IN`，提示值：IN、CH、HS、ANY。
+- **超时**：单次查询超时（毫秒），默认 5000。
+- **EDNS**：配置缓冲区大小（字节）及 DNSSEC OK 位（DO），开启后通过 OPT 伪记录请求 DNSSEC 记录。
+- **查询标志**：逐请求切换 RD（请求递归解析）和 CD（禁用 DNSSEC 校验）。
+- **Records 标签页**：结构化表格展示应答记录 —— 类型、值、TTL 及类型专属字段（MX/SRV 的优先级、TXT/SOA 的条目等）。
+- **Raw 标签页**：完整解码的 DNS 报文（questions、answers、authorities、additionals）及标志栏，显示 QR/AA/TC/RD/RA/AD/CD 位、OPCODE(n) 和 RCODE(n)。
+- 查询完成后自动将会话（查询类型、RCODE、记录数）保存至**请求历史**。
 
 ### 响应查看器
 
@@ -131,7 +154,7 @@
 
 1. 打开 VS Code，点击状态栏中的 **API Pilot** 图标。
 2. 点击 `+` 新建请求。
-3. 输入 URL（支持 `http(s)` 或 `ws(s)`），或从协议下拉框选择 **SSE**/**MQTT**/**gRPC**。HTTP 请求选择方法并点击 **Send**；WebSocket/SSE/MQTT 输入对应地址并点击 **Connect**；gRPC 选择服务与方法后点击 **Invoke**。
+3. 输入 URL（支持 `http(s)` 或 `ws(s)`），或从协议下拉框选择 **SSE**/**MQTT**/**gRPC**/**DNS**。HTTP 请求选择方法并点击 **Send**；WebSocket/SSE/MQTT 输入对应地址并点击 **Connect**；gRPC 选择服务与方法后点击 **Invoke**；DNS 输入主机名后点击 **Query**。
 4. 在下方查看格式化的响应结果或实时 WebSocket 会话。
 
 ---

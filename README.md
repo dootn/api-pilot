@@ -4,6 +4,8 @@
 
 **A powerful API debugging tool built right into VS Code — no browser, no separate app.**
 
+Multi-protocol API client — HTTP, WebSocket, SSE, MQTT, gRPC & DNS — with built-in history, collections.
+
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.85+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
@@ -68,6 +70,27 @@
 - **Metadata**: key-value pairs sent as gRPC headers with per-row enable/disable.
 - URL format: `grpc://host:port` (plaintext) or `grpcs://host:port` (TLS), or bare `host:port`.
 - Sessions are automatically saved to **Request History** with method name and gRPC status code.
+
+### DNS Query
+
+- Select **DNS** from the protocol dropdown in the URL bar to switch into DNS mode.
+- Enter a hostname (e.g. `example.com`) in the URL bar and click **Query**.
+- **DNS Server**: configure the upstream resolver. Supported transports:
+  | URL Format | Protocol | Default Port |
+  |---|---|---|
+  | `udp://1.1.1.1:53` or bare `1.1.1.1` | DNS-over-UDP (plain) | 53 |
+  | `tcp://1.1.1.1:53` | DNS-over-TCP | 53 |
+  | `tls://one.one.one.one` or `dot://one.one.one.one` | DNS-over-TLS (DoT) | 853 |
+  | `https://cloudflare-dns.com/dns-query` or `doh://cloudflare-dns.com/dns-query` | DNS-over-HTTPS (DoH) | 443 |
+  Leave empty to use `udp://1.1.1.1:53`.
+- **Query Type**: free-text input with suggestions (A, AAAA, CNAME, MX, TXT, NS, SOA, SRV, PTR, CAA, HTTPS, TLSA, DS, DNSKEY…). Accepts numeric type codes (e.g. `65` for HTTPS).
+- **Class**: free-text input, defaults to `IN`. Suggestions: IN, CH, HS, ANY.
+- **Timeout**: per-query timeout in milliseconds (default 5000).
+- **EDNS**: configure buffer size (bytes) and enable the DNSSEC OK bit (DO) to request DNSSEC records via an OPT pseudo-record.
+- **Query Flags**: toggle RD (Recursion Desired) and CD (Checking Disabled) per query.
+- **Records tab**: structured table of answer records — Type, Value, TTL, and type-specific fields (priority for MX/SRV, entries for TXT/SOA…).
+- **Raw tab**: full decoded DNS packet (questions, answers, authorities, additionals) plus a flags bar showing QR/AA/TC/RD/RA/AD/CD bits, OPCODE(n) and RCODE(n).
+- Sessions are saved to **Request History** with query type, RCODE, and record count.
 
 ### Response Viewer
 
@@ -141,7 +164,7 @@
 
 1. Open VS Code and click the **API Pilot** icon in the Status Bar.
 2. Click `+` to create a new request.
-3. Enter a URL (http(s) or ws(s)) or select the **SSE**, **MQTT**, or **gRPC** protocol to connect to a Server-Sent Events endpoint, MQTT broker, or gRPC server. For HTTP requests choose a method and click **Send**; for WebSocket/SSE/MQTT click **Connect**; for gRPC click **Invoke**.
+3. Enter a URL (http(s) or ws(s)) or select the **SSE**, **MQTT**, **gRPC**, or **DNS** protocol to connect to a Server-Sent Events endpoint, MQTT broker, gRPC server, or perform a DNS query. For HTTP requests choose a method and click **Send**; for WebSocket/SSE/MQTT click **Connect**; for gRPC click **Invoke**; for DNS enter a hostname and click **Query**.
 4. View the formatted response, live WebSocket conversation, or real-time SSE event stream below.
 
 ---

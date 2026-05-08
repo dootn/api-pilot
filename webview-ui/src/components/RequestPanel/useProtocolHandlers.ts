@@ -25,7 +25,7 @@ function buildPayload(tab: RequestTab, overrides?: Record<string, unknown>) {
 export function useProtocolHandlers(
   tab: RequestTab | undefined,
   updateTab: (id: string, updates: Partial<RequestTab>) => void,
-  flags: { isWs: boolean; isSse: boolean; isMqtt: boolean; isGrpc: boolean }
+  flags: { isWs: boolean; isSse: boolean; isMqtt: boolean; isGrpc: boolean; isDns?: boolean }
 ) {
   const handleWsToggle = () => {
     if (!tab || !tab.url.trim()) return;
@@ -93,6 +93,23 @@ export function useProtocolHandlers(
     });
   };
 
+  const handleDnsQuery = () => {
+    if (!tab || !tab.url.trim()) return;
+
+    if (tab.loading) {
+      updateTab(tab.id, { loading: false });
+      return;
+    }
+
+    const dnsOptions = { queryType: 'A', ...tab.dnsOptions };
+    updateTab(tab.id, { loading: true, dnsResponse: undefined, responseError: null });
+    vscode.postMessage({
+      type: 'dnsQuery',
+      requestId: tab.id,
+      payload: { hostname: tab.url.trim(), dnsOptions },
+    });
+  };
+
   const handleSend = () => {
     if (!tab || !tab.url.trim()) return;
 
@@ -100,6 +117,7 @@ export function useProtocolHandlers(
     if (flags.isGrpc) { handleGrpcCall(); return; }
     if (flags.isMqtt) { handleMqttToggle(); return; }
     if (flags.isSse) { handleSseToggle(); return; }
+    if (flags.isDns) { handleDnsQuery(); return; }
 
     if (tab.loading) {
       vscode.postMessage({ type: 'cancelRequest', requestId: tab.id });

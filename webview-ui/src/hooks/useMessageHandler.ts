@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useTabStore, type RequestTab } from '../stores/tabStore';
-import type { ApiResponse, WsMessage, WsStatus, SseEvent, SseStatus, MqttStatus, MqttMessage, GrpcStatus, GrpcMessage, GrpcServiceDef, GrpcMessageDef } from '../stores/requestStore';
+import type { ApiResponse, WsMessage, WsStatus, SseEvent, SseStatus, MqttStatus, MqttMessage, GrpcStatus, GrpcMessage, GrpcServiceDef, GrpcMessageDef, DnsResponse } from '../stores/requestStore';
 import { useLocaleStore } from '../stores/localeStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useUIStore } from '../stores/uiStore';
@@ -241,6 +241,15 @@ export function useMessageHandler() {
         }
         case 'requestProgress':
           break;
+        case 'dnsResult': {
+          const dnsRes = message.payload as DnsResponse;
+          updateTab(tabId, {
+            dnsResponse: dnsRes,
+            responseError: dnsRes.status !== 'ok' && dnsRes.error ? null : null, // error shown in DnsPanel
+            loading: false,
+          });
+          break;
+        }
       }
     },
     [updateTab, addTabWithData, restoreSession, tabs, activeTabId, setActiveTabId, setLocale, setCustomHttpMethods, openImportModal]

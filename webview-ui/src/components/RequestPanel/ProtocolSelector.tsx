@@ -34,6 +34,7 @@ export function ProtocolSelector({
       <Option value="sse">SSE</Option>
       <Option value="mqtt">MQTT</Option>
       <Option value="grpc">gRPC</Option>
+      <Option value="dns">DNS</Option>
     </Select>
   );
 }

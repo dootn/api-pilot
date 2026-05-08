@@ -4,6 +4,7 @@ import type {
   GrpcFieldDef, GrpcMessageDef, GrpcMethodDef, GrpcServiceDef, GrpcOptions,
   SseEvent, WsMessage, KeyValuePair, FormDataField, RequestBody, AuthConfig,
   TestResult, ConsoleEntry, SSLCertificate, SSLInfo, TimingBreakdown, ApiResponse,
+  DnsQueryType, DnsOptions, DnsRecord, DnsResponse,
 } from '../types';
 
 export type {
@@ -12,4 +13,5 @@ export type {
   GrpcFieldDef, GrpcMessageDef, GrpcMethodDef, GrpcServiceDef, GrpcOptions,
   SseEvent, WsMessage, KeyValuePair, FormDataField, RequestBody, AuthConfig,
   TestResult, ConsoleEntry, SSLCertificate, SSLInfo, TimingBreakdown, ApiResponse,
+  DnsQueryType, DnsOptions, DnsRecord, DnsResponse,
 };

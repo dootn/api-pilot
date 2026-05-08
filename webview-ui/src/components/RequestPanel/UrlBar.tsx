@@ -22,7 +22,7 @@ export function UrlBar() {
   const { environments, activeEnvId } = useEnvironments();
   const urlInputRef = useRef<HTMLInputElement>(null);
   const tab = useActiveTab();
-  const { isWs, isSse, isMqtt, isGrpc, isConnectionProtocol } = useProtocolMode(tab?.protocol);
+  const { isWs, isSse, isMqtt, isGrpc, isDns, isConnectionProtocol } = useProtocolMode(tab?.protocol);
 
   const activeEnvVars = useMemo(() => {
     const env = environments.find((e) => e.id === activeEnvId);
@@ -53,7 +53,7 @@ export function UrlBar() {
 
   if (!tab) return null;
 
-  const { handleSend } = useProtocolHandlers(tab, updateTab, { isWs, isSse, isMqtt, isGrpc });
+  const { handleSend } = useProtocolHandlers(tab, updateTab, { isWs, isSse, isMqtt, isGrpc, isDns });
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newUrl = e.target.value;
@@ -157,7 +157,7 @@ export function UrlBar() {
       id: tab!.id,
       name: tab!.isCustomNamed
         ? tab!.name
-        : (tab!.protocol === 'websocket' || tab!.protocol === 'sse' || tab!.protocol === 'mqtt' || tab!.protocol === 'grpc'
+        : (tab!.protocol === 'websocket' || tab!.protocol === 'sse' || tab!.protocol === 'mqtt' || tab!.protocol === 'grpc' || tab!.protocol === 'dns'
                 ? tab!.url
                 : `${tab!.method} ${tab!.url}`),
       protocol: tab!.protocol,
@@ -203,8 +203,8 @@ export function UrlBar() {
 
       {/* Method selector + URL input: connected group, no gap between them */}
       <div style={{ display: 'flex', flex: 1, minWidth: 0 }}>
-        {/* Method selector — hidden in WS, SSE, MQTT, or gRPC mode */}
-        {!isConnectionProtocol && (
+        {/* Method selector — hidden in WS, SSE, MQTT, gRPC, or DNS mode */}
+        {!isConnectionProtocol && !isDns && (
           <MethodSelector
             method={tab.method}
             onChange={(m) => updateTab(tab.id, { method: m })}
@@ -242,7 +242,7 @@ export function UrlBar() {
             ref={urlInputRef}
             className="url-input"
             type="text"
-            placeholder={isWs ? 'Enter WebSocket URL (e.g. ws://localhost:3456/ws)' : isSse ? 'Enter SSE URL (e.g. http://localhost:3458/sse)' : isMqtt ? 'Enter MQTT broker URL (e.g. mqtt://localhost:1883)' : isGrpc ? 'Enter gRPC target (e.g. grpc://localhost:50051 or host:port)' : 'Enter request URL (e.g. https://api.example.com/users)'}
+            placeholder={isWs ? 'Enter WebSocket URL (e.g. ws://localhost:3456/ws)' : isSse ? 'Enter SSE URL (e.g. http://localhost:3458/sse)' : isMqtt ? 'Enter MQTT broker URL (e.g. mqtt://localhost:1883)' : isGrpc ? 'Enter gRPC target (e.g. grpc://localhost:50051 or host:port)' : isDns ? 'Enter hostname to query (e.g. example.com)' : 'Enter request URL (e.g. https://api.example.com/users)'}
             value={tab.url}
             onChange={handleUrlChange}
             onKeyDown={handleUrlKeyDown}
@@ -335,9 +335,13 @@ export function UrlBar() {
                   : tab.loading
                     ? 'Calling…'
                     : 'Invoke'
-                : tab.loading
-                  ? t('urlCancel')
-                  : t('urlSend')}
+                : isDns
+                  ? tab.loading
+                    ? t('urlCancel')
+                    : t('dnsQueryBtn')
+                  : tab.loading
+                    ? t('urlCancel')
+                    : t('urlSend')}
       </button>
 
       {/* SSL verify toggle — only meaningful for HTTPS (not WS, SSE, MQTT, or gRPC mode) */}

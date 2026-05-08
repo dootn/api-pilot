@@ -6,6 +6,7 @@ import { WsConversation } from './components/RequestPanel/WsConversation';
 import { SseConversation } from './components/RequestPanel/SseConversation';
 import { MqttPanel } from './components/RequestPanel/MqttPanel';
 import { GrpcPanel } from './components/RequestPanel/GrpcPanel';
+import { DnsPanel } from './components/RequestPanel/DnsPanel';
 import { CollectionsSidebar } from './components/Sidebar/CollectionsSidebar';
 import { HistorySidebar } from './components/Sidebar/HistorySidebar';
 import { CompareModal } from './components/CompareModal';
@@ -76,7 +77,7 @@ function App() {
   usePasteImport();
 
   const activeTab = useActiveTab();
-  const { isWs, isSse, isMqtt, isGrpc } = useProtocolMode(activeTab?.protocol);
+  const { isWs, isSse, isMqtt, isGrpc, isDns } = useProtocolMode(activeTab?.protocol);
 
   useVscodeMessage(handleMessage);
 
@@ -190,7 +191,7 @@ function App() {
             onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--border-color)')}
           />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            {isWs ? <WsConversation /> : isSse ? <SseConversation /> : isMqtt ? <MqttPanel /> : isGrpc ? <GrpcPanel /> : <ResponsePanel />}
+            {isWs ? <WsConversation /> : isSse ? <SseConversation /> : isMqtt ? <MqttPanel /> : isGrpc ? <GrpcPanel /> : isDns ? <DnsPanel /> : <ResponsePanel />}
           </div>
         </div>
       </div>
