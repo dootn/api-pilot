@@ -7,7 +7,7 @@
 Multi-protocol API client — HTTP, WebSocket, SSE, MQTT, gRPC & DNS — with built-in history, collections.
 
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.85+-blue.svg)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
+![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
 
 ---
 
@@ -222,4 +222,4 @@ Open **Settings** (`Ctrl+,`) and search for `API Pilot`, or add to your `setting
 
 ## License
 
-MIT
+GPL-3.0-only

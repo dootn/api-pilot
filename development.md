@@ -354,4 +354,4 @@ If F5 is occupied by other tools, customize debug launch key in `.vscode/launch.
 
 ## License
 
-MIT
+GPL-3.0-only

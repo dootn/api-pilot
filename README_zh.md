@@ -7,7 +7,7 @@
 多协议 API 客户端 —— HTTP、WebSocket、SSE、MQTT、gRPC & DNS —— 内置历史记录与集合管理。
 
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.85+-blue.svg)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
+![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
 
 ---
 
@@ -199,4 +199,4 @@ console.warn('响应体过大');
 
 ## 许可证
 
-MIT
+GPL-3.0-only
