@@ -8,6 +8,7 @@ export interface ProtocolMode {
   isMqtt: boolean;
   isGrpc: boolean;
   isDns: boolean;
+  isRedis: boolean;
   isConnectionProtocol: boolean;
 }
 
@@ -18,14 +19,16 @@ export function useProtocolMode(protocol?: Protocol): ProtocolMode {
     const isMqtt = protocol === 'mqtt';
     const isGrpc = protocol === 'grpc';
     const isDns = protocol === 'dns';
+    const isRedis = protocol === 'redis';
     return {
-      isHttp: !isWs && !isSse && !isMqtt && !isGrpc && !isDns,
+      isHttp: !isWs && !isSse && !isMqtt && !isGrpc && !isDns && !isRedis,
       isWs,
       isSse,
       isMqtt,
       isGrpc,
       isDns,
-      isConnectionProtocol: isWs || isSse || isMqtt || isGrpc,
+      isRedis,
+      isConnectionProtocol: isWs || isSse || isMqtt || isGrpc || isRedis,
     };
   }, [protocol]);
 }

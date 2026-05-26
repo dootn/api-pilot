@@ -4,7 +4,7 @@
 
 **强大的 HTTP API 调试工具，直接内嵌在 VS Code 中 —— 无需浏览器，无需额外应用。**
 
-多协议 API 客户端 —— HTTP、WebSocket、SSE、MQTT、gRPC & DNS —— 内置历史记录与集合管理。
+多协议 API 客户端 —— HTTP、WebSocket、SSE、MQTT、gRPC、Redis & DNS —— 内置历史记录与集合管理。
 
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.85+-blue.svg)
 ![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
@@ -88,6 +88,18 @@
 - **Raw 标签页**：完整解码的 DNS 报文（questions、answers、authorities、additionals）及标志栏，显示 QR/AA/TC/RD/RA/AD/CD 位、OPCODE(n) 和 RCODE(n)。
 - 查询完成后自动将会话（查询类型、RCODE、记录数）保存至**请求历史**。
 
+### Redis
+
+- 在 URL 栏左侧的协议下拉框中选择 **Redis**，切换为 Redis 模式。
+- **连接/断开**：输入 Redis 服务器地址（如 `redis://localhost:6379` 或 `rediss://` 开启 TLS），点击 **Connect** 建立连接；点击 **Disconnect** 断开。
+- **Options 标签页**：配置数据库编号（db 0–15）、用户名、密码、连接超时及 TLS 开关。
+- **命令目录**：66 条 Redis 命令，按类别分组（通用、字符串、哈希、列表、集合、有序集合），每条命令含中英文说明及参数预览。
+- **命令执行**：
+  - 从命令目录选择命令，按需填写参数，底部预览栏实时显示完整命令字符串。
+  - 点击 **Execute** 或按 `Ctrl+Enter` 执行，结果以 RESP 格式展示。
+- **历史记录**（面板内）：可展开/折叠本次会话内执行的命令历史，支持重新发送。
+- 断开连接时自动将会话（命令发送数、响应数、持续时间）保存至**请求历史**。
+
 ### 响应查看器
 
 - **状态与耗时**: HTTP 状态码、状态文本、响应时间（ms）、响应体大小
@@ -154,7 +166,7 @@
 
 1. 打开 VS Code，点击状态栏中的 **API Pilot** 图标。
 2. 点击 `+` 新建请求。
-3. 输入 URL（支持 `http(s)` 或 `ws(s)`），或从协议下拉框选择 **SSE**/**MQTT**/**gRPC**/**DNS**。HTTP 请求选择方法并点击 **Send**；WebSocket/SSE/MQTT 输入对应地址并点击 **Connect**；gRPC 选择服务与方法后点击 **Invoke**；DNS 输入主机名后点击 **Query**。
+3. 输入 URL（支持 `http(s)` 或 `ws(s)`），或从协议下拉框选择 **SSE**/**MQTT**/**gRPC**/**Redis**/**DNS**。HTTP 请求选择方法并点击 **Send**；WebSocket/SSE/MQTT/Redis 输入对应地址并点击 **Connect**；gRPC 选择服务与方法后点击 **Invoke**；DNS 输入主机名后点击 **Query**。
 4. 在下方查看格式化的响应结果或实时 WebSocket 会话。
 
 ---

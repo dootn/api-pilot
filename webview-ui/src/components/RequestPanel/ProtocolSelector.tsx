@@ -35,6 +35,7 @@ export function ProtocolSelector({
       <Option value="mqtt">MQTT</Option>
       <Option value="grpc">gRPC</Option>
       <Option value="dns">DNS</Option>
+      <Option value="redis">Redis</Option>
     </Select>
   );
 }

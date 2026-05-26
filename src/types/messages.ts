@@ -244,3 +244,37 @@ export interface GrpcReflectErrorMessage {
   tabId: string;
   payload: { error: string };
 }
+
+// Redis messages (Webview -> Extension)
+export interface RedisConnectMessage {
+  type: 'redisConnect';
+  tabId: string;
+  payload: import('./index').ApiRequest;
+}
+
+export interface RedisDisconnectMessage {
+  type: 'redisDisconnect';
+  payload: { connectionId: string };
+}
+
+export interface RedisSendCommandMessage {
+  type: 'redisSendCommand';
+  payload: { connectionId: string; command: string };
+}
+
+// Redis messages (Extension -> Webview)
+export interface RedisStatusChangedMessage {
+  type: 'redisStatusChanged';
+  tabId: string;
+  payload: {
+    status: import('./index').RedisStatus;
+    connectionId?: string;
+    error?: string;
+  };
+}
+
+export interface RedisMessageReceivedMessage {
+  type: 'redisMessageReceived';
+  tabId: string;
+  payload: import('./index').RedisMessage;
+}

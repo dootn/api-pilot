@@ -148,6 +148,7 @@ export function HistorySidebar() {
                     const isMqtt = protocol === 'mqtt';
                     const isGrpc = protocol === 'grpc';
                     const isDns = protocol === 'dns';
+                    const isRedis = protocol === 'redis';
                     const displayMethod = isWs
                       ? 'WS'
                       : isSse
@@ -158,7 +159,9 @@ export function HistorySidebar() {
                             ? 'gRPC'
                             : isDns
                               ? 'DNS'
-                              : method;
+                              : isRedis
+                                ? 'REDIS'
+                                : method;
                     const url = shortenUrl(entry.request.url || '');
                     return (
                       <div
@@ -172,7 +175,7 @@ export function HistorySidebar() {
                       >
                         <span
                           className="sidebar-method"
-                          style={{ color: isWs ? 'var(--vscode-terminal-ansiCyan, #4ec9b0)' : isSse ? 'var(--vscode-terminal-ansiYellow, #dcdcaa)' : isMqtt ? 'var(--vscode-terminal-ansiMagenta, #c586c0)' : isGrpc ? 'var(--vscode-terminal-ansiBlue, #569cd6)' : isDns ? 'var(--vscode-terminal-ansiGreen, #b5cea8)' : (METHOD_COLORS[method] || '#888') }}
+                          style={{ color: isWs ? 'var(--vscode-terminal-ansiCyan, #4ec9b0)' : isSse ? 'var(--vscode-terminal-ansiYellow, #dcdcaa)' : isMqtt ? 'var(--vscode-terminal-ansiMagenta, #c586c0)' : isGrpc ? 'var(--vscode-terminal-ansiBlue, #569cd6)' : isDns ? 'var(--vscode-terminal-ansiGreen, #b5cea8)' : isRedis ? 'var(--vscode-terminal-ansiRed, #f44747)' : (METHOD_COLORS[method] || '#888') }}
                         >
                           {displayMethod}
                         </span>
@@ -198,6 +201,10 @@ export function HistorySidebar() {
                         ) : isDns ? (
                           <span className="sidebar-status" style={{ color: entry.dnsSession?.rcode === 0 ? '#4ec9b0' : (entry.dnsSession?.rcode == null && entry.dnsSession?.status === 'timeout') ? '#ce9178' : '#f48771', fontSize: 10 }}>
                             {entry.dnsSession?.rcode ?? entry.dnsSession?.status ?? entry.dnsSession?.rcode}
+                          </span>
+                        ) : isRedis ? (
+                          <span className="sidebar-status" style={{ color: 'var(--vscode-terminal-ansiRed, #f44747)', fontSize: 10 }}>
+                            ↑{entry.redisSession?.sentCount ?? 0} ↓{entry.redisSession?.receivedCount ?? 0}
                           </span>
                         ) : (
                           <span

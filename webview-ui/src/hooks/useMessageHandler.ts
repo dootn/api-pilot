@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useTabStore, type RequestTab } from '../stores/tabStore';
-import type { ApiResponse, WsMessage, WsStatus, SseEvent, SseStatus, MqttStatus, MqttMessage, GrpcStatus, GrpcMessage, GrpcServiceDef, GrpcMessageDef, DnsResponse } from '../stores/requestStore';
+import type { ApiResponse, WsMessage, WsStatus, SseEvent, SseStatus, MqttStatus, MqttMessage, GrpcStatus, GrpcMessage, GrpcServiceDef, GrpcMessageDef, DnsResponse, RedisStatus, RedisMessage } from '../stores/requestStore';
 import { useLocaleStore } from '../stores/localeStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useUIStore } from '../stores/uiStore';
@@ -211,6 +211,28 @@ export function useMessageHandler() {
         case 'grpcReflectError': {
           const grpcMsg = message as unknown as { tabId: string; payload: { error: string } };
           updateTab(grpcMsg.tabId, { responseError: grpcMsg.payload.error });
+          return;
+        }
+        case 'redisStatusChanged': {
+          const rdMsg = message as unknown as { tabId: string; payload: { status: RedisStatus; connectionId?: string; error?: string } };
+          const { status, connectionId, error } = rdMsg.payload;
+          updateTab(rdMsg.tabId, {
+            redisStatus: status,
+            redisConnectionId: connectionId,
+            loading: status === 'connecting',
+            ...(status === 'disconnected' || status === 'error' ? { redisConnectedAt: undefined } : {}),
+            ...(status === 'connected' ? { redisConnectedAt: Date.now() } : {}),
+            ...(status === 'error' ? { responseError: error ?? 'Redis error' } : {}),
+          });
+          return;
+        }
+        case 'redisMessageReceived': {
+          const rdMsg = message as unknown as { tabId: string; payload: RedisMessage };
+          const tab = tabs.find((t) => t.id === rdMsg.tabId);
+          if (tab) {
+            const existing = tab.redisMessages ?? [];
+            updateTab(rdMsg.tabId, { redisMessages: [...existing, rdMsg.payload] });
+          }
           return;
         }
       }

@@ -1,8 +1,8 @@
 {
   "name": "api-pilot",
   "displayName": "API Pilot",
-  "description": "Multi-protocol API client — HTTP, GraphQL, WebSocket, SSE, MQTT, gRPC & DNS — with built-in history, collections",
-  "version": "1.8.1",
+  "description": "Multi-protocol API client — HTTP, GraphQL, WebSocket, SSE, MQTT, gRPC, DNS & Redis — with built-in history, collections",
+  "version": "1.8.26",
   "publisher": "dootn",
   "license": "GPL-3.0-only",
   "icon": "resources/icon.png",
@@ -112,6 +112,7 @@
     "@grpc/proto-loader": "^0.8.0",
     "aedes": "^1.0.2",
     "dns-packet": "^5.6.1",
+    "ioredis": "^5.10.1",
     "mqtt": "^5.15.1",
     "undici": "^6.6.0",
     "ws": "^8.18.0"

@@ -2,7 +2,7 @@
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
 
-export type Protocol = 'http' | 'websocket' | 'sse' | 'mqtt' | 'grpc' | 'dns';
+export type Protocol = 'http' | 'websocket' | 'sse' | 'mqtt' | 'grpc' | 'dns' | 'redis';
 
 // DNS query type — any IANA type name or numeric code string
 export type DnsQueryType = string;
@@ -37,6 +37,25 @@ export interface DnsResponse {
   status: 'ok' | 'error' | 'nxdomain' | 'timeout';
   error?: string;
   raw?: Record<string, unknown>;  // full decoded DNS response
+}
+
+export type RedisStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export interface RedisMessage {
+  id: string;
+  direction: 'sent' | 'received';
+  command?: string;
+  response: string;
+  timestamp: number;
+  isError?: boolean;
+}
+
+export interface RedisOptions {
+  db?: number;
+  username?: string;
+  password?: string;
+  tls?: boolean;
+  connectTimeout?: number;
 }
 
 export type WsStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
@@ -296,5 +315,12 @@ export interface HistoryEntry {
   grpcSession?: GrpcSessionSummary;
   dnsSession?: DnsSessionSummary;
   dnsResponse?: DnsResponse;
+  redisSession?: RedisSessionSummary;
   timestamp: number;
+}
+
+export interface RedisSessionSummary {
+  sentCount: number;
+  receivedCount: number;
+  duration: number;
 }

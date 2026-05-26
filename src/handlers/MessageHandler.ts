@@ -7,6 +7,7 @@ import { WsClient } from '../services/WsClient';
 import { SseClient } from '../services/SseClient';
 import { MqttClient } from '../services/MqttClient';
 import { GrpcClient } from '../services/GrpcClient';
+import { RedisClient } from '../services/RedisClient';
 import { WebviewMessage } from '../types/messages';
 import { ApiRequest, Environment } from '../types';
 import { HandlerContext } from './HandlerContext';
@@ -22,6 +23,7 @@ export class MessageHandler {
   private sseClient: SseClient;
   private mqttClient: MqttClient;
   private grpcClient: GrpcClient;
+  private redisClient: RedisClient;
 
   private httpHandler: HttpRequestHandler;
   private collectionHandler: CollectionHandler;
@@ -56,14 +58,16 @@ export class MessageHandler {
     this.sseClient = new SseClient(webview, historyService, maxHistory);
     this.mqttClient = new MqttClient(webview, historyService, maxHistory);
     this.grpcClient = new GrpcClient(webview, historyService, maxHistory);
+    this.redisClient = new RedisClient(webview, historyService, maxHistory);
   }
 
-  /** Clean up all WebSocket/SSE/MQTT/gRPC connections when the panel is disposed. */
+  /** Clean up all WebSocket/SSE/MQTT/gRPC/Redis connections when the panel is disposed. */
   dispose(): void {
     this.wsClient.disposeAll();
     this.sseClient.disposeAll();
     this.mqttClient.disposeAll();
     this.grpcClient.disposeAll();
+    this.redisClient.disposeAll();
   }
 
   async handle(message: WebviewMessage): Promise<void> {
@@ -259,6 +263,19 @@ export class MessageHandler {
         await this.dnsHandler.handleDnsQuery(message.requestId!, p.hostname, p.dnsOptions);
         break;
       }
+      // --- Redis ---
+      case 'redisConnect':
+        this.handleRedisConnect((message as any).tabId as string, message.payload as ApiRequest);
+        break;
+      case 'redisDisconnect':
+        this.redisClient.disconnect((message.payload as { connectionId: string }).connectionId);
+        break;
+      case 'redisSendCommand':
+        await this.redisClient.sendCommand(
+          (message.payload as any).connectionId,
+          (message.payload as any).command,
+        );
+        break;
       default:
         console.warn(`Unknown message type: ${message.type}`);
     }
@@ -289,5 +306,10 @@ export class MessageHandler {
   private handleGrpcReflect(tabId: string, request: ApiRequest): void {
     const envVars = this.envService?.getActiveVariables() ?? [];
     this.grpcClient.reflect(tabId, request, envVars);
+  }
+
+  private handleRedisConnect(tabId: string, request: ApiRequest): void {
+    const envVars = this.envService?.getActiveVariables() ?? [];
+    this.redisClient.connect(tabId, request, envVars);
   }
 }

@@ -9,11 +9,12 @@ import { CodeModal } from './CodeModal';
 import { MqttOptions } from './MqttOptions';
 import { GrpcOptions } from './GrpcOptions';
 import { DnsOptionsTab } from './DnsOptionsTab';
+import { RedisOptions } from './RedisOptions';
 import { useEnvironments } from '../../hooks/useEnvironments';
 import { useI18n, type TranslationKey } from '../../i18n';
 import type { RequestTab } from '../../stores/tabStore';
 
-type Tab = 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'mqtt-options' | 'grpc-options' | 'dns-options';
+type Tab = 'params' | 'headers' | 'body' | 'auth' | 'scripts' | 'mqtt-options' | 'grpc-options' | 'dns-options' | 'redis-options';
 
 function getTabBadge(id: Tab, tab: RequestTab): string | number | null {
   switch (id) {
@@ -47,6 +48,11 @@ function getTabBadge(id: Tab, tab: RequestTab): string | number | null {
       if (!opts) return null;
       return (opts.dnsServer || opts.queryType !== 'A') ? '●' : null;
     }
+    case 'redis-options': {
+      const opts = tab.redisOptions;
+      if (!opts) return null;
+      return (opts.username || opts.password || (opts.db ?? 0) !== 0) ? '●' : null;
+    }
     default:
       return null;
   }
@@ -58,9 +64,10 @@ const TAB_DEFS: { id: Tab; key: TranslationKey; label?: string }[] = [
   { id: 'body',    key: 'tabBody'    },
   { id: 'auth',    key: 'tabAuth'    },
   { id: 'scripts', key: 'tabScripts' },
-  { id: 'mqtt-options', key: 'tabParams', label: 'Options' },
-  { id: 'grpc-options', key: 'tabParams', label: 'Options' },
-  { id: 'dns-options',  key: 'tabParams', label: 'DNS Options' },
+  { id: 'mqtt-options',  key: 'tabParams', label: 'Options'       },
+  { id: 'grpc-options',  key: 'tabParams', label: 'Options'       },
+  { id: 'dns-options',   key: 'tabParams', label: 'DNS Options'   },
+  { id: 'redis-options', key: 'tabParams', label: 'Redis Options' },
 ];
 
 export function RequestTabs() {
@@ -89,38 +96,36 @@ export function RequestTabs() {
   const isMqttMode = tab.protocol === 'mqtt';
   const isGrpcMode = tab.protocol === 'grpc';
   const isDnsMode = tab.protocol === 'dns';
+  const isRedisMode = tab.protocol === 'redis';
 
-  // Auto-switch to grpc-options when entering gRPC mode with an incompatible active tab
+  // Sync active request tab with the current protocol.
+  // Handles both entering special modes and switching back to HTTP/WS/SSE.
   useEffect(() => {
-    if (isGrpcMode && ['params', 'headers', 'auth', 'body', 'scripts'].includes(tab.activeTab)) {
-      updateTab(tab.id, { activeTab: 'grpc-options' });
+    if (isGrpcMode) {
+      if (tab.activeTab !== 'grpc-options') updateTab(tab.id, { activeTab: 'grpc-options' });
+    } else if (isMqttMode) {
+      if (tab.activeTab !== 'mqtt-options') updateTab(tab.id, { activeTab: 'mqtt-options' });
+    } else if (isDnsMode) {
+      if (tab.activeTab !== 'dns-options') updateTab(tab.id, { activeTab: 'dns-options' });
+    } else if (isRedisMode) {
+      if (tab.activeTab !== 'redis-options') updateTab(tab.id, { activeTab: 'redis-options' });
+    } else if (['grpc-options', 'mqtt-options', 'dns-options', 'redis-options'].includes(tab.activeTab)) {
+      // HTTP / WS / SSE — reset from a now-hidden protocol-specific tab
+      updateTab(tab.id, { activeTab: 'params' });
     }
-  }, [isGrpcMode, tab.id, tab.activeTab, updateTab]);
-
-  // Auto-switch to mqtt-options when entering MQTT mode with an incompatible active tab
-  useEffect(() => {
-    if (isMqttMode && ['params', 'headers', 'auth', 'body', 'scripts'].includes(tab.activeTab)) {
-      updateTab(tab.id, { activeTab: 'mqtt-options' });
-    }
-  }, [isMqttMode, tab.id, tab.activeTab, updateTab]);
-
-  // Auto-switch to dns-options when entering DNS mode with an incompatible active tab
-  useEffect(() => {
-    if (isDnsMode && ['params', 'headers', 'auth', 'body', 'scripts', 'mqtt-options', 'grpc-options'].includes(tab.activeTab)) {
-      updateTab(tab.id, { activeTab: 'dns-options' });
-    }
-  }, [isDnsMode, tab.id, tab.activeTab, updateTab]);
+  }, [isGrpcMode, isMqttMode, isDnsMode, isRedisMode, tab.id, tab.activeTab, updateTab]);
 
   // In WS mode, filter out the body tab; in SSE/MQTT/gRPC mode, filter out body and scripts
-  // Also filter out params, headers, auth in gRPC and MQTT modes (handled via options instead)
+  // Also filter out params, headers, auth in gRPC, MQTT, Redis modes (handled via options instead)
   // In MQTT mode also show the mqtt-options tab; in gRPC mode show grpc-options; hide both in other modes
   const visibleTabs = TAB_DEFS
     .filter((def) => !(isWsMode && def.id === 'body'))
-    .filter((def) => !((isSseMode || isMqttMode || isGrpcMode || isDnsMode) && (def.id === 'body' || def.id === 'scripts')))
-    .filter((def) => !((isGrpcMode || isMqttMode || isDnsMode) && (def.id === 'params' || def.id === 'headers' || def.id === 'auth')))
+    .filter((def) => !((isSseMode || isMqttMode || isGrpcMode || isDnsMode || isRedisMode) && (def.id === 'body' || def.id === 'scripts')))
+    .filter((def) => !((isGrpcMode || isMqttMode || isDnsMode || isRedisMode) && (def.id === 'params' || def.id === 'headers' || def.id === 'auth')))
     .filter((def) => !(def.id === 'mqtt-options' && !isMqttMode))
     .filter((def) => !(def.id === 'grpc-options' && !isGrpcMode))
-    .filter((def) => !(def.id === 'dns-options' && !isDnsMode));
+    .filter((def) => !(def.id === 'dns-options' && !isDnsMode))
+    .filter((def) => !(def.id === 'redis-options' && !isRedisMode));
 
   return (
     <div className="request-section">
@@ -146,7 +151,7 @@ export function RequestTabs() {
         })}
 
         {/* Code snippet button — HTTP mode only */}
-        {!isWsMode && !isSseMode && !isMqttMode && !isGrpcMode && !isDnsMode && (
+        {!isWsMode && !isSseMode && !isMqttMode && !isGrpcMode && !isDnsMode && !isRedisMode && (
           <button
             className="tab ml-auto"
             onClick={() => setShowCodeModal(true)}
@@ -190,6 +195,8 @@ export function RequestTabs() {
         {tab.activeTab === 'grpc-options' && isGrpcMode && <GrpcOptions />}
 
         {tab.activeTab === 'dns-options' && isDnsMode && <DnsOptionsTab />}
+
+        {tab.activeTab === 'redis-options' && isRedisMode && <RedisOptions />}
       </div>
 
       {showCodeModal && tab && (

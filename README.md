@@ -4,7 +4,7 @@
 
 **A powerful API debugging tool built right into VS Code — no browser, no separate app.**
 
-Multi-protocol API client — HTTP, WebSocket, SSE, MQTT, gRPC & DNS — with built-in history, collections.
+Multi-protocol API client — HTTP, WebSocket, SSE, MQTT, gRPC, Redis & DNS — with built-in history, collections.
 
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.85+-blue.svg)
 ![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
@@ -92,6 +92,30 @@ Multi-protocol API client — HTTP, WebSocket, SSE, MQTT, gRPC & DNS — with bu
 - **Raw tab**: full decoded DNS packet (questions, answers, authorities, additionals) plus a flags bar showing QR/AA/TC/RD/RA/AD/CD bits, OPCODE(n) and RCODE(n).
 - Sessions are saved to **Request History** with query type, RCODE, and record count.
 
+### Redis
+
+- Select **Redis** from the protocol dropdown in the URL bar to switch into Redis mode.
+- **Connect / Disconnect**: enter a Redis URL (e.g. `redis://localhost:6379` for plaintext or `rediss://localhost:6380` for TLS) and click **Connect**; click **Disconnect** to close the session.
+- **Connection Options** tab: configure Database (0–15), Username (Redis 6+ ACL), Password, Connect Timeout (ms), and TLS support.
+- **Command Builder**: select a command category (General, String, Hash, List, Set, ZSet) and pick a command from the dropdown.
+  - **Bilingual descriptions**: each command includes a description in English and Chinese (Simplified) with usage hints.
+  - **Automatic command preview**: as you fill in arguments, the command string is shown in the preview bar below the builder with type-appropriate quoting.
+  - **Argument fields**: context-aware input for required and optional parameters; numeric fields use number input controls.
+- **Raw Mode**: toggle to enter arbitrary Redis commands (e.g. `EVAL script 0`) without the builder.
+- **Result Display**:
+  - **Nil**: `(nil)` for missing keys
+  - **Simple strings**: `✓` OK or custom message
+  - **Integers**: numeric values and counts
+  - **Bulk strings**: quoted text with expandable/truncate controls
+  - **Arrays**: multi-row tables with per-item copy buttons
+  - **Hashes**: two-column key-value tables
+  - **Sets**: single-column member lists
+  - **Sorted sets**: score + member tables
+  - **Scan results**: cursor + paginated key batches
+  - **Info**: structured server info by section (server, clients, memory, stats, replication, cpu, keyspace…)
+- **Command History**: expandable log showing all executed commands with timestamps, results, and per-command re-run buttons. Full command text is visible in the command log below each result.
+- Sessions are automatically saved to **Request History** with command count and duration on disconnect.
+
 ### Response Viewer
 
 - **Status & Timing**: HTTP status code, status text, response time (ms), and body size — each labeled for clarity
@@ -164,8 +188,8 @@ Multi-protocol API client — HTTP, WebSocket, SSE, MQTT, gRPC & DNS — with bu
 
 1. Open VS Code and click the **API Pilot** icon in the Status Bar.
 2. Click `+` to create a new request.
-3. Enter a URL (http(s) or ws(s)) or select the **SSE**, **MQTT**, **gRPC**, or **DNS** protocol to connect to a Server-Sent Events endpoint, MQTT broker, gRPC server, or perform a DNS query. For HTTP requests choose a method and click **Send**; for WebSocket/SSE/MQTT click **Connect**; for gRPC click **Invoke**; for DNS enter a hostname and click **Query**.
-4. View the formatted response, live WebSocket conversation, or real-time SSE event stream below.
+3. Enter a URL (http(s) or ws(s)) or select the **SSE**, **MQTT**, **gRPC**, **Redis**, or **DNS** protocol to connect to a Server-Sent Events endpoint, MQTT broker, gRPC server, Redis server, or perform a DNS query. For HTTP requests choose a method and click **Send**; for WebSocket/SSE/MQTT/Redis click **Connect**; for gRPC click **Invoke**; for DNS enter a hostname and click **Query**.
+4. View the formatted response, live WebSocket conversation, real-time SSE event stream, or Redis command results below.
 
 ---
 

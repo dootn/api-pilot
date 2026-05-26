@@ -25,7 +25,7 @@ function buildPayload(tab: RequestTab, overrides?: Record<string, unknown>) {
 export function useProtocolHandlers(
   tab: RequestTab | undefined,
   updateTab: (id: string, updates: Partial<RequestTab>) => void,
-  flags: { isWs: boolean; isSse: boolean; isMqtt: boolean; isGrpc: boolean; isDns?: boolean }
+  flags: { isWs: boolean; isSse: boolean; isMqtt: boolean; isGrpc: boolean; isDns?: boolean; isRedis?: boolean }
 ) {
   const handleWsToggle = () => {
     if (!tab || !tab.url.trim()) return;
@@ -110,6 +110,25 @@ export function useProtocolHandlers(
     });
   };
 
+  const handleRedisToggle = () => {
+    if (!tab || !tab.url.trim()) return;
+
+    if (tab.redisStatus === 'connected' || tab.redisStatus === 'connecting') {
+      if (tab.redisConnectionId) {
+        vscode.postMessage({ type: 'redisDisconnect', payload: { connectionId: tab.redisConnectionId } });
+      }
+      updateTab(tab.id, { redisStatus: 'disconnected', redisConnectionId: undefined, loading: false });
+      return;
+    }
+
+    updateTab(tab.id, { loading: true, redisMessages: [], responseError: null });
+    vscode.postMessage({
+      type: 'redisConnect',
+      tabId: tab.id,
+      payload: buildPayload(tab, { body: { type: 'none' }, preScript: undefined, postScript: undefined, redisOptions: tab.redisOptions }),
+    });
+  };
+
   const handleSend = () => {
     if (!tab || !tab.url.trim()) return;
 
@@ -118,6 +137,7 @@ export function useProtocolHandlers(
     if (flags.isMqtt) { handleMqttToggle(); return; }
     if (flags.isSse) { handleSseToggle(); return; }
     if (flags.isDns) { handleDnsQuery(); return; }
+    if (flags.isRedis) { handleRedisToggle(); return; }
 
     if (tab.loading) {
       vscode.postMessage({ type: 'cancelRequest', requestId: tab.id });

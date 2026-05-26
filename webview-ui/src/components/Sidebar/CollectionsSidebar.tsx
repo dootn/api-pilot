@@ -206,6 +206,7 @@ export function CollectionsSidebar() {
           : protocol === 'mqtt' ? 'MQTT'
           : protocol === 'grpc' ? 'gRPC'
           : protocol === 'dns' ? 'DNS'
+          : protocol === 'redis' ? 'REDIS'
           : rawMethod;
         const requestClass = [
           'sidebar-tree-item sidebar-request',

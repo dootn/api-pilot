@@ -5,6 +5,7 @@ import type {
   SseEvent, WsMessage, KeyValuePair, FormDataField, RequestBody, AuthConfig,
   TestResult, ConsoleEntry, SSLCertificate, SSLInfo, TimingBreakdown, ApiResponse,
   DnsQueryType, DnsOptions, DnsRecord, DnsResponse,
+  RedisStatus, RedisMessage, RedisOptions,
 } from '../types';
 
 export type {
@@ -14,4 +15,5 @@ export type {
   SseEvent, WsMessage, KeyValuePair, FormDataField, RequestBody, AuthConfig,
   TestResult, ConsoleEntry, SSLCertificate, SSLInfo, TimingBreakdown, ApiResponse,
   DnsQueryType, DnsOptions, DnsRecord, DnsResponse,
+  RedisStatus, RedisMessage, RedisOptions,
 };

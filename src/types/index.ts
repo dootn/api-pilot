@@ -1,6 +1,6 @@
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
 
-export type Protocol = 'http' | 'websocket' | 'sse' | 'mqtt' | 'grpc' | 'dns';
+export type Protocol = 'http' | 'websocket' | 'sse' | 'mqtt' | 'grpc' | 'dns' | 'redis';
 
 // DNS query type — any IANA-registered name (A, MX, HTTPS…) or a numeric type code like "65"
 export type DnsQueryType = string;
@@ -144,6 +144,7 @@ export interface ApiRequest {
   mqttOptions?: MqttOptions;   // MQTT-specific connection options
   grpcOptions?: GrpcOptions;   // gRPC-specific options
   dnsOptions?: DnsOptions;     // DNS-specific options
+  redisOptions?: RedisOptions; // Redis-specific options
   createdAt: number;
   updatedAt: number;
 }
@@ -297,6 +298,31 @@ export interface GrpcSessionSummary {
   duration: number;        // ms
 }
 
+export type RedisStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+
+export interface RedisMessage {
+  id: string;
+  direction: 'sent' | 'received';
+  command?: string;    // raw command string (for 'sent')
+  response: string;    // formatted response
+  timestamp: number;
+  isError?: boolean;
+}
+
+export interface RedisOptions {
+  db?: number;             // database index 0-15, default 0
+  username?: string;       // Redis 6+ ACL username
+  password?: string;
+  tls?: boolean;           // enable TLS (rediss://)
+  connectTimeout?: number; // ms, default 10000
+}
+
+export interface RedisSessionSummary {
+  sentCount: number;
+  receivedCount: number;
+  duration: number;  // ms
+}
+
 export interface DnsSessionSummary {
   hostname: string;
   queryType: string;
@@ -316,6 +342,7 @@ export interface HistoryEntry {
   grpcSession?: GrpcSessionSummary;
   dnsSession?: DnsSessionSummary;
   dnsResponse?: DnsResponse;
+  redisSession?: RedisSessionSummary;
   timestamp: number;
 }
 
