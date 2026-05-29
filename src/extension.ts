@@ -5,28 +5,45 @@ import { CollectionService } from './services/CollectionService';
 import { EnvService } from './services/EnvService';
 import { HistoryService } from './services/HistoryService';
 
+interface Services {
+  storageService: StorageService;
+  collectionService: CollectionService;
+  envService: EnvService;
+  historyService: HistoryService;
+  webviewProvider: WebviewProvider;
+}
+
 export function activate(context: vscode.ExtensionContext) {
   console.log('API Pilot is now active!');
 
-  const storageService = new StorageService();
-  const collectionService = new CollectionService(storageService);
-  const envService = new EnvService(storageService);
-  const historyService = new HistoryService(storageService);
+  let services: Services | null = null;
 
-  const webviewProvider = new WebviewProvider(context.extensionUri, {
-    collectionService,
-    envService,
-    historyService,
-    storageService,
-    version: context.extension.packageJSON.version as string,
-    repoUrl: context.extension.packageJSON.repository?.url as string | undefined,
-    onCollectionChanged: () => {
-      webviewProvider.notifyWebview({ type: 'collectionsChanged' });
-    },
-    onHistoryChanged: () => {
-      webviewProvider.notifyWebview({ type: 'historyChanged' });
-    },
-  });
+  function getOrInit(): Services {
+    if (services) return services;
+
+    const storageService = new StorageService();
+    const collectionService = new CollectionService(storageService);
+    const envService = new EnvService(storageService);
+    const historyService = new HistoryService(storageService);
+
+    const webviewProvider = new WebviewProvider(context.extensionUri, {
+      collectionService,
+      envService,
+      historyService,
+      storageService,
+      version: context.extension.packageJSON.version as string,
+      repoUrl: context.extension.packageJSON.repository?.url as string | undefined,
+      onCollectionChanged: () => {
+        webviewProvider.notifyWebview({ type: 'collectionsChanged' });
+      },
+      onHistoryChanged: () => {
+        webviewProvider.notifyWebview({ type: 'historyChanged' });
+      },
+    });
+
+    services = { storageService, collectionService, envService, historyService, webviewProvider };
+    return services;
+  }
 
   // Status bar entry (bottom-right) — the main entry point
   const statusBarItem = vscode.window.createStatusBarItem(
@@ -42,20 +59,21 @@ export function activate(context: vscode.ExtensionContext) {
   // Open / reveal the panel
   context.subscriptions.push(
     vscode.commands.registerCommand('apiPilot.openPanel', () => {
-      webviewProvider.revealOrCreate();
+      getOrInit().webviewProvider.revealOrCreate();
     })
   );
 
   // Shortcut: new request (opens panel then React creates a tab)
   context.subscriptions.push(
     vscode.commands.registerCommand('apiPilot.newRequest', () => {
-      webviewProvider.revealOrCreate();
+      getOrInit().webviewProvider.revealOrCreate();
     })
   );
 
   // Open a saved request from external callers
   context.subscriptions.push(
     vscode.commands.registerCommand('apiPilot.openRequest', (requestData: string, collectionId?: string) => {
+      const { webviewProvider } = getOrInit();
       webviewProvider.revealOrCreate();
       setTimeout(() => {
         const parsed = JSON.parse(requestData);
@@ -76,6 +94,7 @@ export function activate(context: vscode.ExtensionContext) {
         validateInput: (value) => (value.trim() ? null : 'Name is required'),
       });
       if (name) {
+        const { collectionService, webviewProvider } = getOrInit();
         collectionService.create(name.trim());
         webviewProvider.notifyWebview({ type: 'collectionsChanged' });
         vscode.window.showInformationMessage(`Collection "${name}" created.`);
@@ -86,6 +105,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Select environment (command palette / status bar env item)
   context.subscriptions.push(
     vscode.commands.registerCommand('apiPilot.selectEnvironment', async () => {
+      const { envService } = getOrInit();
       const envs = envService.getAll();
       const items: vscode.QuickPickItem[] = [
         { label: '$(close) No Environment', description: 'Clear active environment' },
@@ -127,6 +147,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Manage environment variables (command palette)
   context.subscriptions.push(
     vscode.commands.registerCommand('apiPilot.manageEnvVars', async () => {
+      const { envService } = getOrInit();
       const activeId = envService.getActiveEnvId();
       if (!activeId) {
         vscode.window.showWarningMessage('No active environment. Select one first.');
@@ -172,6 +193,7 @@ export function activate(context: vscode.ExtensionContext) {
       try {
         const { parseCurl } = await import('./services/CurlParser');
         const request = parseCurl(curlStr);
+        const { webviewProvider } = getOrInit();
         webviewProvider.revealOrCreate();
         setTimeout(() => {
           webviewProvider.notifyWebview({ type: 'loadRequest', payload: request });
@@ -192,6 +214,7 @@ export function activate(context: vscode.ExtensionContext) {
         'Clear'
       );
       if (confirm === 'Clear') {
+        const { historyService, webviewProvider } = getOrInit();
         historyService.clear();
         webviewProvider.notifyWebview({ type: 'historyChanged' });
         vscode.window.showInformationMessage('History cleared.');
@@ -202,6 +225,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Open quick import modal (keyboard shortcut: Cmd+O / Ctrl+O)
   context.subscriptions.push(
     vscode.commands.registerCommand('apiPilot.openQuickImport', () => {
+      const { webviewProvider } = getOrInit();
       webviewProvider.revealOrCreate();
       setTimeout(() => {
         webviewProvider.notifyWebview({ type: 'openImportModal' });

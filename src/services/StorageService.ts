@@ -27,6 +27,12 @@ export class StorageService {
   private getFullPath(subDir: string, fileName?: string): string | null {
     if (!this.basePath) return null;
     const dir = path.join(this.basePath, subDir);
+    return fileName ? path.join(dir, fileName) : dir;
+  }
+
+  private getWritePath(subDir: string, fileName?: string): string | null {
+    if (!this.basePath) return null;
+    const dir = path.join(this.basePath, subDir);
     this.ensureDir(dir);
     return fileName ? path.join(dir, fileName) : dir;
   }
@@ -43,7 +49,7 @@ export class StorageService {
   }
 
   writeJson<T>(subDir: string, fileName: string, data: T): boolean {
-    const filePath = this.getFullPath(subDir, fileName);
+    const filePath = this.getWritePath(subDir, fileName);
     if (!filePath) return false;
     try {
       const tmpPath = filePath + '.tmp';
@@ -78,7 +84,7 @@ export class StorageService {
   }
 
   writeRaw(subDir: string, fileName: string, data: Buffer): boolean {
-    const filePath = this.getFullPath(subDir, fileName);
+    const filePath = this.getWritePath(subDir, fileName);
     if (!filePath) return false;
     try {
       const tmpPath = filePath + '.tmp';

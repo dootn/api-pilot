@@ -2,7 +2,7 @@
   "name": "api-pilot",
   "displayName": "API Pilot",
   "description": "Multi-protocol API client — HTTP, GraphQL, WebSocket, SSE, MQTT, gRPC, DNS & Redis — with built-in history, collections",
-  "version": "1.8.26",
+  "version": "1.8.29",
   "publisher": "dootn",
   "license": "GPL-3.0-only",
   "icon": "resources/icon.png",
