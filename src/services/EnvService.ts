@@ -13,14 +13,6 @@ export class EnvService {
   private activeEnvId: string | null = null;
 
   constructor(private storage: StorageService) {
-    // Create a default environment if none exist
-    if (this.getAll().length === 0) {
-      const defaultEnv = this.create('Default');
-      this.activeEnvId = defaultEnv.id;
-      this.saveSettings();
-      return;
-    }
-
     // Restore the previously active environment across restarts
     const settings = this.storage.readJson<Settings>('', SETTINGS_FILE);
     if (settings?.activeEnvId) {
@@ -71,10 +63,8 @@ export class EnvService {
       this.activeEnvId = null;
     }
     const result = this.storage.deleteFile(ENVIRONMENTS_DIR, `${id}.json`);
-    // Always keep at least one environment
-    if (this.getAll().length === 0) {
-      const defaultEnv = this.create('Default');
-      this.activeEnvId = defaultEnv.id;
+    if (this.activeEnvId === null) {
+      // If no active environment, persist the null state
       this.saveSettings();
     }
     return result;

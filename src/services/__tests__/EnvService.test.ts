@@ -43,6 +43,11 @@ describe('EnvService', () => {
       expect(all[1].name).toBe('Production');
       expect(all[2].name).toBe('Staging');
     });
+
+    it('should return empty array when no envs are saved', () => {
+      const all = service.getAll();
+      expect(all).toEqual([]);
+    });
   });
 
   describe('getById', () => {
