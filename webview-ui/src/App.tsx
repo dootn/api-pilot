@@ -11,11 +11,13 @@ import { RedisPanel } from './components/RequestPanel/RedisPanel';
 import { CollectionsSidebar } from './components/Sidebar/CollectionsSidebar';
 import { HistorySidebar } from './components/Sidebar/HistorySidebar';
 import { CompareModal } from './components/CompareModal';
+import { CollectionRunnerModal } from './components/CollectionRunner';
 import { useVscodeMessage } from './hooks/useVscodeMessage';
 import { useProtocolMode } from './hooks/useProtocolMode';
 import { useMessageHandler } from './hooks/useMessageHandler';
 import { usePasteImport } from './hooks/usePasteImport';
 import { useTabStore, useActiveTab } from './stores/tabStore';
+import { useRunnerStore } from './stores/runnerStore';
 import { useI18n } from './i18n';
 import { vscode } from './vscode';
 
@@ -25,6 +27,10 @@ function App() {
   // Compare modal
   const compareTabId = useTabStore((s) => s.compareTabId);
   const setCompareTabId = useTabStore((s) => s.setCompareTabId);
+
+  // Collection Runner modal
+  const runnerOpen = useRunnerStore((s) => s.runnerOpen);
+  const closeRunner = useRunnerStore((s) => s.closeRunner);
 
   // Sidebar tab: 'collections' | 'history'
   const [sidebarTab, setSidebarTab] = useState<'collections' | 'history'>('collections');
@@ -200,6 +206,7 @@ function App() {
     {compareTabId && (
       <CompareModal initialTabId={compareTabId} onClose={() => setCompareTabId(null)} />
     )}
+    {runnerOpen && <CollectionRunnerModal onClose={closeRunner} />}
     </>
   );
 }

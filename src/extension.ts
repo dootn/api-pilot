@@ -195,9 +195,7 @@ export function activate(context: vscode.ExtensionContext) {
         const request = parseCurl(curlStr);
         const { webviewProvider } = getOrInit();
         webviewProvider.revealOrCreate();
-        setTimeout(() => {
-          webviewProvider.notifyWebview({ type: 'loadRequest', payload: request });
-        }, 500);
+        webviewProvider.notifyWebviewAfterReady({ type: 'loadRequest', payload: request });
         vscode.window.showInformationMessage('cURL imported successfully!');
       } catch (e) {
         vscode.window.showErrorMessage(`Failed to parse cURL: ${e instanceof Error ? e.message : 'Unknown error'}`);
@@ -227,9 +225,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('apiPilot.openQuickImport', () => {
       const { webviewProvider } = getOrInit();
       webviewProvider.revealOrCreate();
-      setTimeout(() => {
-        webviewProvider.notifyWebview({ type: 'openImportModal' });
-      }, 300);
+      webviewProvider.notifyWebviewAfterReady({ type: 'openImportModal' });
     })
   );
 }

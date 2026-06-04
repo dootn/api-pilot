@@ -126,7 +126,7 @@ export class HistoryTreeItem extends vscode.TreeItem {
   constructor(
     public readonly label: string,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-    public readonly itemType: 'dateGroup' | 'entry' | 'placeholder',
+    public readonly itemType: 'dateGroup' | 'entry' | 'collectionRun' | 'placeholder',
     public readonly entry?: HistoryEntry,
     public readonly groupDate?: string,
     description?: string,
@@ -137,13 +137,13 @@ export class HistoryTreeItem extends vscode.TreeItem {
     this.contextValue = itemType;
 
     if (itemType === 'entry' && entry) {
-      // Remove icon to show method name as text only
-      // this.iconPath = new vscode.ThemeIcon(iconId);
       this.command = {
         command: 'apiPilot.openRequest',
         title: 'Open Request',
         arguments: [JSON.stringify(entry.request)],
       };
+    } else if (itemType === 'collectionRun') {
+      this.iconPath = new vscode.ThemeIcon('run-all');
     } else if (itemType === 'dateGroup') {
       this.iconPath = new vscode.ThemeIcon('calendar');
     } else if (itemType === 'placeholder') {

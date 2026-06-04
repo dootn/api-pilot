@@ -51,6 +51,55 @@ export interface DnsQueryMessage {
   };
 }
 
+// Collection Runner (Webview -> Extension)
+export interface RunCollectionMessage {
+  type: 'runCollection';
+  runId: string;
+  payload: {
+    collectionId: string;
+    selectedRequestIds: string[];
+    iterations: number;
+    delayMs: number;
+    stopOnFailure: boolean;
+    persistEnvChanges: boolean;
+  };
+}
+
+export interface CancelCollectionRunMessage {
+  type: 'cancelCollectionRun';
+  runId: string;
+}
+
+// Collection Runner (Extension -> Webview)
+export interface CollectionRunProgressMessage {
+  type: 'collectionRunProgress';
+  runId: string;
+  payload: {
+    requestIndex: number;
+    requestId: string;
+    requestName: string;
+    folderPath?: string;
+    iteration: number;
+    status: 'running' | 'passed' | 'failed' | 'error';
+    response?: { status: number; statusText: string; time: number; bodySize: number };
+    testResults?: Array<{ name: string; passed: boolean; error?: string }>;
+    consoleLogs?: Array<{ level: 'log' | 'warn' | 'error'; args: string; source: 'pre' | 'post' }>;
+    error?: string;
+  };
+}
+
+export interface CollectionRunCompleteMessage {
+  type: 'collectionRunComplete';
+  runId: string;
+  payload: {
+    totalRequests: number;
+    passedTests: number;
+    failedTests: number;
+    totalTime: number;
+    aborted: boolean;
+  };
+}
+
 // DNS messages (Extension -> Webview)
 export interface DnsResultMessage {
   type: 'dnsResult';

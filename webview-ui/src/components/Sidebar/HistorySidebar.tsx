@@ -163,6 +163,7 @@ export function HistorySidebar() {
                                 ? 'REDIS'
                                 : method;
                     const url = shortenUrl(entry.request.url || '');
+
                     return (
                       <div
                         key={entry.id}

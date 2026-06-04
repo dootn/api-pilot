@@ -19,6 +19,8 @@ export interface WebviewServices {
 export class WebviewProvider {
   private panel: vscode.WebviewPanel | undefined;
   private messageHandler: MessageHandler | undefined;
+  private isReady: boolean = false;
+  private pendingMessages: Array<{ type: string; payload?: unknown }> = [];
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -38,6 +40,28 @@ export class WebviewProvider {
   /** Send an arbitrary message to the webview, if the panel is alive. */
   notifyWebview(message: { type: string; payload?: unknown }): void {
     this.panel?.webview.postMessage(message);
+  }
+
+  /**
+   * Send a message after webview is ready.
+   * If webview is not yet ready, the message is queued and sent once 'ready' is received.
+   * If webview is already ready, the message is sent immediately.
+   */
+  notifyWebviewAfterReady(message: { type: string; payload?: unknown }): void {
+    if (this.isReady && this.panel) {
+      this.panel.webview.postMessage(message);
+    } else if (this.panel) {
+      this.pendingMessages.push(message);
+    }
+  }
+
+  private flushPendingMessages(): void {
+    while (this.pendingMessages.length > 0 && this.panel && this.isReady) {
+      const msg = this.pendingMessages.shift();
+      if (msg) {
+        this.panel.webview.postMessage(msg);
+      }
+    }
   }
 
   private _createPanel(): void {
@@ -67,6 +91,11 @@ export class WebviewProvider {
     );
 
     panel.webview.onDidReceiveMessage((message) => {
+      // Mark webview as ready and flush pending messages when 'ready' is received
+      if (message.type === 'ready' && !this.isReady) {
+        this.isReady = true;
+        this.flushPendingMessages();
+      }
       this.messageHandler?.handle(message);
     });
 
@@ -74,6 +103,8 @@ export class WebviewProvider {
       this.messageHandler?.dispose();
       this.panel = undefined;
       this.messageHandler = undefined;
+      this.isReady = false;
+      this.pendingMessages = [];
     });
 
     panel.webview.html = this._getHtml(panel.webview);

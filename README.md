@@ -142,6 +142,16 @@ Multi-protocol API client — HTTP, WebSocket, SSE, MQTT, gRPC, Redis & DNS — 
 - Save the current request directly into any collection
 - **Search / Filter**: Real-time search box filters requests by name or URL across all collections and folders; matching sections auto-expand
 
+### Collection Runner
+
+Right-click any collection → **▶ Run Collection** to open the Collection Runner modal.
+
+- **Select requests**: Choose all or individual requests to include in the run
+- **Configure**: Set number of **iterations**, **delay between requests** (ms), and enable **stop-on-failure**
+- **Persist env changes**: Optionally write `pm.environment.set()` variable changes back to the active environment after the run
+- **Live progress**: Per-request status (✓ passed / ✗ failed / ⟳ running / ⚠ error), HTTP status, response time, and test pass/fail counts update in real time
+- **Summary**: After the run, a summary bar shows total requests, tests passed/failed, and total elapsed time
+
 ### Environment Variables
 
 - Create multiple environments (e.g. dev, staging, prod) with key-value variable sets

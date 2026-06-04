@@ -368,6 +368,26 @@ const en = {
   redisHistoryEmpty: 'No previous commands',
   redisShowHistory: 'Show history',
   redisHideHistory: 'Hide history',
+  // Collection Runner
+  ctxRunCollection: '▶ Run Collection',
+  ctxRunFolder: '▶ Run Folder',
+  runnerTitle: 'Collection Runner',
+  runnerSelectAll: 'Select All',
+  runnerDeselectAll: 'Deselect All',
+  runnerIterations: 'Iterations',
+  runnerDelay: 'Delay (ms)',
+  runnerStopOnFailure: 'Stop on failure',
+  runnerRunBtn: '▶ Run',
+  runnerCancelBtn: '■ Stop',
+  runnerNoRequests: 'No requests in this collection',
+  runnerStatusPassed: 'passed',
+  runnerStatusFailed: 'failed',
+  runnerStatusError: 'error',
+  runnerSummaryRequests: 'requests',
+  runnerSummaryTests: 'tests',
+  runnerAborted: 'Run stopped',
+  runnerIterationLabel: 'Iteration',
+  runnerPersistEnv: 'Persist env changes after run',
 } as const;
 
 const zhCN: Record<keyof typeof en, string> = {
@@ -738,6 +758,26 @@ const zhCN: Record<keyof typeof en, string> = {
   redisHistoryEmpty: '暂无历史命令',
   redisShowHistory: '查看历史',
   redisHideHistory: '隐藏历史',
+  // Collection Runner
+  ctxRunCollection: '▶ 运行集合',
+  ctxRunFolder: '▶ 运行文件夹',
+  runnerTitle: '集合运行器',
+  runnerSelectAll: '全选',
+  runnerDeselectAll: '取消全选',
+  runnerIterations: '迭代次数',
+  runnerDelay: '请求间延时 (ms)',
+  runnerStopOnFailure: '遇到失败立即停止',
+  runnerRunBtn: '▶ 运行',
+  runnerCancelBtn: '■ 停止',
+  runnerNoRequests: '此集合中没有请求',
+  runnerStatusPassed: '通过',
+  runnerStatusFailed: '失败',
+  runnerStatusError: '错误',
+  runnerSummaryRequests: '个请求',
+  runnerSummaryTests: '个测试',
+  runnerAborted: '运行已停止',
+  runnerIterationLabel: '第',
+  runnerPersistEnv: '运行完成后写回环境变量',
 };
 
 const translations: Record<string, Record<TranslationKey, string>> = { en, 'zh-CN': zhCN };

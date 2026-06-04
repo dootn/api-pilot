@@ -4,6 +4,7 @@ import type { ApiResponse, WsMessage, WsStatus, SseEvent, SseStatus, MqttStatus,
 import { useLocaleStore } from '../stores/localeStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useUIStore } from '../stores/uiStore';
+import { useRunnerStore } from '../stores/runnerStore';
 
 export function useMessageHandler() {
   const tabs = useTabStore((s) => s.tabs);
@@ -233,6 +234,14 @@ export function useMessageHandler() {
             const existing = tab.redisMessages ?? [];
             updateTab(rdMsg.tabId, { redisMessages: [...existing, rdMsg.payload] });
           }
+          return;
+        }
+        case 'collectionRunProgress': {
+          useRunnerStore.getState().updateEntry(message.payload as any);
+          return;
+        }
+        case 'collectionRunComplete': {
+          useRunnerStore.getState().completeRun(message.payload as any);
           return;
         }
       }

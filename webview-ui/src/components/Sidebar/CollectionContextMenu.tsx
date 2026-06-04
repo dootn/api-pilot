@@ -1,6 +1,7 @@
 import React from 'react';
 import { vscode } from '../../vscode';
 import { useI18n } from '../../i18n';
+import { useRunnerStore } from '../../stores/runnerStore';
 
 interface CollectionItem {
   type: 'request' | 'folder';
@@ -51,8 +52,39 @@ export function CollectionContextMenu({ contextMenu, menuRef, collections, openR
     >
       {contextMenu.target.kind === 'collection' && (() => {
         const target = contextMenu.target as { kind: 'collection'; id: string; name: string };
+        const collection = collections.find((c) => c.id === target.id);
+
+        const flattenRequests = (items: CollectionItem[], folderPath: string[] = []): Array<{ id: string; name: string; method: string; url: string; folderPath?: string }> => {
+          const result: Array<{ id: string; name: string; method: string; url: string; folderPath?: string }> = [];
+          for (const item of items) {
+            if (item.type === 'request' && item.request) {
+              result.push({ id: item.request.id, name: item.request.name, method: item.request.method, url: item.request.url, folderPath: folderPath.length ? folderPath.join(' / ') : undefined });
+            } else if (item.type === 'folder' && item.items) {
+              result.push(...flattenRequests(item.items, [...folderPath, item.name]));
+            }
+          }
+          return result;
+        };
+
         return (
           <>
+            <div
+              className="ctx-item"
+              onClick={() =>
+                runCmd(() => {
+                  if (collection) {
+                    useRunnerStore.getState().openRunner({
+                      id: collection.id,
+                      name: collection.name,
+                      requests: flattenRequests(collection.items),
+                    });
+                  }
+                })
+              }
+            >
+              {t('ctxRunCollection')}
+            </div>
+            <div className="ctx-separator" />
             <div
               className="ctx-item"
               onClick={() =>
@@ -89,8 +121,49 @@ export function CollectionContextMenu({ contextMenu, menuRef, collections, openR
       })()}
       {contextMenu.target.kind === 'folder' && (() => {
         const target = contextMenu.target as { collectionId: string; folderName: string; label: string };
+        const collection = collections.find((c) => c.id === target.collectionId);
+
+        const findFolderItems = (items: CollectionItem[], folderName: string): CollectionItem[] | null => {
+          for (const item of items) {
+            if (item.type === 'folder' && item.name === folderName) return item.items ?? [];
+            if (item.type === 'folder' && item.items) {
+              const found = findFolderItems(item.items, folderName);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+
+        const flattenFolderRequests = (items: CollectionItem[], folderPath: string[] = []): Array<{ id: string; name: string; method: string; url: string; folderPath?: string }> => {
+          const result: Array<{ id: string; name: string; method: string; url: string; folderPath?: string }> = [];
+          for (const item of items) {
+            if (item.type === 'request' && item.request) {
+              result.push({ id: item.request.id, name: item.request.name, method: item.request.method, url: item.request.url, folderPath: folderPath.length ? folderPath.join(' / ') : undefined });
+            } else if (item.type === 'folder' && item.items) {
+              result.push(...flattenFolderRequests(item.items, [...folderPath, item.name]));
+            }
+          }
+          return result;
+        };
+
         return (
           <>
+            <div className="ctx-item" onClick={() => runCmd(() => {
+              if (collection) {
+                const folderItems = findFolderItems(collection.items, target.folderName) ?? [];
+                const requests = flattenFolderRequests(folderItems, [target.folderName]);
+                if (requests.length > 0) {
+                  useRunnerStore.getState().openRunner({
+                    id: collection.id,
+                    name: `${collection.name} / ${target.label}`,
+                    requests,
+                  });
+                }
+              }
+            })}>
+              {t('ctxRunFolder')}
+            </div>
+            <div className="ctx-separator" />
             <div className="ctx-item" onClick={() => runCmd(() => vscode.postMessage({ type: 'addSubfolder', payload: { collectionId: target.collectionId, parentFolderName: target.folderName } }))}>
               {t('ctxAddSubfolder')}
             </div>

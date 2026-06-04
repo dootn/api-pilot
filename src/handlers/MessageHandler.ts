@@ -17,6 +17,7 @@ import { EnvironmentHandler } from './EnvironmentHandler';
 import { HistoryHandler } from './HistoryHandler';
 import { SessionHandler } from './SessionHandler';
 import { DnsRequestHandler } from './DnsRequestHandler';
+import { CollectionRunnerHandler } from './CollectionRunnerHandler';
 
 export class MessageHandler {
   private wsClient: WsClient;
@@ -31,6 +32,7 @@ export class MessageHandler {
   private historyHandler: HistoryHandler;
   private sessionHandler: SessionHandler;
   private dnsHandler: DnsRequestHandler;
+  private runnerHandler: CollectionRunnerHandler;
 
   constructor(
     webview: vscode.Webview,
@@ -52,6 +54,7 @@ export class MessageHandler {
     this.historyHandler = new HistoryHandler(ctx);
     this.sessionHandler = new SessionHandler(ctx);
     this.dnsHandler = new DnsRequestHandler(ctx);
+    this.runnerHandler = new CollectionRunnerHandler(ctx);
 
     const maxHistory = vscode.workspace.getConfiguration('api-pilot').get<number>('maxHistory', 1000);
     this.wsClient = new WsClient(webview, historyService, maxHistory);
@@ -275,6 +278,22 @@ export class MessageHandler {
           (message.payload as any).connectionId,
           (message.payload as any).command,
         );
+        break;
+      // --- Collection Runner ---
+      case 'runCollection':
+        this.runnerHandler.run(
+          (message as any).runId as string,
+          message.payload as {
+            collectionId: string;
+            selectedRequestIds: string[];
+            iterations: number;
+            delayMs: number;
+            stopOnFailure: boolean;
+          },
+        );
+        break;
+      case 'cancelCollectionRun':
+        this.runnerHandler.cancel((message as any).runId as string);
         break;
       default:
         console.warn(`Unknown message type: ${message.type}`);
