@@ -3,11 +3,21 @@ import { HttpClient } from '../HttpClient';
 import { ApiRequest, KeyValuePair } from '../../types';
 
 // Mock undici
-vi.mock('undici', () => ({
-  request: vi.fn(),
-}));
+vi.mock('undici', () => {
+  class MockAgent {
+    opts: unknown;
+    close = vi.fn().mockResolvedValue(undefined);
+    constructor(opts?: unknown) {
+      this.opts = opts;
+    }
+  }
+  return {
+    request: vi.fn(),
+    Agent: MockAgent,
+  };
+});
 
-import { request as undiciRequest } from 'undici';
+import { request as undiciRequest, Agent as UndiciAgent } from 'undici';
 const mockRequest = vi.mocked(undiciRequest);
 
 function makeRequest(overrides: Partial<ApiRequest> = {}): ApiRequest {
@@ -184,7 +194,52 @@ describe('HttpClient', () => {
       expect(opts.body).toContain('name=test');
     });
 
-    it('should not send body for GET requests', async () => {
+    it('should always dispatch through an Agent owned by this undici copy', async () => {
+      await client.send(makeRequest(), 'req-1');
+      const opts = mockRequest.mock.calls[0][1] as any;
+      expect(opts.dispatcher).toBeInstanceOf(UndiciAgent);
+    });
+
+    it('should reuse the same Agent across requests', async () => {
+      await client.send(makeRequest(), 'req-1');
+      await client.send(makeRequest(), 'req-2');
+      const firstOpts = mockRequest.mock.calls[0][1] as any;
+      const secondOpts = mockRequest.mock.calls[1][1] as any;
+      expect(secondOpts.dispatcher).toBe(firstOpts.dispatcher);
+    });
+
+    it('should configure the Agent to skip TLS verification when sslVerify is false', async () => {
+      await client.send(makeRequest({ sslVerify: false }), 'req-1');
+      const opts = mockRequest.mock.calls[0][1] as any;
+      expect(opts.dispatcher.opts).toEqual({ connect: { rejectUnauthorized: false } });
+    });
+
+    it('should attach selected files as a form-data body', async () => {
+      await client.send(
+        makeRequest({
+          method: 'POST',
+          body: {
+            type: 'form-data',
+            formData: [
+              {
+                key: 'file',
+                value: '',
+                enabled: true,
+                type: 'file',
+                fileName: 'a.txt',
+                fileData: Buffer.from('file contents').toString('base64'),
+              },
+            ],
+          },
+        }),
+        'req-1'
+      );
+      const opts = mockRequest.mock.calls[0][1] as any;
+      expect(opts.body).toBeInstanceOf(FormData);
+      expect(Array.from(opts.body.entries())).toHaveLength(1);
+    });
+
+    it('should allow a body with GET requests', async () => {
       await client.send(
         makeRequest({
           method: 'GET',
@@ -193,7 +248,7 @@ describe('HttpClient', () => {
         'req-1'
       );
       const opts = mockRequest.mock.calls[0][1] as any;
-      expect(opts.body).toBeUndefined();
+      expect(opts.body).toBe('{}');
     });
 
     it('should resolve environment variables', async () => {
@@ -224,6 +279,16 @@ describe('HttpClient', () => {
     it('should throw on network error', async () => {
       mockRequest.mockRejectedValue(new Error('ECONNREFUSED'));
       await expect(client.send(makeRequest(), 'req-1')).rejects.toThrow('ECONNREFUSED');
+    });
+  });
+
+  describe('dispose', () => {
+    it('should close its Agent instances', async () => {
+      await client.send(makeRequest(), 'req-1');
+      const opts = mockRequest.mock.calls[0][1] as any;
+      const agent = opts.dispatcher;
+      client.dispose();
+      expect(agent.close).toHaveBeenCalled();
     });
   });
 
