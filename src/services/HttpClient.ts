@@ -44,6 +44,37 @@ diagnosticsChannel.subscribe('undici:request:headers', (msg: any) => {
 export class HttpClient {
   private abortControllers = new Map<string, AbortController>();
   private variableResolver = new VariableResolver();
+  private agents = new Map<boolean, Agent>();
+
+  /**
+   * Returns an Agent instance owned by this undici copy.
+   *
+   * `undici.request()` uses its shared global dispatcher unless one is passed
+   * explicitly. In the VS Code extension host that shared dispatcher can be
+   * claimed by a different undici version loaded elsewhere in the process,
+   * which then fails to encode the FormData instances created by this copy:
+   *   TypeError: Cannot read properties of null (reading 'byteLength')
+   * Always dispatching through our own Agent keeps body encoding and I/O on
+   * the same undici implementation.
+   */
+  private getAgent(sslVerify: boolean): Agent {
+    let agent = this.agents.get(sslVerify);
+    if (!agent) {
+      agent = new Agent(sslVerify ? {} : { connect: { rejectUnauthorized: false } });
+      this.agents.set(sslVerify, agent);
+    }
+    return agent;
+  }
+
+  dispose(): void {
+    const agents = [...this.agents.values()];
+    this.agents.clear();
+    for (const agent of agents) {
+      agent.close().catch(() => {
+        // Closing is best-effort on dispose.
+      });
+    }
+  }
 
   async send(apiRequest: ApiRequest, requestId: string, envVariables?: KeyValuePair[], timeoutMs?: number): Promise<ApiResponse> {
     const controller = new AbortController();
@@ -60,9 +91,10 @@ export class HttpClient {
       const headers = this.buildHeaders(resolvedRequest);
       const body = this.buildBody(resolvedRequest);
 
-      // When SSL verification is explicitly disabled, use a custom Agent
+      // Always use an Agent from this undici copy instead of the process-wide
+      // global dispatcher (see getAgent for why this matters).
       const sslVerify = resolvedRequest.sslVerify ?? true;
-      const dispatcher = sslVerify ? undefined : new Agent({ connect: { rejectUnauthorized: false } });
+      const dispatcher = this.getAgent(sslVerify);
 
       const effectiveTimeout = timeoutMs ?? 30000;
       const timingStore: TimingStore = {};
@@ -73,7 +105,7 @@ export class HttpClient {
         signal: controller.signal,
         headersTimeout: effectiveTimeout,
         bodyTimeout: effectiveTimeout,
-        ...(dispatcher ? { dispatcher } : {}),
+        dispatcher,
       }));
 
       const flatHeaders = this.flattenHeaders(response.headers);

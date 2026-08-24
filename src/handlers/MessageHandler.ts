@@ -66,6 +66,7 @@ export class MessageHandler {
 
   /** Clean up all WebSocket/SSE/MQTT/gRPC/Redis connections when the panel is disposed. */
   dispose(): void {
+    this.httpHandler.dispose();
     this.wsClient.disposeAll();
     this.sseClient.disposeAll();
     this.mqttClient.disposeAll();

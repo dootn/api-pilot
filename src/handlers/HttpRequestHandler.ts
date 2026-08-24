@@ -117,6 +117,10 @@ export class HttpRequestHandler {
     this.httpClient.cancel(requestId);
   }
 
+  dispose(): void {
+    this.httpClient.dispose();
+  }
+
   async handleCopyAsCurl(request: ApiRequest): Promise<void> {
     const envVariables = this.ctx.envService?.getActiveVariables() || [];
     const resolver = new VariableResolver();
